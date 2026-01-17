@@ -1,0 +1,185 @@
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { User, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
+import { AppRole, UserRole, Staff } from '@/types/database';
+
+interface AuthContextType {
+  user: User | null;
+  session: Session | null;
+  userRole: AppRole | null;
+  staffData: Staff | null;
+  isLoading: boolean;
+  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
+  signOut: () => Promise<void>;
+  isOwner: boolean;
+  isAccountant: boolean;
+  isStaff: boolean;
+  isCA: boolean;
+  canManageStaff: boolean;
+  canViewSalaries: boolean;
+  canMakePayments: boolean;
+  accountingMode: boolean;
+  setAccountingMode: (mode: boolean) => void;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [userRole, setUserRole] = useState<AppRole | null>(null);
+  const [staffData, setStaffData] = useState<Staff | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [accountingMode, setAccountingMode] = useState(false);
+
+  useEffect(() => {
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        // Defer fetching additional data
+        if (session?.user) {
+          setTimeout(() => {
+            fetchUserData(session.user.id);
+          }, 0);
+        } else {
+          setUserRole(null);
+          setStaffData(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchUserData(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchUserData = async (userId: string) => {
+    try {
+      // Fetch user role
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (roleError && roleError.code !== 'PGRST116') {
+        console.error('Error fetching role:', roleError);
+      }
+
+      if (roleData) {
+        setUserRole(roleData.role as AppRole);
+      }
+
+      // Fetch staff data
+      const { data: staffDataResult, error: staffError } = await supabase
+        .from('staff')
+        .select('*')
+        .eq('user_id', userId)
+        .single();
+
+      if (staffError && staffError.code !== 'PGRST116') {
+        console.error('Error fetching staff data:', staffError);
+      }
+
+      if (staffDataResult) {
+        setStaffData(staffDataResult as Staff);
+      }
+    } catch (error) {
+      console.error('Error in fetchUserData:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      const redirectUrl = `${window.location.origin}/`;
+      
+      const { error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+          },
+        },
+      });
+      return { error };
+    } catch (error) {
+      return { error: error as Error };
+    }
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setAccountingMode(false);
+  };
+
+  const isOwner = userRole === 'owner';
+  const isAccountant = userRole === 'accountant';
+  const isStaff = userRole === 'staff';
+  const isCA = userRole === 'ca';
+
+  // Permission helpers
+  const canManageStaff = isOwner;
+  const canViewSalaries = isOwner || (isStaff && !accountingMode) || (isAccountant && !accountingMode);
+  const canMakePayments = isOwner;
+
+  const value = {
+    user,
+    session,
+    userRole,
+    staffData,
+    isLoading,
+    signIn,
+    signUp,
+    signOut,
+    isOwner,
+    isAccountant,
+    isStaff,
+    isCA,
+    canManageStaff,
+    canViewSalaries,
+    canMakePayments,
+    accountingMode,
+    setAccountingMode,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+}
