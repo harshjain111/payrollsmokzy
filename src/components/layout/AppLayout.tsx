@@ -260,96 +260,93 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       {/* Header */}
-      <SidebarHeader className="p-4">
+      <SidebarHeader className="p-3 pb-2">
         <div className={cn(
           "flex items-center gap-3 transition-all duration-200",
           isCollapsed && "justify-center"
         )}>
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
-            <Wallet className="h-5 w-5 text-white" />
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shrink-0">
+            <Wallet className="h-4 w-4 text-white" />
           </div>
           {!isCollapsed && (
             <div className="animate-fade-in">
-              <span className="text-xl font-bold text-sidebar-foreground">Smokzy</span>
-              <p className="text-xs text-sidebar-muted">Payroll System</p>
+              <span className="text-lg font-bold text-sidebar-foreground">Smokzy</span>
+              <p className="text-[10px] text-sidebar-muted">Payroll System</p>
             </div>
           )}
         </div>
       </SidebarHeader>
 
-      {/* Accountant mode toggle */}
-      {isAccountant && !isCollapsed && (
-        <div className="px-4 pb-4">
-          <div className="flex items-center gap-1 rounded-xl bg-sidebar-accent/30 p-1">
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                'flex-1 text-xs rounded-lg h-9 transition-all',
-                !accountingMode 
-                  ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg' 
-                  : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
-              )}
-              onClick={() => setAccountingMode(false)}
-            >
-              <User className="mr-1.5 h-3.5 w-3.5" />
-              My Account
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className={cn(
-                'flex-1 text-xs rounded-lg h-9 transition-all',
-                accountingMode 
-                  ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg' 
-                  : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-accent/50'
-              )}
-              onClick={() => setAccountingMode(true)}
-            >
-              <Briefcase className="mr-1.5 h-3.5 w-3.5" />
-              Accounting
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Accountant mode toggle for collapsed */}
-      {isAccountant && isCollapsed && (
-        <div className="px-2 pb-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
+      {/* Accountant mode toggle - Cleaner design */}
+      {isAccountant && (
+        <div className={cn("px-3 pb-3", isCollapsed && "px-2 pb-2")}>
+          {!isCollapsed ? (
+            <div className="flex items-center rounded-lg bg-sidebar-accent/40 p-0.5">
               <Button
-                size="icon"
+                size="sm"
                 variant="ghost"
                 className={cn(
-                  'w-full h-10 rounded-lg',
-                  accountingMode 
-                    ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' 
-                    : 'bg-sidebar-accent/30'
+                  'flex-1 text-xs rounded-md h-8 transition-all gap-1.5',
+                  !accountingMode 
+                    ? 'bg-sidebar-foreground/10 text-sidebar-foreground font-medium shadow-sm' 
+                    : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-transparent'
                 )}
-                onClick={() => setAccountingMode(!accountingMode)}
+                onClick={() => setAccountingMode(false)}
               >
-                {accountingMode ? <Briefcase className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                <User className="h-3.5 w-3.5" />
+                My Account
               </Button>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              {accountingMode ? 'Switch to My Account' : 'Switch to Accounting'}
-            </TooltipContent>
-          </Tooltip>
+              <Button
+                size="sm"
+                variant="ghost"
+                className={cn(
+                  'flex-1 text-xs rounded-md h-8 transition-all gap-1.5',
+                  accountingMode 
+                    ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white font-medium shadow-sm' 
+                    : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-transparent'
+                )}
+                onClick={() => setAccountingMode(true)}
+              >
+                <Briefcase className="h-3.5 w-3.5" />
+                Accounting
+              </Button>
+            </div>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className={cn(
+                    'w-full h-9 rounded-lg transition-all',
+                    accountingMode 
+                      ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' 
+                      : 'bg-sidebar-accent/40 text-sidebar-muted hover:text-sidebar-foreground'
+                  )}
+                  onClick={() => setAccountingMode(!accountingMode)}
+                >
+                  {accountingMode ? <Briefcase className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">
+                {accountingMode ? 'Switch to My Account' : 'Switch to Accounting'}
+              </TooltipContent>
+            </Tooltip>
+          )}
         </div>
       )}
 
       {/* Navigation */}
       <SidebarContent className="px-2">
         {navSections.map((section, sectionIdx) => (
-          <SidebarGroup key={sectionIdx}>
+          <SidebarGroup key={sectionIdx} className="py-1">
             {section.title && !isCollapsed && (
-              <SidebarGroupLabel className="text-xs font-medium text-sidebar-muted uppercase tracking-wider px-2 mb-1">
+              <SidebarGroupLabel className="text-[10px] font-semibold text-sidebar-muted/70 uppercase tracking-wider px-3 mb-1">
                 {section.title}
               </SidebarGroupLabel>
             )}
             <SidebarGroupContent>
-              <SidebarMenu>
+              <SidebarMenu className="gap-0.5">
                 {section.items.map((item) => {
                   const isActive = location.pathname === item.href || 
                     (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
@@ -363,44 +360,38 @@ function AppSidebar() {
                             isActive={isActive}
                             tooltip={item.title}
                             className={cn(
-                              "relative transition-all duration-200",
+                              "relative h-9 transition-all duration-150",
                               isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
                             )}
                           >
                             <Link to={item.href}>
                               {isActive && (
-                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
                               )}
-                              <div className={cn(
-                                'relative p-1.5 rounded-lg transition-colors',
-                                isActive 
-                                  ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20' 
-                                  : 'bg-transparent'
-                              )}>
+                              <div className="relative flex items-center justify-center w-5 h-5">
                                 <item.icon className={cn(
                                   'h-4 w-4',
                                   isActive ? 'text-amber-400' : 'text-sidebar-muted'
                                 )} />
-                                {item.badge && item.badge > 0 && (
-                                  <NotificationBadge count={item.badge} />
+                                {item.badge && item.badge > 0 && isCollapsed && (
+                                  <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive" />
                                 )}
                               </div>
-                              <span className={cn(
-                                "transition-opacity flex-1",
-                                isCollapsed && "opacity-0"
-                              )}>
-                                {item.title}
-                              </span>
-                              {!isCollapsed && item.badge && item.badge > 0 && (
-                                <span className="ml-auto bg-destructive/10 text-destructive text-xs font-medium px-1.5 py-0.5 rounded-full">
-                                  {item.badge}
-                                </span>
+                              {!isCollapsed && (
+                                <>
+                                  <span className="flex-1 text-sm">{item.title}</span>
+                                  {item.badge && item.badge > 0 && (
+                                    <span className="bg-destructive/20 text-destructive text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
+                                      {item.badge}
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </Link>
                           </SidebarMenuButton>
                         </TooltipTrigger>
                         {isCollapsed && (
-                          <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                          <TooltipContent side="right" className="text-xs">
                             {item.title}
                             {item.badge && item.badge > 0 && ` (${item.badge})`}
                           </TooltipContent>
@@ -416,43 +407,43 @@ function AppSidebar() {
       </SidebarContent>
 
       {/* Footer - User menu */}
-      <SidebarFooter className="p-2">
+      <SidebarFooter className="p-2 mt-auto">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className={cn(
-              "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all hover:bg-sidebar-accent/50 group",
+              "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all hover:bg-sidebar-accent/50 group",
               isCollapsed && "justify-center px-2"
             )}>
-              <Avatar className="h-9 w-9 border-2 border-sidebar-accent shrink-0">
-                <AvatarFallback className="bg-gradient-to-br from-amber-400 to-orange-500 text-white text-xs font-medium">
+              <Avatar className="h-8 w-8 border border-sidebar-accent shrink-0">
+                <AvatarFallback className="bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-medium">
                   {getInitials(displayName)}
                 </AvatarFallback>
               </Avatar>
               {!isCollapsed && (
-                <div className="flex-1 overflow-hidden animate-fade-in">
-                  <p className="truncate text-sm font-medium text-sidebar-foreground">
+                <div className="flex-1 overflow-hidden animate-fade-in min-w-0">
+                  <p className="truncate text-xs font-medium text-sidebar-foreground">
                     {displayName}
                   </p>
-                  <p className="truncate text-xs text-sidebar-muted">
+                  <p className="truncate text-[10px] text-sidebar-muted">
                     {roleDisplay}
                   </p>
                 </div>
               )}
               {!isCollapsed && (
-                <Settings className="h-4 w-4 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors shrink-0" />
+                <Settings className="h-3.5 w-3.5 text-sidebar-muted group-hover:text-sidebar-foreground transition-colors shrink-0" />
               )}
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="top" className="w-56 rounded-xl bg-popover">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+          <DropdownMenuContent align="end" side="top" className="w-48 rounded-lg">
+            <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="rounded-lg">
-              <Settings className="mr-2 h-4 w-4" />
+            <DropdownMenuItem className="rounded-md text-sm">
+              <Settings className="mr-2 h-3.5 w-3.5" />
               Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-lg">
-              <LogOut className="mr-2 h-4 w-4" />
+            <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm">
+              <LogOut className="mr-2 h-3.5 w-3.5" />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
