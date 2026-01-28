@@ -24,8 +24,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText } from 'lucide-react';
+import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import type { Staff } from '@/types/database';
 
 export default function StaffList() {
@@ -33,6 +45,7 @@ export default function StaffList() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStaff();
@@ -69,6 +82,45 @@ export default function StaffList() {
       .join('')
       .toUpperCase()
       .slice(0, 2);
+  };
+
+  const handleDelete = async (member: Staff) => {
+    try {
+      setDeletingId(member.id);
+
+      // Delete user role first if exists
+      if (member.user_id) {
+        await supabase
+          .from('user_roles')
+          .delete()
+          .eq('user_id', member.user_id);
+      }
+
+      // Delete staff record
+      const { error } = await supabase
+        .from('staff')
+        .delete()
+        .eq('id', member.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Staff Deleted',
+        description: `${member.full_name} has been removed.`,
+      });
+
+      // Refresh the list
+      fetchStaff();
+    } catch (error: any) {
+      console.error('Error deleting staff:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete staff. They may have associated records.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -193,6 +245,38 @@ export default function StaffList() {
                                 View Ledger
                               </Link>
                             </DropdownMenuItem>
+                            {isOwner && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete Staff</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to delete <strong>{member.full_name}</strong>? 
+                                      This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(member)}
+                                      disabled={deletingId === member.id}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      {deletingId === member.id ? 'Deleting...' : 'Delete'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
