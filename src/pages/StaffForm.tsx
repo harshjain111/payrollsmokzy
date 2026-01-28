@@ -37,7 +37,7 @@ export default function StaffForm() {
   // Form state
   const [fullName, setFullName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
-  const [email, setEmail] = useState('');
+  
   const [phone, setPhone] = useState('');
   const [department, setDepartment] = useState('');
   const [designation, setDesignation] = useState('');
@@ -77,7 +77,7 @@ export default function StaffForm() {
       if (data) {
         setFullName(data.full_name);
         setEmployeeId(data.employee_id);
-        setEmail(data.email);
+        // email is auto-generated, no need to load
         setPhone(data.phone || '');
         setDepartment(data.department || '');
         setDesignation(data.designation || '');
@@ -125,10 +125,6 @@ export default function StaffForm() {
       toast({ title: 'Validation Error', description: 'Employee ID is required.', variant: 'destructive' });
       return;
     }
-    if (!email.trim()) {
-      toast({ title: 'Validation Error', description: 'Email is required.', variant: 'destructive' });
-      return;
-    }
     if (monthlySalary <= 0) {
       toast({ title: 'Validation Error', description: 'Monthly salary must be greater than 0.', variant: 'destructive' });
       return;
@@ -151,7 +147,7 @@ export default function StaffForm() {
           .update({
             full_name: fullName.trim(),
             employee_id: employeeId.trim(),
-            email: email.trim(),
+            email: `${employeeId.trim().toLowerCase()}@internal.smokzy.com`,
             phone: phone.trim() || null,
             department: department.trim() || null,
             designation: designation.trim() || null,
@@ -200,7 +196,7 @@ export default function StaffForm() {
             user_id: tempUserId,
             full_name: fullName.trim(),
             employee_id: employeeId.trim(),
-            email: email.trim(),
+            email: `${employeeId.trim().toLowerCase()}@internal.smokzy.com`,
             phone: phone.trim() || null,
             department: department.trim() || null,
             designation: designation.trim() || null,
@@ -314,16 +310,6 @@ export default function StaffForm() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email *</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="john@company.com"
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
@@ -331,6 +317,32 @@ export default function StaffForm() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="+91 98765 43210"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Joining</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !dateOfJoining && 'text-muted-foreground'
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {dateOfJoining ? format(dateOfJoining, 'PPP') : 'Pick a date (optional)'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={dateOfJoining}
+                    onSelect={(date) => setDateOfJoining(date || new Date())}
+                    initialFocus
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 
@@ -355,46 +367,18 @@ export default function StaffForm() {
             </div>
           </div>
 
-          {/* Role & Salary */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Role *</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as 'staff' | 'accountant')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="accountant">Accountant</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Date of Joining *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      'w-full justify-start text-left font-normal',
-                      !dateOfJoining && 'text-muted-foreground'
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dateOfJoining ? format(dateOfJoining, 'PPP') : 'Pick a date'}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dateOfJoining}
-                    onSelect={(date) => date && setDateOfJoining(date)}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          {/* Role */}
+          <div className="space-y-2">
+            <Label>Role *</Label>
+            <Select value={role} onValueChange={(v) => setRole(v as 'staff' | 'accountant')}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="staff">Staff</SelectItem>
+                <SelectItem value="accountant">Accountant</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
