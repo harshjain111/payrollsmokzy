@@ -2,11 +2,15 @@ export type AppRole = 'owner' | 'accountant' | 'staff' | 'ca';
 
 export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque';
 
-export type VoucherType = 'payment' | 'journal' | 'settlement' | 'advance' | 'deduction';
+export type VoucherType = 'payment' | 'journal' | 'settlement' | 'advance' | 'deduction' | 'expense';
 
 export type RequestStatus = 'pending' | 'approved' | 'rejected';
 
 export type SettlementStatus = 'pending' | 'settled';
+
+export type ExpenseCategory = 'travel' | 'food' | 'logistics' | 'equipment' | 'office_supplies' | 'communication' | 'other';
+
+export type ExpenseStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'reimbursed';
 
 export interface UserRole {
   id: string;
@@ -58,7 +62,7 @@ export interface LedgerEntry {
   debit: number;
   credit: number;
   running_balance: number;
-  tag?: 'salary' | 'advance' | 'deduction' | 'adjustment';
+  tag?: 'salary' | 'advance' | 'deduction' | 'adjustment' | 'expense';
   reference_month?: string;
   payment_mode?: PaymentMode;
   paid_by?: string;
@@ -104,6 +108,40 @@ export interface SalarySettlement {
   staff?: StaffPublic;
 }
 
+export interface Expense {
+  id: string;
+  staff_id: string;
+  amount: number;
+  category: ExpenseCategory;
+  description: string;
+  expense_date: string;
+  proof_url?: string;
+  status: ExpenseStatus;
+  submitted_at?: string;
+  approved_by?: string;
+  approved_at?: string;
+  rejection_reason?: string;
+  reimbursed_at?: string;
+  reimbursed_by?: string;
+  ledger_entry_id?: string;
+  created_at: string;
+  updated_at: string;
+  created_by?: string;
+  staff?: StaffPublic;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  title: string;
+  message: string;
+  type: 'info' | 'success' | 'warning' | 'error';
+  reference_type?: string;
+  reference_id?: string;
+  is_read: boolean;
+  created_at: string;
+}
+
 export interface AuditLog {
   id: string;
   table_name: string;
@@ -123,6 +161,7 @@ export interface DashboardStats {
   totalPayrollLiability: number;
   advancesOutstanding: number;
   pendingRequests: number;
+  pendingExpenses: number;
   monthlySettled: number;
   monthlyPending: number;
 }
@@ -132,6 +171,27 @@ export interface StaffDashboardData {
   totalAdvances: number;
   currentBalance: number;
   pendingRequests: number;
+  pendingExpenses: number;
   lastPayment?: LedgerEntry;
   recentEntries: LedgerEntry[];
 }
+
+// Expense category labels
+export const EXPENSE_CATEGORY_LABELS: Record<ExpenseCategory, string> = {
+  travel: 'Travel',
+  food: 'Food & Meals',
+  logistics: 'Logistics',
+  equipment: 'Equipment',
+  office_supplies: 'Office Supplies',
+  communication: 'Communication',
+  other: 'Other',
+};
+
+// Expense status labels
+export const EXPENSE_STATUS_LABELS: Record<ExpenseStatus, string> = {
+  draft: 'Draft',
+  pending: 'Pending Approval',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  reimbursed: 'Reimbursed',
+};

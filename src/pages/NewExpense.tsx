@@ -1,0 +1,276 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { AmountInput } from '@/components/ui/amount';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { CalendarIcon, Upload, ArrowLeft, Send, Save } from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { toast } from '@/hooks/use-toast';
+import type { ExpenseCategory } from '@/types/database';
+import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
+
+export default function NewExpense() {
+  const navigate = useNavigate();
+  const { user, staffData } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [amount, setAmount] = useState(0);
+  const [category, setCategory] = useState<ExpenseCategory>('other');
+  const [description, setDescription] = useState('');
+  const [expenseDate, setExpenseDate] = useState<Date>(new Date());
+  const [proofFile, setProofFile] = useState<File | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({
+          title: 'File too large',
+          description: 'Please select a file smaller than 5MB',
+          variant: 'destructive',
+        });
+        return;
+      }
+      setProofFile(file);
+    }
+  };
+
+  const uploadProof = async (): Promise<string | null> => {
+    if (!proofFile || !user) return null;
+
+    const fileExt = proofFile.name.split('.').pop();
+    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+
+    const { data, error } = await supabase.storage
+      .from('expense-proofs')
+      .upload(fileName, proofFile);
+
+    if (error) {
+      console.error('Error uploading proof:', error);
+      throw new Error('Failed to upload proof');
+    }
+
+    return data.path;
+  };
+
+  const handleSubmit = async (asDraft: boolean) => {
+    if (!staffData) {
+      toast({
+        title: 'Error',
+        description: 'Staff data not found',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (amount <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Please enter a valid expense amount',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!description.trim()) {
+      toast({
+        title: 'Description required',
+        description: 'Please provide a description for the expense',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      // Upload proof if present
+      let proofUrl: string | null = null;
+      if (proofFile) {
+        proofUrl = await uploadProof();
+      }
+
+      const { error } = await supabase
+        .from('expenses')
+        .insert({
+          staff_id: staffData.id,
+          amount,
+          category,
+          description: description.trim(),
+          expense_date: format(expenseDate, 'yyyy-MM-dd'),
+          proof_url: proofUrl,
+          status: asDraft ? 'draft' as const : 'pending' as const,
+          submitted_at: asDraft ? null : new Date().toISOString(),
+          created_by: user?.id,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: asDraft ? 'Expense saved as draft' : 'Expense submitted',
+        description: asDraft 
+          ? 'Your expense has been saved. You can submit it later.'
+          : 'Your expense has been submitted for approval.',
+      });
+
+      navigate('/expenses');
+    } catch (error) {
+      console.error('Error creating expense:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to create expense. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="New Expense"
+        description="Record an expense for reimbursement"
+      >
+        <Button variant="ghost" onClick={() => navigate('/expenses')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+        </Button>
+      </PageHeader>
+
+      <Card className="max-w-2xl">
+        <CardHeader>
+          <CardTitle>Expense Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount *</Label>
+            <AmountInput
+              value={amount}
+              onChange={setAmount}
+              placeholder="0.00"
+            />
+          </div>
+
+          {/* Category */}
+          <div className="space-y-2">
+            <Label htmlFor="category">Category *</Label>
+            <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {EXPENSE_CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Expense Date */}
+          <div className="space-y-2">
+            <Label>Expense Date *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    'w-full justify-start text-left font-normal',
+                    !expenseDate && 'text-muted-foreground'
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {expenseDate ? format(expenseDate, 'PPP') : 'Pick a date'}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={expenseDate}
+                  onSelect={(date) => date && setExpenseDate(date)}
+                  disabled={(date) => date > new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Description */}
+          <div className="space-y-2">
+            <Label htmlFor="description">Description *</Label>
+            <Textarea
+              id="description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe the expense (e.g., Cab fare for client meeting)"
+              rows={3}
+            />
+          </div>
+
+          {/* Proof Upload */}
+          <div className="space-y-2">
+            <Label htmlFor="proof">Proof / Receipt (optional)</Label>
+            <div className="flex items-center gap-4">
+              <Input
+                id="proof"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={handleFileChange}
+                className="cursor-pointer"
+              />
+              {proofFile && (
+                <span className="text-sm text-muted-foreground">
+                  {proofFile.name}
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Upload a receipt or proof (max 5MB, images or PDF)
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => handleSubmit(true)}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Save as Draft
+            </Button>
+            <Button
+              onClick={() => handleSubmit(false)}
+              disabled={isSubmitting}
+              className="flex-1"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              Submit for Approval
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

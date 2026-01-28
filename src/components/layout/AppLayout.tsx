@@ -28,6 +28,7 @@ import {
   Calculator,
   User,
   Wallet,
+  Receipt,
 } from 'lucide-react';
 
 interface NavItem {
@@ -59,6 +60,11 @@ const navItems: NavItem[] = [
     href: '/payments',
     icon: CreditCard,
     roles: ['owner', 'accountant'],
+  },
+  {
+    title: 'Expenses',
+    href: '/expenses',
+    icon: Receipt,
   },
   {
     title: 'Requests',
