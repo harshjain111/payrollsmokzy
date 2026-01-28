@@ -6,11 +6,12 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Amount } from '@/components/ui/amount';
+import { ApprovalsWidget } from './ApprovalsWidget';
+import { PayoutsWidget } from './PayoutsWidget';
 import {
   Users,
   Wallet,
   ArrowUpRight,
-  ClipboardList,
   Calculator,
   TrendingUp,
   Plus,
@@ -18,7 +19,6 @@ import {
   Receipt,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { PaymentRequest, Staff } from '@/types/database';
 
 export function OwnerDashboard() {
   const [stats, setStats] = useState({
@@ -26,10 +26,7 @@ export function OwnerDashboard() {
     activeStaff: 0,
     totalPayroll: 0,
     advancesOutstanding: 0,
-    pendingRequests: 0,
-    pendingExpenses: 0,
   });
-  const [pendingRequests, setPendingRequests] = useState<(PaymentRequest & { staff: Staff })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -48,25 +45,6 @@ export function OwnerDashboard() {
       const activeStaff = staffData?.filter(s => s.is_active) || [];
       const totalPayroll = activeStaff.reduce((sum, s) => sum + Number(s.monthly_salary), 0);
 
-      // Fetch pending requests
-      const { data: requestsData, error: requestsError } = await supabase
-        .from('payment_requests')
-        .select(`
-          *,
-          staff:staff_id (*)
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (requestsError) throw requestsError;
-
-      // Fetch pending expenses count
-      const { count: expenseCount } = await supabase
-        .from('expenses')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending');
-
       // Fetch advances (total debits - credits for advance tags)
       const { data: ledgerData, error: ledgerError } = await supabase
         .from('ledger_entries')
@@ -84,11 +62,7 @@ export function OwnerDashboard() {
         activeStaff: activeStaff.length,
         totalPayroll,
         advancesOutstanding: advances,
-        pendingRequests: requestsData?.length || 0,
-        pendingExpenses: expenseCount || 0,
       });
-
-      setPendingRequests(requestsData as any || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -136,71 +110,23 @@ export function OwnerDashboard() {
           color="orange"
         />
         <StatCard
-          title="Pending Approvals"
-          value={stats.pendingRequests + stats.pendingExpenses}
-          subtitle={`${stats.pendingRequests} requests, ${stats.pendingExpenses} expenses`}
-          icon={ClipboardList}
+          title="Monthly Target"
+          value={format(new Date(), 'MMM yyyy')}
+          subtitle="Current period"
+          icon={Calculator}
           color="pink"
         />
       </div>
 
+      {/* Action Widgets - Clickable with Details */}
+      <div className="grid gap-5 md:grid-cols-2">
+        <ApprovalsWidget variant="compact" />
+        <PayoutsWidget variant="compact" showSalary />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Pending Requests */}
-        <Card className="rounded-2xl shadow-card border-0">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <div>
-              <CardTitle className="text-lg font-semibold">Pending Requests</CardTitle>
-              <CardDescription>Payment requests awaiting approval</CardDescription>
-            </div>
-            <Link to="/requests">
-              <Button variant="ghost" size="sm" className="rounded-lg text-primary hover:text-primary">
-                View all
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {pendingRequests.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
-                  <ClipboardList className="h-8 w-8 text-muted-foreground/50" />
-                </div>
-                <p className="text-muted-foreground">No pending requests</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {pendingRequests.map((request) => (
-                  <div
-                    key={request.id}
-                    className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <span className="text-sm font-semibold text-primary">
-                          {request.staff?.full_name?.charAt(0) || '?'}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-foreground">
-                          {request.staff?.full_name}
-                        </p>
-                        <p className="text-sm text-muted-foreground truncate max-w-[180px]">
-                          {request.reason}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <Amount value={request.amount} size="md" />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {format(new Date(request.created_at), 'dd MMM')}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Approvals Card (Full View) */}
+        <ApprovalsWidget variant="full" />
 
         {/* Quick Actions */}
         <Card className="rounded-2xl shadow-card border-0">
@@ -209,21 +135,21 @@ export function OwnerDashboard() {
             <CardDescription>Common tasks and shortcuts</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
-            <Link to="/payments/new">
+            <Link to="/payouts">
               <Button variant="outline" className="w-full justify-start h-auto py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all">
-                <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mr-3">
-                  <Wallet className="h-5 w-5 text-blue-600" />
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mr-3">
+                  <Wallet className="h-5 w-5 text-primary" />
                 </div>
                 <div className="text-left">
-                  <p className="font-medium">Record Payment</p>
-                  <p className="text-xs text-muted-foreground">Create a new payment entry</p>
+                  <p className="font-medium">Execute Payouts</p>
+                  <p className="text-xs text-muted-foreground">Pay approved requests & expenses</p>
                 </div>
               </Button>
             </Link>
             <Link to="/settlements">
               <Button variant="outline" className="w-full justify-start h-auto py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all">
-                <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center mr-3">
-                  <Calculator className="h-5 w-5 text-emerald-600" />
+                <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center mr-3">
+                  <Calculator className="h-5 w-5 text-secondary-foreground" />
                 </div>
                 <div className="text-left">
                   <p className="font-medium">Settle Salary</p>
@@ -233,19 +159,19 @@ export function OwnerDashboard() {
             </Link>
             <Link to="/expenses">
               <Button variant="outline" className="w-full justify-start h-auto py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all">
-                <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center mr-3">
-                  <Receipt className="h-5 w-5 text-orange-600" />
+                <div className="w-10 h-10 rounded-lg bg-accent/50 flex items-center justify-center mr-3">
+                  <Receipt className="h-5 w-5 text-accent-foreground" />
                 </div>
                 <div className="text-left">
                   <p className="font-medium">Review Expenses</p>
-                  <p className="text-xs text-muted-foreground">{stats.pendingExpenses} pending for approval</p>
+                  <p className="text-xs text-muted-foreground">Approve pending expense claims</p>
                 </div>
               </Button>
             </Link>
             <Link to="/reports">
               <Button variant="outline" className="w-full justify-start h-auto py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all">
-                <div className="w-10 h-10 rounded-lg bg-purple-50 flex items-center justify-center mr-3">
-                  <TrendingUp className="h-5 w-5 text-purple-600" />
+                <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center mr-3">
+                  <TrendingUp className="h-5 w-5 text-muted-foreground" />
                 </div>
                 <div className="text-left">
                   <p className="font-medium">View Reports</p>

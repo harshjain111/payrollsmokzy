@@ -256,6 +256,9 @@ export type Database = {
           approved_by: string | null
           created_at: string
           id: string
+          ledger_entry_id: string | null
+          paid_at: string | null
+          paid_by: string | null
           reason: string
           rejection_reason: string | null
           requested_by: string
@@ -269,6 +272,9 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           id?: string
+          ledger_entry_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
           reason: string
           rejection_reason?: string | null
           requested_by: string
@@ -282,6 +288,9 @@ export type Database = {
           approved_by?: string | null
           created_at?: string
           id?: string
+          ledger_entry_id?: string | null
+          paid_at?: string | null
+          paid_by?: string | null
           reason?: string
           rejection_reason?: string | null
           requested_by?: string
@@ -290,6 +299,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_requests_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "payment_requests_staff_id_fkey"
             columns: ["staff_id"]

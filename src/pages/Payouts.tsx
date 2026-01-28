@@ -114,7 +114,7 @@ export default function Payouts() {
       if (expensesError) throw expensesError;
       setApprovedExpenses((expensesData || []) as unknown as ApprovedExpense[]);
 
-      // Fetch approved requests (not yet paid - we'll track via ledger)
+      // Fetch approved requests (not yet paid - tracked via paid_at column)
       const { data: requestsData, error: requestsError } = await supabase
         .from('payment_requests')
         .select(`
@@ -122,6 +122,7 @@ export default function Payouts() {
           staff:staff_id(*)
         `)
         .eq('status', 'approved')
+        .is('paid_at', null) // Only show unpaid requests
         .order('approved_at', { ascending: true });
 
       if (requestsError) throw requestsError;
@@ -221,14 +222,17 @@ export default function Payouts() {
 
         if (updateError) throw updateError;
       } else if (selectedItem.type === 'request') {
-        // Mark request as paid by updating status to a custom field or we delete it
-        // For now, we'll delete the request since it's been paid
-        const { error: deleteError } = await supabase
+        // Mark request as paid using paid_at tracking column
+        const { error: updateError } = await supabase
           .from('payment_requests')
-          .delete()
+          .update({
+            paid_at: new Date().toISOString(),
+            paid_by: user.id,
+            ledger_entry_id: ledgerEntry.id,
+          })
           .eq('id', selectedItem.id);
 
-        if (deleteError) throw deleteError;
+        if (updateError) throw updateError;
       } else if (selectedItem.type === 'salary') {
         const { error: updateError } = await supabase
           .from('salary_settlements')
