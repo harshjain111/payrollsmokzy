@@ -389,14 +389,14 @@ function AppSidebar() {
                                   'h-4 w-4',
                                   isActive ? 'text-amber-400' : 'text-sidebar-muted'
                                 )} />
-                                {item.badge && item.badge > 0 && isCollapsed && (
+                                {typeof item.badge === 'number' && item.badge > 0 && isCollapsed && (
                                   <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-destructive" />
                                 )}
                               </div>
                               {!isCollapsed && (
                                 <>
                                   <span className="flex-1 text-sm">{item.title}</span>
-                                  {item.badge && item.badge > 0 && (
+                                  {typeof item.badge === 'number' && item.badge > 0 && (
                                     <span className="bg-destructive/20 text-destructive text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
                                       {item.badge}
                                     </span>
