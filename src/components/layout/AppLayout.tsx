@@ -49,7 +49,7 @@ const navItems: NavItem[] = [
     title: 'Staff',
     href: '/staff',
     icon: Users,
-    roles: ['owner'],
+    roles: ['owner'], // Only owner can manage staff (see salaries)
   },
   {
     title: 'Ledger',
@@ -60,7 +60,7 @@ const navItems: NavItem[] = [
     title: 'Payments',
     href: '/payments/new',
     icon: CreditCard,
-    roles: ['owner', 'accountant'],
+    roles: ['owner', 'admin', 'accountant'], // Admin added for payment recording
   },
   {
     title: 'Expenses',
@@ -76,13 +76,13 @@ const navItems: NavItem[] = [
     title: 'Settlements',
     href: '/settlements',
     icon: Calculator,
-    roles: ['owner'],
+    roles: ['owner'], // STRICT: Only owner can access settlements (salary data)
   },
   {
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,
-    roles: ['owner', 'ca', 'accountant'],
+    roles: ['owner', 'ca', 'admin', 'accountant'], // Admin added for reports
   },
   {
     title: 'Audit Log',

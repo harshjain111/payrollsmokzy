@@ -13,12 +13,16 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   isOwner: boolean;
+  isAdmin: boolean;
   isAccountant: boolean;
   isStaff: boolean;
   isCA: boolean;
   canManageStaff: boolean;
   canViewSalaries: boolean;
   canMakePayments: boolean;
+  canApproveExpenses: boolean;
+  canRecordPayments: boolean;
+  canAccessSettlements: boolean;
   accountingMode: boolean;
   setAccountingMode: (mode: boolean) => void;
 }
@@ -144,14 +148,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const isOwner = userRole === 'owner';
+  const isAdmin = userRole === 'admin';
   const isAccountant = userRole === 'accountant';
   const isStaff = userRole === 'staff';
   const isCA = userRole === 'ca';
 
-  // Permission helpers
+  // Permission helpers - STRICT SALARY CONFIDENTIALITY
   const canManageStaff = isOwner;
-  const canViewSalaries = isOwner || (isStaff && !accountingMode) || (isAccountant && !accountingMode);
+  
+  // CRITICAL: Only Owner can view salary data
+  // Staff can only view their OWN salary (handled at component level)
+  // Admin, Accountant, CA cannot view ANY salary data
+  const canViewSalaries = isOwner;
+  
+  // Payment permissions
   const canMakePayments = isOwner;
+  const canRecordPayments = isOwner || isAdmin || isAccountant;
+  
+  // Expense approval - Owner and Admin only
+  const canApproveExpenses = isOwner || isAdmin;
+  
+  // Settlement access - Owner ONLY
+  const canAccessSettlements = isOwner;
 
   const value = {
     user,
@@ -163,12 +181,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     signUp,
     signOut,
     isOwner,
+    isAdmin,
     isAccountant,
     isStaff,
     isCA,
     canManageStaff,
     canViewSalaries,
     canMakePayments,
+    canApproveExpenses,
+    canRecordPayments,
+    canAccessSettlements,
     accountingMode,
     setAccountingMode,
   };
