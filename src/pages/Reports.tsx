@@ -49,6 +49,8 @@ import {
   exportSalaryRegisterPDF,
   exportPaymentRegisterPDF,
   exportExpenseReportPDF,
+  exportAdvanceReportPDF,
+  exportSummaryPDF,
 } from '@/lib/pdf-export';
 import type { Staff } from '@/types/database';
 
@@ -387,20 +389,30 @@ export default function Reports() {
     const selectedStaffName = staff.find(s => s.id === selectedStaffId)?.full_name || 'All Staff';
     
     switch (activeReport) {
+      case 'summary':
+        exportSummaryPDF(summaryStats, selectedMonth);
+        toast({ title: 'PDF Exported', description: 'Summary report downloaded.' });
+        break;
       case 'ledger':
         exportLedgerPDF(reportData, selectedStaffName, dateRange);
+        toast({ title: 'PDF Exported', description: 'Ledger report downloaded.' });
         break;
       case 'salary':
         exportSalaryRegisterPDF(reportData, selectedMonth, canViewSalaries);
+        toast({ title: 'PDF Exported', description: 'Salary register downloaded.' });
+        break;
+      case 'advance':
+        exportAdvanceReportPDF(reportData);
+        toast({ title: 'PDF Exported', description: 'Advance report downloaded.' });
         break;
       case 'payment':
         exportPaymentRegisterPDF(reportData, dateRange);
+        toast({ title: 'PDF Exported', description: 'Payment register downloaded.' });
         break;
       case 'expense':
         exportExpenseReportPDF(reportData, dateRange);
+        toast({ title: 'PDF Exported', description: 'Expense report downloaded.' });
         break;
-      default:
-        toast({ title: 'PDF export not available', description: 'Use CSV for this report.', variant: 'destructive' });
     }
   };
 
@@ -415,7 +427,7 @@ export default function Reports() {
             <Download className="mr-2 h-4 w-4" />
             CSV
           </Button>
-          <Button onClick={handlePDFExport} disabled={reportData.length === 0 || activeReport === 'summary' || activeReport === 'advance'}>
+          <Button onClick={handlePDFExport} disabled={activeReport === 'summary' ? false : reportData.length === 0}>
             <FileDown className="mr-2 h-4 w-4" />
             PDF
           </Button>

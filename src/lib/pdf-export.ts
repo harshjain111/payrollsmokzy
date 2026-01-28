@@ -256,3 +256,53 @@ export function exportExpenseReportPDF(
   
   downloadPDF(doc, 'expense_reimbursement');
 }
+
+export function exportAdvanceReportPDF(data: any[]) {
+  const tableData = data.map(item => [
+    item.staff?.full_name || '',
+    item.staff?.employee_id || '',
+    `₹${Number(item.totalAdvances).toLocaleString('en-IN')}`,
+    `₹${Number(item.totalAdjusted).toLocaleString('en-IN')}`,
+    `₹${Number(item.outstanding).toLocaleString('en-IN')}`,
+  ]);
+  
+  const totalOutstanding = data.reduce((sum, e) => sum + (Number(e.outstanding) || 0), 0);
+  
+  const doc = exportToPDF({
+    title: 'Advance Outstanding Report',
+    subtitle: `As of ${format(new Date(), 'dd MMM yyyy')}`,
+    headers: ['Staff Name', 'Employee ID', 'Total Advances', 'Adjusted', 'Outstanding'],
+    data: tableData,
+    totals: ['Total', '', '', '', `₹${totalOutstanding.toLocaleString('en-IN')}`],
+  });
+  
+  downloadPDF(doc, 'advance_outstanding');
+}
+
+export function exportSummaryPDF(
+  stats: {
+    totalPayroll: number;
+    totalAdvances: number;
+    totalExpenses: number;
+    totalPayments: number;
+    staffCount: number;
+  },
+  month: string
+) {
+  const tableData = [
+    ['Total Active Staff', stats.staffCount.toString()],
+    ['Monthly Payroll Liability', `₹${stats.totalPayroll.toLocaleString('en-IN')}`],
+    ['Total Settlements Paid', `₹${stats.totalPayments.toLocaleString('en-IN')}`],
+    ['Advances Outstanding', `₹${stats.totalAdvances.toLocaleString('en-IN')}`],
+    ['Expenses Reimbursed', `₹${stats.totalExpenses.toLocaleString('en-IN')}`],
+  ];
+  
+  const doc = exportToPDF({
+    title: 'Monthly Payroll Summary',
+    subtitle: format(new Date(month + '-01'), 'MMMM yyyy'),
+    headers: ['Metric', 'Value'],
+    data: tableData,
+  });
+  
+  downloadPDF(doc, `payroll_summary_${month}`);
+}
