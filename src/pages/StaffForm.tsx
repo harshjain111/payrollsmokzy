@@ -19,7 +19,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AmountInput } from '@/components/ui/amount';
-import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -285,231 +285,239 @@ export default function StaffForm() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-4xl mx-auto">
       <PageHeader
         title={isEditing ? 'Edit Staff' : 'Add New Staff'}
         description={isEditing ? 'Update staff information' : 'Add a new team member with login credentials'}
       >
-        <Button variant="ghost" onClick={() => navigate('/staff')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+        <Button variant="ghost" size="sm" onClick={() => navigate('/staff')} className="gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
       </PageHeader>
 
-      <div className="max-w-2xl space-y-6">
+      <div className="grid gap-6">
         {/* Login Credentials - Only for new staff */}
         {!isEditing && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Login Credentials</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Login Credentials</CardTitle>
               <CardDescription>
                 Staff will login using their phone number and password
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number *</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
-                    placeholder="9876543210"
-                    className="pl-10"
-                    maxLength={15}
-                  />
+            <CardContent>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                      placeholder="9876543210"
+                      className="pl-10"
+                      maxLength={15}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This will be their login identifier
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  This will be their login identifier
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Password *</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Minimum 6 characters"
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4 text-muted-foreground" />
-                    ) : (
-                      <Eye className="h-4 w-4 text-muted-foreground" />
-                    )}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Minimum 6 characters"
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Eye className="h-4 w-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Share this password securely with the staff member
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Share this password securely with the staff member
-                </p>
               </div>
             </CardContent>
           </Card>
         )}
 
         {/* Personal Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Personal Information</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Personal Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fullName">Full Name *</Label>
-                <Input
-                  id="fullName"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="John Doe"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="employeeId">Employee ID *</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="employeeId"
-                    value={employeeId}
-                    onChange={(e) => setEmployeeId(e.target.value)}
-                    placeholder="EMP1234"
-                    disabled={isEditing}
-                  />
-                  {!isEditing && (
-                    <Button 
-                      type="button" 
-                      variant="outline" 
-                      size="sm"
-                      onClick={() => setEmployeeId(generateEmployeeId())}
-                    >
-                      Regenerate
-                    </Button>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground">Auto-generated unique ID</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {isEditing && (
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="editPhone">Phone Number</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="editPhone"
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
-                      placeholder="9876543210"
-                      className="pl-10"
-                      disabled
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">Phone number cannot be changed</p>
+                  <Label htmlFor="fullName">Full Name *</Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="John Doe"
+                  />
                 </div>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email (Optional)</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="staff@company.com"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Date of Joining</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !dateOfJoining && 'text-muted-foreground'
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dateOfJoining ? format(dateOfJoining, 'PPP') : 'Pick a date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={dateOfJoining}
-                      onSelect={(date) => setDateOfJoining(date || new Date())}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
+                <div className="space-y-2">
+                  <Label htmlFor="employeeId">Employee ID *</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      id="employeeId"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      placeholder="EMP1234"
+                      disabled={isEditing}
+                      className="flex-1"
                     />
-                  </PopoverContent>
-                </Popover>
+                    {!isEditing && (
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        size="icon"
+                        onClick={() => setEmployeeId(generateEmployeeId())}
+                        className="shrink-0"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Auto-generated unique ID</p>
+                </div>
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                {isEditing && (
+                  <div className="space-y-2">
+                    <Label htmlFor="editPhone">Phone Number</Label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="editPhone"
+                        type="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                        placeholder="9876543210"
+                        className="pl-10"
+                        disabled
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">Phone number cannot be changed</p>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email (Optional)</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="staff@company.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Date of Joining</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          'w-full justify-start text-left font-normal',
+                          !dateOfJoining && 'text-muted-foreground'
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateOfJoining ? format(dateOfJoining, 'PPP') : 'Pick a date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-popover" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateOfJoining}
+                        onSelect={(date) => setDateOfJoining(date || new Date())}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Work Details */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Work Details</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Work Details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="department">Department</Label>
-                <Input
-                  id="department"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  placeholder="Operations"
-                />
+          <CardContent>
+            <div className="grid gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Input
+                    id="department"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="Operations"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="designation">Designation</Label>
+                  <Input
+                    id="designation"
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    placeholder="Manager"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="designation">Designation</Label>
-                <Input
-                  id="designation"
-                  value={designation}
-                  onChange={(e) => setDesignation(e.target.value)}
-                  placeholder="Manager"
-                />
-              </div>
-            </div>
 
-            <div className="space-y-2">
-              <Label>System Role *</Label>
-              <Select value={role} onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="staff">Staff</SelectItem>
-                  <SelectItem value="accountant">Accountant</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                {role === 'staff' && 'Can view own data, submit expenses and payment requests'}
-                {role === 'accountant' && 'Can record payments, reimburse expenses, export reports (no salary visibility)'}
-                {role === 'admin' && 'Can approve expenses and requests, record payments (no salary visibility)'}
-              </p>
+              <div className="space-y-2">
+                <Label>System Role *</Label>
+                <Select value={role} onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}>
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover">
+                    <SelectItem value="staff">Staff</SelectItem>
+                    <SelectItem value="accountant">Accountant</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {role === 'staff' && 'Can view own data, submit expenses and payment requests'}
+                  {role === 'accountant' && 'Can record payments, reimburse expenses, export reports (no salary visibility)'}
+                  {role === 'admin' && 'Can approve expenses and requests, record payments (no salary visibility)'}
+                </p>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Salary Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Salary Information</CardTitle>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg">Salary Information</CardTitle>
             <CardDescription>
               This information is confidential and only visible to owners
             </CardDescription>
@@ -544,11 +552,11 @@ export default function StaffForm() {
         </Card>
 
         {/* Status */}
-        <Card>
+        <Card className="shadow-sm">
           <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <Label htmlFor="isActive" className="text-base">Active Status</Label>
+            <div className="flex items-center justify-between gap-4">
+              <div className="space-y-1">
+                <Label htmlFor="isActive" className="text-base font-medium">Active Status</Label>
                 <p className="text-sm text-muted-foreground">
                   Inactive staff cannot login or receive payments
                 </p>
@@ -563,11 +571,11 @@ export default function StaffForm() {
         </Card>
 
         {/* Actions */}
-        <div className="flex gap-3">
-          <Button variant="outline" onClick={() => navigate('/staff')} className="flex-1">
+        <div className="flex flex-col-reverse sm:flex-row gap-3 pb-6">
+          <Button variant="outline" onClick={() => navigate('/staff')} className="flex-1 sm:flex-none">
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1">
+          <Button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 sm:flex-none sm:min-w-[160px]">
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -581,7 +589,7 @@ export default function StaffForm() {
             ) : (
               <>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Create Staff Account
+                Create Staff
               </>
             )}
           </Button>
