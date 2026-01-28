@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +28,7 @@ const requestSchema = z.object({
 
 export default function NewRequest() {
   const navigate = useNavigate();
-  const { user, staffData, isAccountant, accountingMode, isStaff } = useAuth();
+  const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
 
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string>('');
@@ -39,16 +38,22 @@ export default function NewRequest() {
   const [isFetchingStaff, setIsFetchingStaff] = useState(true);
 
   // Staff creating for themselves
+  // Accountant in personal mode also creates for themselves
   const isPersonalRequest = isStaff || (isAccountant && !accountingMode);
+  
+  // Admin, Owner, Accountant (in accounting mode) can create for any staff
+  const canRequestForOthers = isOwner || isAdmin || (isAccountant && accountingMode);
 
   useEffect(() => {
     if (isPersonalRequest && staffData?.id) {
       setSelectedStaff(staffData.id);
       setIsFetchingStaff(false);
-    } else {
+    } else if (canRequestForOthers) {
       fetchStaffList();
+    } else {
+      setIsFetchingStaff(false);
     }
-  }, [isPersonalRequest, staffData?.id]);
+  }, [isPersonalRequest, staffData?.id, canRequestForOthers]);
 
   const fetchStaffList = async () => {
     try {
@@ -85,14 +90,43 @@ export default function NewRequest() {
 
     setIsLoading(true);
     try {
-      const { error } = await supabase.from('payment_requests').insert({
-        staff_id: selectedStaff,
-        requested_by: user?.id,
-        amount,
-        reason: reason.trim(),
-      });
+      const { data: newRequest, error } = await supabase
+        .from('payment_requests')
+        .insert({
+          staff_id: selectedStaff,
+          requested_by: user?.id,
+          amount,
+          reason: reason.trim(),
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Notify Owner and Admin about new request
+      const { data: approvers } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['owner', 'admin']);
+
+      if (approvers && newRequest) {
+        const staffName = isPersonalRequest 
+          ? staffData?.full_name 
+          : staffList.find(s => s.id === selectedStaff)?.full_name || 'Staff';
+        
+        for (const approver of approvers) {
+          if (approver.user_id !== user?.id) {
+            await supabase.rpc('create_notification', {
+              _user_id: approver.user_id,
+              _title: 'New Payment Request',
+              _message: `${staffName} has submitted a payment request of ₹${amount.toLocaleString('en-IN')} for "${reason.slice(0, 50)}${reason.length > 50 ? '...' : ''}"`,
+              _type: 'info',
+              _reference_type: 'payment_request',
+              _reference_id: newRequest.id,
+            });
+          }
+        }
+      }
 
       toast.success('Request submitted successfully');
       navigate('/requests');
@@ -120,22 +154,25 @@ export default function NewRequest() {
         <CardHeader>
           <CardTitle>Request Details</CardTitle>
           <CardDescription>
-            Fill in the details for your payment request
+            {isPersonalRequest 
+              ? 'Fill in the details for your payment request'
+              : 'Create a payment request on behalf of a staff member'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Staff Selection */}
-            {!isPersonalRequest && (
+            {/* Staff Selection - for Admin/Owner/Accountant in accounting mode */}
+            {canRequestForOthers && (
               <div className="space-y-2">
-                <Label htmlFor="staff">Staff Member</Label>
+                <Label htmlFor="staff">Staff Member *</Label>
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
                     {staffList.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id || ''}>
                         {s.full_name} ({s.employee_id})
                       </SelectItem>
                     ))}
@@ -154,7 +191,7 @@ export default function NewRequest() {
 
             {/* Amount */}
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
+              <Label htmlFor="amount">Amount *</Label>
               <AmountInput
                 value={amount}
                 onChange={setAmount}
@@ -164,7 +201,7 @@ export default function NewRequest() {
 
             {/* Reason */}
             <div className="space-y-2">
-              <Label htmlFor="reason">Reason</Label>
+              <Label htmlFor="reason">Reason *</Label>
               <Textarea
                 id="reason"
                 value={reason}

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -19,7 +20,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AmountInput } from '@/components/ui/amount';
-import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone, RefreshCw } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone, RefreshCw, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -27,8 +28,15 @@ import { toast } from '@/hooks/use-toast';
 export default function StaffForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user, isOwner } = useAuth();
+  const { user, isOwner, isAdmin, isAccountant } = useAuth();
   const isEditing = !!id;
+  
+  // Determine who can access this page
+  // Owner: full access (add/edit with salary)
+  // Admin/Accountant: can add staff without salary
+  const canAddStaff = isOwner || isAdmin || isAccountant;
+  const canSetSalary = isOwner;
+  const canEditStaff = isOwner; // Only owner can edit existing staff
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(isEditing);
@@ -58,20 +66,32 @@ export default function StaffForm() {
   }, [isEditing]);
 
   useEffect(() => {
-    if (!isOwner) {
+    // Access control
+    if (!canAddStaff) {
       toast({
         title: 'Access Denied',
-        description: 'Only owners can manage staff.',
+        description: 'You do not have permission to manage staff.',
         variant: 'destructive',
       });
       navigate('/dashboard');
       return;
     }
     
+    // Only owner can edit existing staff
+    if (isEditing && !canEditStaff) {
+      toast({
+        title: 'Access Denied',
+        description: 'Only owners can edit staff information.',
+        variant: 'destructive',
+      });
+      navigate('/staff');
+      return;
+    }
+    
     if (isEditing) {
       fetchStaffData();
     }
-  }, [id, isOwner]);
+  }, [id, canAddStaff, canEditStaff]);
 
   const fetchStaffData = async () => {
     try {
@@ -153,7 +173,9 @@ export default function StaffForm() {
         return;
       }
     }
-    if (monthlySalary <= 0) {
+    
+    // Salary validation only for owner, or when editing
+    if (canSetSalary && monthlySalary <= 0 && isEditing) {
       toast({ title: 'Validation Error', description: 'Monthly salary must be greater than 0.', variant: 'destructive' });
       return;
     }
@@ -169,7 +191,7 @@ export default function StaffForm() {
       setIsSubmitting(true);
 
       if (isEditing) {
-        // Update existing staff
+        // Update existing staff (Owner only)
         const { error: staffError } = await supabase
           .from('staff')
           .update({
@@ -225,6 +247,9 @@ export default function StaffForm() {
         // Create new staff with auth user via edge function
         const { data: session } = await supabase.auth.getSession();
         
+        // For non-owner, salary is 0 (owner will set it later)
+        const salaryToSet = canSetSalary ? monthlySalary : 0;
+        
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-staff-user`,
           {
@@ -243,7 +268,7 @@ export default function StaffForm() {
                 email: email.trim() || null,
                 department: department.trim() || null,
                 designation: designation.trim() || null,
-                monthly_salary: monthlySalary,
+                monthly_salary: salaryToSet,
                 date_of_joining: format(dateOfJoining, 'yyyy-MM-dd'),
                 is_active: isActive,
               },
@@ -257,9 +282,32 @@ export default function StaffForm() {
           throw new Error(result.error || 'Failed to create staff');
         }
 
+        // If created by Admin/Accountant (without salary), notify Owner
+        if (!canSetSalary) {
+          const { data: owners } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('role', 'owner');
+          
+          if (owners && result.staff_id) {
+            for (const owner of owners) {
+              await supabase.rpc('create_notification', {
+                _user_id: owner.user_id,
+                _title: 'Salary Required for New Staff',
+                _message: `${fullName} has been added by ${isAdmin ? 'Admin' : 'Accountant'}. Please set their monthly salary.`,
+                _type: 'warning',
+                _reference_type: 'staff',
+                _reference_id: result.staff_id,
+              });
+            }
+          }
+        }
+
         toast({ 
           title: 'Staff Created', 
-          description: `${fullName} has been added. They can login using phone: ${formatPhoneInput(phone)}` 
+          description: canSetSalary 
+            ? `${fullName} has been added. They can login using phone: ${formatPhoneInput(phone)}` 
+            : `${fullName} has been added. Owner has been notified to set their salary.`
         });
       }
 
@@ -295,6 +343,16 @@ export default function StaffForm() {
           <span className="hidden sm:inline">Back</span>
         </Button>
       </PageHeader>
+
+      {/* Non-owner adding staff notice */}
+      {!isEditing && !canSetSalary && (
+        <Alert className="border-warning bg-warning/10">
+          <AlertCircle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-warning">
+            You can add staff members, but the Owner will need to set their salary before salary settlements can be processed.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="grid gap-6">
         {/* Login Credentials - Only for new staff */}
@@ -514,42 +572,44 @@ export default function StaffForm() {
           </CardContent>
         </Card>
 
-        {/* Salary Information */}
-        <Card className="shadow-sm">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Salary Information</CardTitle>
-            <CardDescription>
-              This information is confidential and only visible to owners
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Monthly Salary (₹) *</Label>
-              <AmountInput
-                value={monthlySalary}
-                onChange={setMonthlySalary}
-                placeholder="0.00"
-              />
-            </div>
-
-            {/* Salary change reason (only for editing) */}
-            {isEditing && monthlySalary !== originalSalary && (
-              <div className="space-y-2 p-4 bg-warning/10 rounded-lg border border-warning/20">
-                <Label htmlFor="salaryReason">Reason for Salary Change *</Label>
-                <Textarea
-                  id="salaryReason"
-                  value={salaryChangeReason}
-                  onChange={(e) => setSalaryChangeReason(e.target.value)}
-                  placeholder="Annual increment, promotion, etc."
-                  rows={2}
+        {/* Salary Information - Only visible to Owner */}
+        {canSetSalary && (
+          <Card className="shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-lg">Salary Information</CardTitle>
+              <CardDescription>
+                This information is confidential and only visible to owners
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Monthly Salary (₹) *</Label>
+                <AmountInput
+                  value={monthlySalary}
+                  onChange={setMonthlySalary}
+                  placeholder="0.00"
                 />
-                <p className="text-xs text-muted-foreground">
-                  Previous: ₹{originalSalary.toLocaleString('en-IN')} → New: ₹{monthlySalary.toLocaleString('en-IN')}
-                </p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+
+              {/* Salary change reason (only for editing) */}
+              {isEditing && monthlySalary !== originalSalary && (
+                <div className="space-y-2 p-4 bg-warning/10 rounded-lg border border-warning/20">
+                  <Label htmlFor="salaryReason">Reason for Salary Change *</Label>
+                  <Textarea
+                    id="salaryReason"
+                    value={salaryChangeReason}
+                    onChange={(e) => setSalaryChangeReason(e.target.value)}
+                    placeholder="Annual increment, promotion, etc."
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Previous: ₹{originalSalary.toLocaleString('en-IN')} → New: ₹{monthlySalary.toLocaleString('en-IN')}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Status */}
         <Card className="shadow-sm">

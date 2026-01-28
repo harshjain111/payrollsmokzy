@@ -29,7 +29,15 @@ import { RejectExpenseDialog } from '@/components/expenses/RejectExpenseDialog';
 import { ReimburseExpenseDialog } from '@/components/expenses/ReimburseExpenseDialog';
 
 export default function Expenses() {
-  const { user, isOwner, isAccountant, isStaff } = useAuth();
+  const { 
+    user, 
+    isOwner, 
+    isAdmin, 
+    isAccountant, 
+    isStaff,
+    canApproveExpenses 
+  } = useAuth();
+  
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -117,13 +125,23 @@ export default function Expenses() {
     }
   };
 
+  // Permission checks:
+  // - Only Staff and Owner can create expenses (staff for self, owner can create for anyone)
+  const canCreateExpense = isStaff || isOwner;
+  
+  // - Only Owner and Admin can approve/reject (NOT Accountant)
+  const canApprove = canApproveExpenses;
+  
+  // - Owner, Admin, Accountant can reimburse APPROVED expenses
+  const canReimburse = isOwner || isAdmin || isAccountant;
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Expenses"
         description="Track and manage expense reimbursements"
       >
-        {(isStaff || isOwner) && (
+        {canCreateExpense && (
           <Link to="/expenses/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -153,7 +171,6 @@ export default function Expenses() {
           {isStaff && <TabsTrigger value="draft">Drafts</TabsTrigger>}
           <TabsTrigger value="pending">Pending</TabsTrigger>
           <TabsTrigger value="approved">Approved</TabsTrigger>
-          {isAccountant && <TabsTrigger value="approved">To Reimburse</TabsTrigger>}
           <TabsTrigger value="reimbursed">Reimbursed</TabsTrigger>
           <TabsTrigger value="rejected">Rejected</TabsTrigger>
         </TabsList>
@@ -171,7 +188,7 @@ export default function Expenses() {
                 ? "No expenses have been recorded yet." 
                 : `No ${EXPENSE_STATUS_LABELS[activeTab as ExpenseStatus] || activeTab} expenses.`}
               action={
-                (isStaff || isOwner) ? (
+                canCreateExpense ? (
                   <Link to="/expenses/new">
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
@@ -218,8 +235,8 @@ export default function Expenses() {
                             <Eye className="h-4 w-4" />
                           </Button>
 
-                          {/* Owner can approve/reject pending expenses */}
-                          {isOwner && expense.status === 'pending' && (
+                          {/* Owner/Admin can approve/reject pending expenses */}
+                          {canApprove && expense.status === 'pending' && (
                             <>
                               <Button
                                 variant="ghost"
@@ -240,8 +257,8 @@ export default function Expenses() {
                             </>
                           )}
 
-                          {/* Accountant or Owner can reimburse approved expenses */}
-                          {(isOwner || isAccountant) && expense.status === 'approved' && (
+                          {/* Owner/Admin/Accountant can reimburse APPROVED expenses ONLY */}
+                          {canReimburse && expense.status === 'approved' && (
                             <Button
                               variant="ghost"
                               size="icon"

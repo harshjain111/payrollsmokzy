@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Amount } from '@/components/ui/amount';
 import { StatCard } from '@/components/ui/stat-card';
@@ -23,13 +23,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale } from 'lucide-react';
+import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock } from 'lucide-react';
 import { format } from 'date-fns';
 import type { LedgerEntry, StaffPublic } from '@/types/database';
 
 export default function Ledger() {
   const [searchParams] = useSearchParams();
-  const { isOwner, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
+  const { isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode, canViewSalaries } = useAuth();
   
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
@@ -39,8 +39,20 @@ export default function Ledger() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
 
-  // Calculate totals
-  const totals = entries.reduce(
+  // Calculate totals (exclude salary entries for non-owners)
+  const visibleEntries = entries.filter(entry => {
+    // If user can view salaries, show all entries
+    if (canViewSalaries) return true;
+    // Otherwise, hide salary-related entries for other staff
+    // Staff can see their own salary entries
+    if (isStaff || (isAccountant && !accountingMode)) {
+      return true; // Staff sees all their own entries
+    }
+    // Admin/Accountant in work mode: mask salary entries
+    return entry.tag !== 'salary';
+  });
+
+  const totals = visibleEntries.reduce(
     (acc, entry) => ({
       debit: acc.debit + Number(entry.debit),
       credit: acc.credit + Number(entry.credit),
@@ -58,7 +70,7 @@ export default function Ledger() {
     setIsLoading(true);
     try {
       // Fetch staff list (for filter dropdown)
-      if (isOwner || (isAccountant && accountingMode) || isCA) {
+      if (isOwner || isAdmin || (isAccountant && accountingMode) || isCA) {
         const { data: staffData, error: staffError } = await supabase
           .from('staff_public')
           .select('*')
@@ -123,8 +135,15 @@ export default function Ledger() {
     return months;
   };
 
-  const canFilterByStaff = isOwner || (isAccountant && accountingMode) || isCA;
+  const canFilterByStaff = isOwner || isAdmin || (isAccountant && accountingMode) || isCA;
   const selectedStaffName = staffList.find(s => s.id === selectedStaff)?.full_name;
+
+  // Check if an entry should be masked (for non-owners viewing other staff's salary entries)
+  const shouldMaskEntry = (entry: LedgerEntry): boolean => {
+    if (canViewSalaries) return false;
+    if (isStaff || (isAccountant && !accountingMode)) return false; // Own entries
+    return entry.tag === 'salary';
+  };
 
   return (
     <div className="space-y-6">
@@ -209,7 +228,7 @@ export default function Ledger() {
       {/* Ledger Table */}
       <Card className="rounded-2xl shadow-card border-0 overflow-hidden">
         <CardContent className="p-0">
-          {entries.length === 0 && !isLoading ? (
+          {visibleEntries.length === 0 && !isLoading ? (
             <EmptyState
               icon={FileText}
               title="No entries found"
@@ -230,54 +249,75 @@ export default function Ledger() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry, index) => (
-                    <TableRow key={entry.id} className="group">
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {format(new Date(entry.entry_date), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-xs px-2 py-1 rounded-md bg-muted/50">
-                          {entry.voucher_no}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/5 text-primary capitalize">
-                          {entry.voucher_type}
-                        </span>
-                      </TableCell>
-                      <TableCell className="max-w-[300px]">
-                        <span className="truncate block">{entry.description}</span>
-                        {entry.tag && (
-                          <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded mt-1 inline-block">
-                            {entry.tag}
+                  {visibleEntries.map((entry) => {
+                    const isMasked = shouldMaskEntry(entry);
+                    
+                    return (
+                      <TableRow key={entry.id} className="group">
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {format(new Date(entry.entry_date), 'dd MMM yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-mono text-xs px-2 py-1 rounded-md bg-muted/50">
+                            {entry.voucher_no}
                           </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {entry.debit > 0 ? (
-                          <span className="text-destructive font-medium">
-                            ₹{Number(entry.debit).toLocaleString('en-IN')}
+                        </TableCell>
+                        <TableCell>
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/5 text-primary capitalize">
+                            {entry.voucher_type}
                           </span>
-                        ) : (
-                          <span className="text-muted-foreground/50">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums">
-                        {entry.credit > 0 ? (
-                          <span className="text-success font-medium">
-                            ₹{Number(entry.credit).toLocaleString('en-IN')}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground/50">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono tabular-nums font-medium">
-                        <span className={entry.running_balance >= 0 ? 'text-success' : 'text-destructive'}>
-                          {entry.running_balance >= 0 ? '+' : '-'}₹{Math.abs(entry.running_balance).toLocaleString('en-IN')}
-                        </span>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell className="max-w-[300px]">
+                          {isMasked ? (
+                            <span className="flex items-center gap-2 text-muted-foreground">
+                              <Lock className="h-3 w-3" />
+                              <span className="italic">Salary entry (hidden)</span>
+                            </span>
+                          ) : (
+                            <>
+                              <span className="truncate block">{entry.description}</span>
+                              {entry.tag && (
+                                <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded mt-1 inline-block">
+                                  {entry.tag}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {isMasked ? (
+                            <span className="text-muted-foreground">***</span>
+                          ) : entry.debit > 0 ? (
+                            <span className="text-destructive font-medium">
+                              ₹{Number(entry.debit).toLocaleString('en-IN')}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">
+                          {isMasked ? (
+                            <span className="text-muted-foreground">***</span>
+                          ) : entry.credit > 0 ? (
+                            <span className="text-success font-medium">
+                              ₹{Number(entry.credit).toLocaleString('en-IN')}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-mono tabular-nums font-medium">
+                          {isMasked ? (
+                            <span className="text-muted-foreground">***</span>
+                          ) : (
+                            <span className={entry.running_balance >= 0 ? 'text-success' : 'text-destructive'}>
+                              {entry.running_balance >= 0 ? '+' : '-'}₹{Math.abs(entry.running_balance).toLocaleString('en-IN')}
+                            </span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

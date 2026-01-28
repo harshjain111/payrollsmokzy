@@ -27,7 +27,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, Check, X, Loader2 } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, Loader2, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
@@ -37,7 +37,16 @@ interface RequestWithStaff extends PaymentRequest {
 }
 
 export default function Requests() {
-  const { isOwner, isStaff, staffData, user, isAccountant, accountingMode } = useAuth();
+  const { 
+    isOwner, 
+    isAdmin, 
+    isStaff, 
+    staffData, 
+    user, 
+    isAccountant, 
+    accountingMode,
+    canApproveRequests 
+  } = useAuth();
   
   const [requests, setRequests] = useState<RequestWithStaff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -66,6 +75,7 @@ export default function Requests() {
         .order('created_at', { ascending: false });
 
       // Staff can only see their own requests
+      // Accountant in personal mode sees own requests only
       if (isStaff || (isAccountant && !accountingMode)) {
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
@@ -102,6 +112,39 @@ export default function Requests() {
 
       if (error) throw error;
 
+      // Notify the staff member
+      if (request.staff?.user_id) {
+        await supabase.rpc('create_notification', {
+          _user_id: request.staff.user_id,
+          _title: 'Request Approved',
+          _message: `Your payment request of ₹${request.amount.toLocaleString('en-IN')} has been approved.`,
+          _type: 'success',
+          _reference_type: 'payment_request',
+          _reference_id: request.id,
+        });
+      }
+
+      // Notify accountants that a request is ready for payment
+      const { data: accountants } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .in('role', ['accountant', 'owner']);
+      
+      if (accountants) {
+        for (const acc of accountants) {
+          if (acc.user_id !== user?.id) {
+            await supabase.rpc('create_notification', {
+              _user_id: acc.user_id,
+              _title: 'Request Ready for Payment',
+              _message: `Payment request for ${request.staff?.full_name} (₹${request.amount.toLocaleString('en-IN')}) is approved and ready for payment.`,
+              _type: 'info',
+              _reference_type: 'payment_request',
+              _reference_id: request.id,
+            });
+          }
+        }
+      }
+
       toast.success('Request approved successfully');
       fetchRequests();
     } catch (error) {
@@ -130,6 +173,18 @@ export default function Requests() {
 
       if (error) throw error;
 
+      // Notify the staff member
+      if (selectedRequest.staff?.user_id) {
+        await supabase.rpc('create_notification', {
+          _user_id: selectedRequest.staff.user_id,
+          _title: 'Request Rejected',
+          _message: `Your payment request of ₹${selectedRequest.amount.toLocaleString('en-IN')} has been rejected. Reason: ${rejectionReason}`,
+          _type: 'error',
+          _reference_type: 'payment_request',
+          _reference_id: selectedRequest.id,
+        });
+      }
+
       toast.success('Request rejected');
       setRejectionReason('');
       fetchRequests();
@@ -142,15 +197,20 @@ export default function Requests() {
     }
   };
 
-  const canApprove = isOwner;
-  const canCreateRequest = isStaff || isAccountant;
+  // Permission checks using centralized auth context
+  // Owner and Admin can approve - Accountant CANNOT approve
+  const canApprove = canApproveRequests;
+  
+  // Staff, Accountant, and Admin can create requests
+  // Owner can also create but usually doesn't need to
+  const canCreateRequest = isStaff || isAccountant || isAdmin || isOwner;
 
   return (
     <div>
       <PageHeader
         title="Payment Requests"
         description={
-          isOwner
+          canApprove
             ? "Review and approve payment requests"
             : "View and create payment requests"
         }
@@ -196,9 +256,7 @@ export default function Requests() {
                     <TableHead className="max-w-[300px]">Reason</TableHead>
                     <TableHead className="text-right">Amount</TableHead>
                     <TableHead>Status</TableHead>
-                    {canApprove && activeTab === 'pending' && (
-                      <TableHead className="text-right">Actions</TableHead>
-                    )}
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -229,30 +287,47 @@ export default function Requests() {
                       <TableCell>
                         <StatusBadge status={request.status} />
                       </TableCell>
-                      {canApprove && activeTab === 'pending' && (
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-success hover:text-success"
-                              onClick={() => handleApprove(request)}
-                              disabled={isProcessing}
-                            >
-                              <Check className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-destructive hover:text-destructive"
-                              onClick={() => setSelectedRequest(request)}
-                              disabled={isProcessing}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      )}
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          {/* Approve/Reject buttons - only for Owner/Admin on pending */}
+                          {canApprove && request.status === 'pending' && (
+                            <>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-success hover:text-success"
+                                onClick={() => handleApprove(request)}
+                                disabled={isProcessing}
+                              >
+                                <Check className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive"
+                                onClick={() => setSelectedRequest(request)}
+                                disabled={isProcessing}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                          
+                          {/* Pay button - for approved requests, visible to Owner/Admin/Accountant */}
+                          {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
+                            <Link to={`/payments/new?request=${request.id}&staff=${request.staff_id}&amount=${request.amount}`}>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                className="gap-1"
+                              >
+                                <CreditCard className="h-4 w-4" />
+                                Pay
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
