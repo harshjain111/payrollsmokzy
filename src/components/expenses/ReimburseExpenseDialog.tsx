@@ -121,8 +121,8 @@ export function ReimburseExpenseDialog({
           <DialogTitle>Reimburse Expense</DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-3">
-              <div className="bg-muted p-3 rounded-md space-y-1 text-foreground">
-                <p><strong>Staff:</strong> {expense.staff?.full_name}</p>
+              <div className="bg-muted p-3 rounded-md space-y-2 text-foreground">
+                <p><strong>Staff:</strong> {expense.staff?.full_name || 'Unknown Staff'}</p>
                 <p><strong>Category:</strong> {EXPENSE_CATEGORY_LABELS[expense.category]}</p>
                 <p><strong>Description:</strong> {expense.description}</p>
                 <p className="flex items-center gap-2">

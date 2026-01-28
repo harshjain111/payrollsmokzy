@@ -87,6 +87,13 @@ export function ExpenseDetailsDialog({
 
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="col-span-2">
+              <p className="text-muted-foreground">Staff Member</p>
+              <p className="font-medium">{expense.staff?.full_name || 'Unknown Staff'}</p>
+              {expense.staff?.employee_id && (
+                <p className="text-xs text-muted-foreground">{expense.staff.employee_id}</p>
+              )}
+            </div>
             <div>
               <p className="text-muted-foreground">Category</p>
               <p className="font-medium">{EXPENSE_CATEGORY_LABELS[expense.category]}</p>
@@ -94,10 +101,6 @@ export function ExpenseDetailsDialog({
             <div>
               <p className="text-muted-foreground">Date</p>
               <p className="font-medium">{format(new Date(expense.expense_date), 'dd MMM yyyy')}</p>
-            </div>
-            <div className="col-span-2">
-              <p className="text-muted-foreground">Staff</p>
-              <p className="font-medium">{expense.staff?.full_name}</p>
             </div>
             <div className="col-span-2">
               <p className="text-muted-foreground">Description</p>
