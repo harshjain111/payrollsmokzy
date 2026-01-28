@@ -1,3 +1,4 @@
+import * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface AmountProps {
@@ -57,40 +58,38 @@ interface AmountInputProps {
   disabled?: boolean;
 }
 
-export function AmountInput({
-  value,
-  onChange,
-  currency = '₹',
-  placeholder = '0.00',
-  className,
-  disabled = false,
-}: AmountInputProps) {
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/[^0-9.]/g, '');
-    const numValue = parseFloat(rawValue) || 0;
-    onChange(numValue);
-  };
+export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(
+  ({ value, onChange, currency = '₹', placeholder = '0.00', className, disabled = false }, ref) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const rawValue = e.target.value.replace(/[^0-9.]/g, '');
+      const numValue = parseFloat(rawValue) || 0;
+      onChange(numValue);
+    };
 
-  return (
-    <div className={cn('relative', className)}>
-      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
-        {currency}
-      </span>
-      <input
-        type="text"
-        inputMode="decimal"
-        value={value > 0 ? value.toString() : ''}
-        onChange={handleChange}
-        placeholder={placeholder}
-        disabled={disabled}
-        className={cn(
-          'flex h-10 w-full rounded-md border border-input bg-background pl-8 pr-3 py-2',
-          'font-mono tabular-nums text-right',
-          'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-          'disabled:cursor-not-allowed disabled:opacity-50',
-          'placeholder:text-muted-foreground'
-        )}
-      />
-    </div>
-  );
-}
+    return (
+      <div className={cn('relative', className)}>
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+          {currency}
+        </span>
+        <input
+          ref={ref}
+          type="text"
+          inputMode="decimal"
+          value={value > 0 ? value.toString() : ''}
+          onChange={handleChange}
+          placeholder={placeholder}
+          disabled={disabled}
+          className={cn(
+            'flex h-10 w-full rounded-md border border-input bg-background pl-8 pr-3 py-2',
+            'font-mono tabular-nums text-right',
+            'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'placeholder:text-muted-foreground'
+          )}
+        />
+      </div>
+    );
+  }
+);
+
+AmountInput.displayName = "AmountInput";

@@ -8,13 +8,13 @@ const corsHeaders = {
 };
 
 interface CreateStaffUserRequest {
-  email: string;
+  phone: string;
   password: string;
   full_name: string;
   role: "staff" | "accountant" | "admin";
   staff_data: {
     employee_id: string;
-    phone?: string;
+    email?: string;
     department?: string;
     designation?: string;
     monthly_salary: number;
@@ -22,6 +22,12 @@ interface CreateStaffUserRequest {
     is_active: boolean;
   };
 }
+
+// Convert phone to pseudo-email for Supabase auth
+const phoneToEmail = (phone: string): string => {
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  return `${cleanPhone}@phone.smokzy.internal`;
+};
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -77,24 +83,45 @@ serve(async (req) => {
 
     // Parse request body
     const body: CreateStaffUserRequest = await req.json();
-    const { email, password, full_name, role, staff_data } = body;
+    const { phone, password, full_name, role, staff_data } = body;
 
     // Validate required fields
-    if (!email || !password || !full_name || !role || !staff_data) {
+    if (!phone || !password || !full_name || !role || !staff_data) {
       throw new Error("Missing required fields");
+    }
+
+    // Clean and validate phone
+    const cleanPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length < 10) {
+      throw new Error("Phone number must be at least 10 digits");
     }
 
     if (password.length < 6) {
       throw new Error("Password must be at least 6 characters");
     }
 
-    // Create auth user
+    // Convert phone to pseudo-email
+    const pseudoEmail = phoneToEmail(cleanPhone);
+
+    // Check if phone already exists
+    const { data: existingStaff } = await supabaseAdmin
+      .from("staff")
+      .select("id")
+      .eq("phone", cleanPhone)
+      .maybeSingle();
+
+    if (existingStaff) {
+      throw new Error("A staff member with this phone number already exists");
+    }
+
+    // Create auth user with pseudo-email
     const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
+      email: pseudoEmail,
       password,
       email_confirm: true,
       user_metadata: {
         full_name,
+        phone: cleanPhone,
       },
     });
 
@@ -125,8 +152,8 @@ serve(async (req) => {
         user_id: userId,
         employee_id: staff_data.employee_id,
         full_name: full_name,
-        email: email,
-        phone: staff_data.phone || null,
+        email: staff_data.email || pseudoEmail,
+        phone: cleanPhone,
         department: staff_data.department || null,
         designation: staff_data.designation || null,
         monthly_salary: staff_data.monthly_salary,
@@ -158,6 +185,7 @@ serve(async (req) => {
         success: true,
         staff: staffRecord,
         user_id: userId,
+        login_phone: cleanPhone,
       }),
       {
         status: 200,

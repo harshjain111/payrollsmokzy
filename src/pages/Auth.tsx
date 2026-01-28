@@ -4,31 +4,30 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Wallet, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Wallet, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
 
-const emailSchema = z.string().email('Please enter a valid email address');
+const phoneSchema = z.string().min(10, 'Please enter a valid phone number').max(15, 'Phone number too long');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
-const nameSchema = z.string().min(2, 'Name must be at least 2 characters');
+
+// Convert phone to pseudo-email for Supabase auth
+const phoneToEmail = (phone: string) => {
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  return `${cleanPhone}@phone.smokzy.internal`;
+};
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { user, signIn, signUp, isLoading: authLoading } = useAuth();
+  const { user, signIn, isLoading: authLoading } = useAuth();
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Login form
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-
-  // Signup form
-  const [signupEmail, setSignupEmail] = useState('');
-  const [signupPassword, setSignupPassword] = useState('');
-  const [signupName, setSignupName] = useState('');
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -36,11 +35,19 @@ export default function Auth() {
     }
   }, [user, authLoading, navigate]);
 
+  const formatPhoneInput = (value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    return digits;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    const cleanPhone = formatPhoneInput(loginPhone);
+    
     try {
-      emailSchema.parse(loginEmail);
+      phoneSchema.parse(cleanPhone);
       passwordSchema.parse(loginPassword);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -50,47 +57,19 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    const { error } = await signIn(loginEmail, loginPassword);
+    const pseudoEmail = phoneToEmail(cleanPhone);
+    const { error } = await signIn(pseudoEmail, loginPassword);
     setIsLoading(false);
 
     if (error) {
       if (error.message.includes('Invalid login credentials')) {
-        toast.error('Invalid email or password');
+        toast.error('Invalid phone number or password');
       } else {
         toast.error(error.message);
       }
     } else {
       toast.success('Welcome back!');
       navigate('/dashboard');
-    }
-  };
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    try {
-      emailSchema.parse(signupEmail);
-      passwordSchema.parse(signupPassword);
-      nameSchema.parse(signupName);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        toast.error(error.errors[0].message);
-        return;
-      }
-    }
-
-    setIsLoading(true);
-    const { error } = await signUp(signupEmail, signupPassword, signupName);
-    setIsLoading(false);
-
-    if (error) {
-      if (error.message.includes('already registered')) {
-        toast.error('This email is already registered. Please sign in.');
-      } else {
-        toast.error(error.message);
-      }
-    } else {
-      toast.success('Account created! Please contact your administrator to assign your role.');
     }
   };
 
@@ -103,12 +82,14 @@ export default function Auth() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20 px-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center gap-2 mb-4">
-            <Wallet className="h-10 w-10 text-primary" />
+          <div className="inline-flex items-center justify-center gap-3 mb-4">
+            <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+              <Wallet className="h-6 w-6 text-white" />
+            </div>
             <span className="text-3xl font-bold text-foreground">Smokzy</span>
           </div>
           <p className="text-muted-foreground">
@@ -116,154 +97,81 @@ export default function Auth() {
           </p>
         </div>
 
-        <Card className="shadow-lg border-border">
-          <Tabs defaultValue="login" className="w-full">
-            <CardHeader className="pb-4">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-            </CardHeader>
+        <Card className="shadow-xl border-border/50">
+          <CardHeader className="pb-4 text-center">
+            <h2 className="text-xl font-semibold">Welcome Back</h2>
+            <p className="text-sm text-muted-foreground">Sign in with your phone number</p>
+          </CardHeader>
 
-            <CardContent>
-              <TabsContent value="login" className="mt-0">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-email">Email</Label>
-                    <Input
-                      id="login-email"
-                      type="email"
-                      placeholder="name@company.com"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-phone">Phone Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="login-phone"
+                    type="tel"
+                    placeholder="9876543210"
+                    value={loginPhone}
+                    onChange={(e) => setLoginPhone(formatPhoneInput(e.target.value))}
+                    required
+                    autoComplete="tel"
+                    className="pl-10"
+                    maxLength={15}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">Enter your registered phone number</p>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="login-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={loginPassword}
-                        onChange={(e) => setLoginPassword(e.target.value)}
-                        required
-                        autoComplete="current-password"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
                   <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading}
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
                   >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-muted-foreground" />
                     ) : (
-                      'Sign In'
+                      <Eye className="h-4 w-4 text-muted-foreground" />
                     )}
                   </Button>
-                </form>
-              </TabsContent>
+                </div>
+              </div>
 
-              <TabsContent value="signup" className="mt-0">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-name">Full Name</Label>
-                    <Input
-                      id="signup-name"
-                      type="text"
-                      placeholder="John Doe"
-                      value={signupName}
-                      onChange={(e) => setSignupName(e.target.value)}
-                      required
-                      autoComplete="name"
-                    />
-                  </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing in...
+                  </>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-email">Email</Label>
-                    <Input
-                      id="signup-email"
-                      type="email"
-                      placeholder="name@company.com"
-                      value={signupEmail}
-                      onChange={(e) => setSignupEmail(e.target.value)}
-                      required
-                      autoComplete="email"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="signup-password">Password</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder="••••••••"
-                        value={signupPassword}
-                        onChange={(e) => setSignupPassword(e.target.value)}
-                        required
-                        autoComplete="new-password"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? (
-                          <EyeOff className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Eye className="h-4 w-4 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
-                  </Button>
-
-                  <p className="text-xs text-center text-muted-foreground">
-                    After signup, contact your administrator to assign your role.
-                  </p>
-                </form>
-              </TabsContent>
-            </CardContent>
-          </Tabs>
+              <p className="text-xs text-center text-muted-foreground pt-2">
+                Contact your administrator if you don't have an account
+              </p>
+            </form>
+          </CardContent>
         </Card>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
