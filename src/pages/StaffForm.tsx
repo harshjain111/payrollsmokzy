@@ -19,11 +19,10 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { AmountInput } from '@/components/ui/amount';
-import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import type { AppRole } from '@/types/database';
 
 export default function StaffForm() {
   const navigate = useNavigate();
@@ -38,9 +37,9 @@ export default function StaffForm() {
   // Form state
   const [fullName, setFullName] = useState('');
   const [employeeId, setEmployeeId] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
   const [designation, setDesignation] = useState('');
   const [role, setRole] = useState<'staff' | 'accountant' | 'admin'>('staff');
@@ -87,8 +86,8 @@ export default function StaffForm() {
       if (data) {
         setFullName(data.full_name);
         setEmployeeId(data.employee_id);
-        setEmail(data.email);
         setPhone(data.phone || '');
+        setEmail(data.email || '');
         setDepartment(data.department || '');
         setDesignation(data.designation || '');
         setMonthlySalary(Number(data.monthly_salary));
@@ -129,6 +128,10 @@ export default function StaffForm() {
     return `${prefix}${timestamp}${random}`;
   };
 
+  const formatPhoneInput = (value: string) => {
+    return value.replace(/\D/g, '');
+  };
+
   const handleSubmit = async () => {
     // Validation
     if (!fullName.trim()) {
@@ -140,8 +143,9 @@ export default function StaffForm() {
       return;
     }
     if (!isEditing) {
-      if (!email.trim()) {
-        toast({ title: 'Validation Error', description: 'Email is required for new staff.', variant: 'destructive' });
+      const cleanPhone = formatPhoneInput(phone);
+      if (cleanPhone.length < 10) {
+        toast({ title: 'Validation Error', description: 'Please enter a valid phone number (min 10 digits).', variant: 'destructive' });
         return;
       }
       if (!password || password.length < 6) {
@@ -171,7 +175,8 @@ export default function StaffForm() {
           .update({
             full_name: fullName.trim(),
             employee_id: employeeId.trim(),
-            phone: phone.trim() || null,
+            phone: formatPhoneInput(phone) || null,
+            email: email.trim() || null,
             department: department.trim() || null,
             designation: designation.trim() || null,
             monthly_salary: monthlySalary,
@@ -229,13 +234,13 @@ export default function StaffForm() {
               'Authorization': `Bearer ${session.session?.access_token}`,
             },
             body: JSON.stringify({
-              email: email.trim(),
+              phone: formatPhoneInput(phone),
               password: password,
               full_name: fullName.trim(),
               role: role,
               staff_data: {
                 employee_id: employeeId.trim(),
-                phone: phone.trim() || null,
+                email: email.trim() || null,
                 department: department.trim() || null,
                 designation: designation.trim() || null,
                 monthly_salary: monthlySalary,
@@ -254,7 +259,7 @@ export default function StaffForm() {
 
         toast({ 
           title: 'Staff Created', 
-          description: `${fullName} has been added successfully. They can now login with their email and password.` 
+          description: `${fullName} has been added. They can login using phone: ${formatPhoneInput(phone)}` 
         });
       }
 
@@ -283,7 +288,7 @@ export default function StaffForm() {
     <div className="space-y-6">
       <PageHeader
         title={isEditing ? 'Edit Staff' : 'Add New Staff'}
-        description={isEditing ? 'Update staff information and credentials' : 'Add a new team member with login credentials'}
+        description={isEditing ? 'Update staff information' : 'Add a new team member with login credentials'}
       >
         <Button variant="ghost" onClick={() => navigate('/staff')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -292,27 +297,32 @@ export default function StaffForm() {
       </PageHeader>
 
       <div className="max-w-2xl space-y-6">
-        {/* Account Credentials - Only for new staff */}
+        {/* Login Credentials - Only for new staff */}
         {!isEditing && (
           <Card>
             <CardHeader>
               <CardTitle>Login Credentials</CardTitle>
               <CardDescription>
-                These credentials will be used by the staff member to login to the system
+                Staff will login using their phone number and password
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="staff@company.com"
-                />
+                <Label htmlFor="phone">Phone Number *</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                    placeholder="9876543210"
+                    className="pl-10"
+                    maxLength={15}
+                  />
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  This will be their login email
+                  This will be their login identifier
                 </p>
               </div>
               <div className="space-y-2">
@@ -390,13 +400,32 @@ export default function StaffForm() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isEditing && (
+                <div className="space-y-2">
+                  <Label htmlFor="editPhone">Phone Number</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="editPhone"
+                      type="tel"
+                      value={phone}
+                      onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
+                      placeholder="9876543210"
+                      className="pl-10"
+                      disabled
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Phone number cannot be changed</p>
+                </div>
+              )}
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="email">Email (Optional)</Label>
                 <Input
-                  id="phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="staff@company.com"
                 />
               </div>
               <div className="space-y-2">
