@@ -45,9 +45,10 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'cheque', label: 'Cheque' },
 ];
 
-const PAYMENT_TYPES = [
+// Payment types - salary only visible to owner
+const getAllPaymentTypes = (canRecordSalary: boolean) => [
   { value: 'advance', label: 'Advance Payment', icon: Banknote, description: 'Pay advance to staff' },
-  { value: 'salary', label: 'Salary Payment', icon: Wallet, description: 'Record salary payment' },
+  ...(canRecordSalary ? [{ value: 'salary', label: 'Salary Payment', icon: Wallet, description: 'Record salary payment' }] : []),
   { value: 'expense', label: 'Expense Reimbursement', icon: Receipt, description: 'Reimburse approved expenses' },
 ] as const;
 
@@ -61,11 +62,14 @@ interface StaffFinancials {
 
 export default function RecordPayment() {
   const navigate = useNavigate();
-  const { user, isOwner, isAccountant, isStaff } = useAuth();
+  const { user, isOwner, isAccountant, isAdmin, isStaff, canRecordSalaryPayments } = useAuth();
   
-  // Determine access
-  const hasAccess = isOwner || isAccountant;
+  // Determine access - Admin can also record payments
+  const hasAccess = isOwner || isAccountant || isAdmin;
   const accessDenied = isStaff || !hasAccess;
+  
+  // Get available payment types based on role
+  const PAYMENT_TYPES = getAllPaymentTypes(canRecordSalaryPayments);
   
   // Core state
   const [staff, setStaff] = useState<Staff[]>([]);

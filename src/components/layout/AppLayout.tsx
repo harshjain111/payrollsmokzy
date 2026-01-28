@@ -1,5 +1,6 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationCounts } from '@/hooks/useNotificationCounts';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -23,6 +24,9 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
   useSidebar,
 } from '@/components/ui/sidebar';
 import {
@@ -47,6 +51,8 @@ import {
   UserPlus,
   PanelLeftClose,
   PanelLeft,
+  Briefcase,
+  ArrowUpRight,
 } from 'lucide-react';
 
 interface NavItem {
@@ -54,66 +60,175 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   roles?: string[];
+  badge?: number;
 }
 
-const navItems: NavItem[] = [
-  {
-    title: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    title: 'Staff',
-    href: '/staff',
-    icon: Users,
-    roles: ['owner'],
-  },
-  {
-    title: 'Add User',
-    href: '/staff/new',
-    icon: UserPlus,
-    roles: ['owner'],
-  },
-  {
-    title: 'Ledger',
-    href: '/ledger',
-    icon: FileText,
-  },
-  {
-    title: 'Payments',
-    href: '/payments/new',
-    icon: CreditCard,
-    roles: ['owner', 'admin', 'accountant'],
-  },
-  {
-    title: 'Expenses',
-    href: '/expenses',
-    icon: Receipt,
-  },
-  {
-    title: 'Requests',
-    href: '/requests',
-    icon: ClipboardList,
-  },
-  {
-    title: 'Settlements',
-    href: '/settlements',
-    icon: Calculator,
-    roles: ['owner'],
-  },
-  {
-    title: 'Reports',
-    href: '/reports',
-    icon: BarChart3,
-    roles: ['owner', 'ca', 'admin', 'accountant'],
-  },
-  {
-    title: 'Audit Log',
-    href: '/audit-log',
-    icon: History,
-    roles: ['owner', 'ca'],
-  },
-];
+interface NavSection {
+  title?: string;
+  items: NavItem[];
+}
+
+// Get navigation items based on role and context
+function getNavSections(
+  userRole: string | null,
+  accountingMode: boolean,
+  isAccountant: boolean,
+  counts: { pendingRequests: number; pendingExpenses: number; approvedExpenses: number }
+): NavSection[] {
+  // Owner - full access
+  if (userRole === 'owner') {
+    return [
+      {
+        items: [
+          { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { title: 'Staff', href: '/staff', icon: Users },
+          { title: 'Add User', href: '/staff/new', icon: UserPlus },
+        ],
+      },
+      {
+        title: 'Finance',
+        items: [
+          { title: 'Ledger', href: '/ledger', icon: FileText },
+          { title: 'Payments', href: '/payments/new', icon: CreditCard },
+          { 
+            title: 'Expenses', 
+            href: '/expenses', 
+            icon: Receipt,
+            badge: counts.pendingExpenses + counts.approvedExpenses,
+          },
+          { 
+            title: 'Requests', 
+            href: '/requests', 
+            icon: ClipboardList,
+            badge: counts.pendingRequests,
+          },
+          { title: 'Settlements', href: '/settlements', icon: Calculator },
+        ],
+      },
+      {
+        title: 'Reports',
+        items: [
+          { title: 'Reports', href: '/reports', icon: BarChart3 },
+          { title: 'Audit Log', href: '/audit-log', icon: History },
+        ],
+      },
+    ];
+  }
+
+  // Admin - can approve, record payments (no salary)
+  if (userRole === 'admin') {
+    return [
+      {
+        items: [
+          { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        ],
+      },
+      {
+        title: 'Finance',
+        items: [
+          { title: 'Ledger', href: '/ledger', icon: FileText },
+          { title: 'Payments', href: '/payments/new', icon: CreditCard },
+          { 
+            title: 'Expenses', 
+            href: '/expenses', 
+            icon: Receipt,
+            badge: counts.pendingExpenses + counts.approvedExpenses,
+          },
+          { 
+            title: 'Requests', 
+            href: '/requests', 
+            icon: ClipboardList,
+            badge: counts.pendingRequests,
+          },
+        ],
+      },
+      {
+        title: 'Reports',
+        items: [
+          { title: 'Reports', href: '/reports', icon: BarChart3 },
+        ],
+      },
+    ];
+  }
+
+  // Accountant - dual context
+  if (isAccountant) {
+    if (!accountingMode) {
+      // My Account context (personal/employee view)
+      return [
+        {
+          title: 'My Account',
+          items: [
+            { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { title: 'My Ledger', href: '/ledger', icon: FileText },
+            { title: 'My Expenses', href: '/expenses', icon: Receipt },
+            { title: 'My Requests', href: '/requests', icon: ClipboardList },
+          ],
+        },
+      ];
+    } else {
+      // Accounting context (finance operator view)
+      return [
+        {
+          title: 'Accounting',
+          items: [
+            { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { title: 'Requests', href: '/requests', icon: ClipboardList },
+            { 
+              title: 'Expenses', 
+              href: '/expenses', 
+              icon: Receipt,
+              badge: counts.approvedExpenses,
+            },
+            { title: 'Payments', href: '/payments/new', icon: CreditCard },
+            { title: 'Ledger', href: '/ledger', icon: FileText },
+            { title: 'Reports', href: '/reports', icon: BarChart3 },
+          ],
+        },
+      ];
+    }
+  }
+
+  // Staff - personal view only
+  if (userRole === 'staff') {
+    return [
+      {
+        items: [
+          { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { title: 'My Ledger', href: '/ledger', icon: FileText },
+          { title: 'My Expenses', href: '/expenses', icon: Receipt },
+          { title: 'My Requests', href: '/requests', icon: ClipboardList },
+        ],
+      },
+    ];
+  }
+
+  // CA - read-only access
+  if (userRole === 'ca') {
+    return [
+      {
+        items: [
+          { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { title: 'Ledger', href: '/ledger', icon: FileText },
+          { title: 'Reports', href: '/reports', icon: BarChart3 },
+          { title: 'Audit Log', href: '/audit-log', icon: History },
+        ],
+      },
+    ];
+  }
+
+  return [];
+}
+
+function NotificationBadge({ count }: { count: number }) {
+  if (count === 0) return null;
+  
+  return (
+    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center font-medium">
+      {count > 9 ? '9+' : count}
+    </span>
+  );
+}
 
 function AppSidebar() {
   const { userRole, staffData, signOut, isAccountant, accountingMode, setAccountingMode, user } = useAuth();
@@ -121,11 +236,9 @@ function AppSidebar() {
   const navigate = useNavigate();
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const counts = useNotificationCounts();
 
-  const filteredNavItems = navItems.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.includes(userRole || '');
-  });
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts);
 
   const handleSignOut = async () => {
     await signOut();
@@ -193,67 +306,113 @@ function AppSidebar() {
               )}
               onClick={() => setAccountingMode(true)}
             >
-              <Calculator className="mr-1.5 h-3.5 w-3.5" />
+              <Briefcase className="mr-1.5 h-3.5 w-3.5" />
               Accounting
             </Button>
           </div>
         </div>
       )}
 
+      {/* Accountant mode toggle for collapsed */}
+      {isAccountant && isCollapsed && (
+        <div className="px-2 pb-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="ghost"
+                className={cn(
+                  'w-full h-10 rounded-lg',
+                  accountingMode 
+                    ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white' 
+                    : 'bg-sidebar-accent/30'
+                )}
+                onClick={() => setAccountingMode(!accountingMode)}
+              >
+                {accountingMode ? <Briefcase className="h-4 w-4" /> : <User className="h-4 w-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {accountingMode ? 'Switch to My Account' : 'Switch to Accounting'}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+
       {/* Navigation */}
       <SidebarContent className="px-2">
-        <SidebarMenu>
-          {filteredNavItems.map((item) => {
-            const isActive = location.pathname === item.href || 
-              (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
-            
-            return (
-              <SidebarMenuItem key={item.href}>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                      className={cn(
-                        "relative transition-all duration-200",
-                        isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
-                      )}
-                    >
-                      <Link to={item.href}>
-                        {isActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
+        {navSections.map((section, sectionIdx) => (
+          <SidebarGroup key={sectionIdx}>
+            {section.title && !isCollapsed && (
+              <SidebarGroupLabel className="text-xs font-medium text-sidebar-muted uppercase tracking-wider px-2 mb-1">
+                {section.title}
+              </SidebarGroupLabel>
+            )}
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {section.items.map((item) => {
+                  const isActive = location.pathname === item.href || 
+                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
+                  
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={isActive}
+                            tooltip={item.title}
+                            className={cn(
+                              "relative transition-all duration-200",
+                              isActive && "bg-sidebar-accent text-sidebar-accent-foreground"
+                            )}
+                          >
+                            <Link to={item.href}>
+                              {isActive && (
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
+                              )}
+                              <div className={cn(
+                                'relative p-1.5 rounded-lg transition-colors',
+                                isActive 
+                                  ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20' 
+                                  : 'bg-transparent'
+                              )}>
+                                <item.icon className={cn(
+                                  'h-4 w-4',
+                                  isActive ? 'text-amber-400' : 'text-sidebar-muted'
+                                )} />
+                                {item.badge && item.badge > 0 && (
+                                  <NotificationBadge count={item.badge} />
+                                )}
+                              </div>
+                              <span className={cn(
+                                "transition-opacity flex-1",
+                                isCollapsed && "opacity-0"
+                              )}>
+                                {item.title}
+                              </span>
+                              {!isCollapsed && item.badge && item.badge > 0 && (
+                                <span className="ml-auto bg-destructive/10 text-destructive text-xs font-medium px-1.5 py-0.5 rounded-full">
+                                  {item.badge}
+                                </span>
+                              )}
+                            </Link>
+                          </SidebarMenuButton>
+                        </TooltipTrigger>
+                        {isCollapsed && (
+                          <TooltipContent side="right" className="bg-popover text-popover-foreground">
+                            {item.title}
+                            {item.badge && item.badge > 0 && ` (${item.badge})`}
+                          </TooltipContent>
                         )}
-                        <div className={cn(
-                          'p-1.5 rounded-lg transition-colors',
-                          isActive 
-                            ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20' 
-                            : 'bg-transparent'
-                        )}>
-                          <item.icon className={cn(
-                            'h-4 w-4',
-                            isActive ? 'text-amber-400' : 'text-sidebar-muted'
-                          )} />
-                        </div>
-                        <span className={cn(
-                          "transition-opacity",
-                          isCollapsed && "opacity-0"
-                        )}>
-                          {item.title}
-                        </span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </TooltipTrigger>
-                  {isCollapsed && (
-                    <TooltipContent side="right" className="bg-popover text-popover-foreground">
-                      {item.title}
-                    </TooltipContent>
-                  )}
-                </Tooltip>
-              </SidebarMenuItem>
-            );
-          })}
-        </SidebarMenu>
+                      </Tooltip>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
       </SidebarContent>
 
       {/* Footer - User menu */}
@@ -304,10 +463,14 @@ function AppSidebar() {
 }
 
 function AppHeader() {
-  const { user, staffData, userRole } = useAuth();
+  const { user, staffData, userRole, isAccountant, accountingMode } = useAuth();
   const location = useLocation();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
+  const counts = useNotificationCounts();
+
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts);
+  const allItems = navSections.flatMap(s => s.items);
 
   const getInitials = (name: string) => {
     return name
@@ -321,10 +484,13 @@ function AppHeader() {
   const displayName = staffData?.full_name || user?.email || 'User';
   const roleDisplay = userRole ? userRole.charAt(0).toUpperCase() + userRole.slice(1) : '';
 
-  const currentNavItem = navItems.find(item => 
+  const currentNavItem = allItems.find(item => 
     location.pathname === item.href || 
     (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
   );
+
+  // Add context indicator for accountant
+  const contextLabel = isAccountant ? (accountingMode ? '(Accounting)' : '(Personal)') : '';
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-4 lg:px-6">
@@ -344,6 +510,11 @@ function AppHeader() {
         <div className="hidden sm:block">
           <h1 className="text-base font-semibold text-foreground">
             {currentNavItem?.title || 'Dashboard'}
+            {contextLabel && (
+              <span className="ml-2 text-xs font-normal text-muted-foreground">
+                {contextLabel}
+              </span>
+            )}
           </h1>
         </div>
       </div>
