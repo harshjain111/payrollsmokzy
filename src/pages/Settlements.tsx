@@ -18,7 +18,7 @@ import {
 import { Amount } from '@/components/ui/amount';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Calculator, Check, AlertTriangle, Lock, Info } from 'lucide-react';
+import { ArrowLeft, Calculator, Check, AlertTriangle, Lock, Info, ShieldX } from 'lucide-react';
 import { format, subMonths, getDaysInMonth, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import { SettlementConfirmDialog } from '@/components/settlements/SettlementConfirmDialog';
@@ -51,7 +51,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
 
 export default function Settlements() {
   const navigate = useNavigate();
-  const { user, isOwner } = useAuth();
+  const { user, canAccessSettlements } = useAuth();
   
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
@@ -68,24 +68,34 @@ export default function Settlements() {
   const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
-    if (!isOwner) {
-      toast({
-        title: 'Access Denied',
-        description: 'Only owners can settle salaries.',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
-      return;
+    if (canAccessSettlements) {
+      fetchStaff();
     }
-    fetchStaff();
-  }, [isOwner]);
+  }, [canAccessSettlements]);
 
   useEffect(() => {
-    if (selectedStaffId && selectedMonth) {
+    if (canAccessSettlements && selectedStaffId && selectedMonth) {
       validateSettlement();
       calculateSettlement();
     }
-  }, [selectedStaffId, selectedMonth, leaveDays]);
+  }, [selectedStaffId, selectedMonth, leaveDays, canAccessSettlements]);
+
+  // STRICT ACCESS CONTROL: Only Owner can access settlements
+  if (!canAccessSettlements) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <ShieldX className="h-16 w-16 text-destructive" />
+        <h2 className="text-xl font-semibold">Access Denied</h2>
+        <p className="text-muted-foreground text-center max-w-md">
+          Salary settlements contain confidential compensation data and are restricted to the Owner only.
+        </p>
+        <Button onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
+    );
+  }
 
   const fetchStaff = async () => {
     try {
@@ -104,7 +114,6 @@ export default function Settlements() {
 
   const validateSettlement = async () => {
     try {
-      // Check if already settled
       const { data: settledData } = await supabase
         .rpc('is_salary_settled', {
           _staff_id: selectedStaffId,
@@ -113,7 +122,6 @@ export default function Settlements() {
       
       setIsAlreadySettled(settledData);
 
-      // Run server-side validation
       const { data: validationData, error } = await supabase
         .rpc('validate_settlement', {
           _staff_id: selectedStaffId,
@@ -125,7 +133,6 @@ export default function Settlements() {
       const result = validationData as unknown as ValidationResult;
       setValidation(result);
 
-      // Generate warnings
       const newWarnings: string[] = [];
       
       if (result.warning) {
@@ -144,7 +151,6 @@ export default function Settlements() {
     try {
       setIsCalculating(true);
 
-      // Get salary for the month
       const { data: salaryData, error: salaryError } = await supabase
         .rpc('get_staff_salary_for_month', {
           _staff_id: selectedStaffId,
@@ -153,7 +159,6 @@ export default function Settlements() {
 
       if (salaryError) throw salaryError;
 
-      // Get advances outstanding
       const { data: advanceData, error: advanceError } = await supabase
         .rpc('get_advances_outstanding', {
           _staff_id: selectedStaffId,
@@ -163,12 +168,11 @@ export default function Settlements() {
 
       const monthlySalary = Number(salaryData) || 0;
       const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
-      const dailySalary = monthlySalary / 30; // Standard 30-day calculation
+      const dailySalary = monthlySalary / 30;
       const leaveDeduction = dailySalary * leaveDays;
       const grossSalary = monthlySalary - leaveDeduction;
       const advancesOutstanding = Number(advanceData) || 0;
       
-      // Calculate net payable
       let netPayable = grossSalary - advancesOutstanding;
       let excessAdvance = 0;
       
@@ -177,7 +181,6 @@ export default function Settlements() {
         netPayable = 0;
       }
 
-      // Add leave warning
       const newWarnings = [...warnings.filter(w => !w.includes('leave'))];
       if (leaveDays > 5) {
         newWarnings.push(`High leave days (${leaveDays} days) - please verify`);
@@ -212,7 +215,6 @@ export default function Settlements() {
   const handleSettleClick = () => {
     if (!calculation) return;
 
-    // Validation checks
     const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
     
     if (leaveDays > 30) {
@@ -255,13 +257,11 @@ export default function Settlements() {
     try {
       setIsSettling(true);
 
-      // Generate voucher number
       const { data: voucherNo, error: voucherError } = await supabase
         .rpc('generate_voucher_no', { _voucher_type: 'settlement' });
 
       if (voucherError) throw voucherError;
 
-      // Create ledger entry for salary payment (only if net > 0)
       let ledgerEntryId = null;
       if (calculation.netPayable > 0) {
         const { data: ledgerEntry, error: ledgerError } = await supabase
@@ -289,7 +289,6 @@ export default function Settlements() {
         ledgerEntryId = ledgerEntry.id;
       }
 
-      // If there were advances, create adjustment entry
       if (calculation.advancesOutstanding > 0 && calculation.grossSalary > 0) {
         const adjustmentAmount = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
         
@@ -313,7 +312,6 @@ export default function Settlements() {
           });
       }
 
-      // Create salary settlement record
       const { error: settlementError } = await supabase
         .from('salary_settlements')
         .insert({
@@ -339,7 +337,6 @@ export default function Settlements() {
         description: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} has been settled successfully.`,
       });
 
-      // Reset form
       setSelectedStaffId('');
       setLeaveDays(0);
       setCalculation(null);
@@ -358,7 +355,6 @@ export default function Settlements() {
     }
   };
 
-  // Generate month options (last 12 months, excluding future)
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const date = subMonths(new Date(), i);
     return {
@@ -423,7 +419,6 @@ export default function Settlements() {
               </Select>
             </div>
 
-            {/* Validation Messages */}
             {isAlreadySettled && (
               <Alert className="border-warning bg-warning/10">
                 <Lock className="h-4 w-4 text-warning" />
@@ -506,93 +501,78 @@ export default function Settlements() {
               Settlement Calculation
             </CardTitle>
             <CardDescription>
-              {selectedStaff ? selectedStaff.full_name : 'Select a staff member'}
+              {selectedStaff ? `For ${selectedStaff.full_name}` : 'Select a staff member'}
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isCalculating ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            {!calculation ? (
+              <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                <Calculator className="h-12 w-12 mb-4 opacity-50" />
+                <p>Select staff and month to calculate</p>
               </div>
-            ) : calculation ? (
+            ) : (
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Monthly Salary</p>
-                    <Amount value={calculation.monthlySalary} className="text-foreground" />
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Daily Rate (÷30)</p>
-                    <Amount value={calculation.dailySalary} className="text-foreground" />
-                  </div>
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">Monthly Salary</span>
+                  <Amount value={calculation.monthlySalary} className="font-medium" />
                 </div>
-
+                
+                <div className="flex justify-between items-center py-2">
+                  <span className="text-muted-foreground">
+                    Leave Deduction ({calculation.leaveDays} days × ₹{calculation.dailySalary.toFixed(2)})
+                  </span>
+                  <span className="text-destructive font-medium">
+                    -<Amount value={calculation.leaveDeduction} />
+                  </span>
+                </div>
+                
                 <Separator />
-
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Monthly Salary</span>
-                    <Amount value={calculation.monthlySalary} />
-                  </div>
-                  {calculation.leaveDays > 0 && (
-                    <div className="flex justify-between text-destructive">
-                      <span>Leave Deduction ({calculation.leaveDays} days)</span>
-                      <span>- <Amount value={calculation.leaveDeduction} /></span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-medium">
-                    <span>Gross Salary</span>
-                    <Amount value={calculation.grossSalary} />
-                  </div>
+                
+                <div className="flex justify-between items-center py-2">
+                  <span className="font-medium">Gross Salary</span>
+                  <Amount value={calculation.grossSalary} className="font-medium" />
                 </div>
-
+                
+                {calculation.advancesOutstanding > 0 && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-muted-foreground">Advances Outstanding</span>
+                    <span className="text-warning font-medium">
+                      -<Amount value={Math.min(calculation.advancesOutstanding, calculation.grossSalary)} />
+                    </span>
+                  </div>
+                )}
+                
                 <Separator />
-
-                <div className="space-y-2 text-sm">
-                  {calculation.advancesOutstanding > 0 && (
-                    <div className="flex justify-between text-warning">
-                      <span>Advances Outstanding</span>
-                      <span>- <Amount value={calculation.advancesOutstanding} /></span>
-                    </div>
-                  )}
+                
+                <div className="flex justify-between items-center py-3 bg-primary/5 rounded-lg px-4 -mx-4">
+                  <span className="font-semibold text-lg">Net Payable</span>
+                  <Amount value={calculation.netPayable} size="lg" className="font-bold text-primary" />
                 </div>
-
-                <Separator />
-
-                <div className="p-4 bg-primary/5 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold">Net Payable</span>
-                    <Amount value={calculation.netPayable} size="lg" className="text-primary font-bold" />
-                  </div>
-                  {calculation.excessAdvance > 0 && (
-                    <p className="text-xs text-warning mt-2">
-                      ₹{calculation.excessAdvance.toLocaleString('en-IN')} excess advance will carry forward
-                    </p>
-                  )}
-                </div>
-
-                {calculation.netPayable === 0 && calculation.grossSalary > 0 && (
+                
+                {calculation.excessAdvance > 0 && (
                   <Alert className="border-info bg-info/10">
                     <Info className="h-4 w-4 text-info" />
-                    <AlertDescription className="text-info text-xs">
-                      Net payable is ₹0 because advances exceed salary. You'll need to confirm zero payment.
+                    <AlertDescription className="text-info">
+                      ₹{calculation.excessAdvance.toLocaleString('en-IN')} advance will remain outstanding after this settlement.
                     </AlertDescription>
                   </Alert>
                 )}
-
+                
                 <Button 
-                  className="w-full" 
-                  size="lg"
                   onClick={handleSettleClick}
-                  disabled={!canSettle}
+                  disabled={!canSettle || isSettling}
+                  className="w-full mt-4"
+                  size="lg"
                 >
-                  <Check className="mr-2 h-4 w-4" />
-                  {isAlreadySettled ? 'Already Settled' : 'Review & Settle'}
+                  {isSettling ? (
+                    'Processing...'
+                  ) : (
+                    <>
+                      <Check className="mr-2 h-4 w-4" />
+                      Settle Salary
+                    </>
+                  )}
                 </Button>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Select staff and month to see calculation
               </div>
             )}
           </CardContent>
@@ -606,25 +586,21 @@ export default function Settlements() {
             open={showConfirmDialog}
             onOpenChange={setShowConfirmDialog}
             onConfirm={handleSettle}
+            isLoading={isSettling}
             staffName={selectedStaff.full_name}
             month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
             calculation={calculation}
             paymentMode={paymentMode}
-            isLoading={isSettling}
           />
-
+          
           <ZeroPaymentConfirmDialog
             open={showZeroPaymentDialog}
             onOpenChange={setShowZeroPaymentDialog}
             onConfirm={handleSettle}
+            isLoading={isSettling}
             staffName={selectedStaff.full_name}
             month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
-            reason={
-              calculation.advancesOutstanding > calculation.grossSalary
-                ? `Outstanding advances (₹${calculation.advancesOutstanding.toLocaleString('en-IN')}) exceed gross salary`
-                : 'No salary payable after deductions'
-            }
-            isLoading={isSettling}
+            reason={`Advances (₹${calculation.advancesOutstanding.toLocaleString('en-IN')}) exceed or equal gross salary`}
           />
         </>
       )}

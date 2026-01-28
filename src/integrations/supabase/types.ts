@@ -564,6 +564,7 @@ export type Database = {
           running_balance: number
         }[]
       }
+      can_view_salary: { Args: { _user_id: string }; Returns: boolean }
       create_notification: {
         Args: {
           _message: string
@@ -597,6 +598,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_admin: { Args: { _user_id: string }; Returns: boolean }
       is_finance_user: { Args: { _user_id: string }; Returns: boolean }
       is_salary_settled: {
         Args: { _month: string; _staff_id: string }
@@ -608,7 +610,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "owner" | "accountant" | "staff" | "ca"
+      app_role: "owner" | "accountant" | "staff" | "ca" | "admin"
       expense_category:
         | "travel"
         | "food"
@@ -760,7 +762,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "accountant", "staff", "ca"],
+      app_role: ["owner", "accountant", "staff", "ca", "admin"],
       expense_category: [
         "travel",
         "food",

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ import { format } from 'date-fns';
 import type { Staff } from '@/types/database';
 
 export default function StaffList() {
+  const { canViewSalaries, isOwner } = useAuth();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +40,8 @@ export default function StaffList() {
 
   const fetchStaff = async () => {
     try {
+      // Only owners can access full staff table with salary
+      // This page should only be accessible to owners anyway
       const { data, error } = await supabase
         .from('staff')
         .select('*')
@@ -73,12 +77,14 @@ export default function StaffList() {
         title="Staff Management"
         description="Manage your team members and their details"
       >
-        <Link to="/staff/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Staff
-          </Button>
-        </Link>
+        {isOwner && (
+          <Link to="/staff/new">
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Staff
+            </Button>
+          </Link>
+        )}
       </PageHeader>
 
       {/* Search */}
@@ -105,8 +111,8 @@ export default function StaffList() {
               title="No staff found"
               description={searchQuery ? "Try adjusting your search" : "Add your first team member"}
               action={
-                !searchQuery
-                  ? <Button onClick={() => {}}>Add Staff</Button>
+                !searchQuery && isOwner
+                  ? <Link to="/staff/new"><Button>Add Staff</Button></Link>
                   : undefined
               }
             />
@@ -118,7 +124,10 @@ export default function StaffList() {
                     <TableHead>Employee</TableHead>
                     <TableHead>Department</TableHead>
                     <TableHead>Designation</TableHead>
-                    <TableHead className="text-right">Salary</TableHead>
+                    {/* SALARY CONFIDENTIALITY: Only show salary column to Owner */}
+                    {canViewSalaries && (
+                      <TableHead className="text-right">Salary</TableHead>
+                    )}
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
@@ -144,9 +153,12 @@ export default function StaffList() {
                       </TableCell>
                       <TableCell>{member.department || '-'}</TableCell>
                       <TableCell>{member.designation || '-'}</TableCell>
-                      <TableCell className="text-right">
-                        <Amount value={member.monthly_salary} />
-                      </TableCell>
+                      {/* SALARY CONFIDENTIALITY: Only show salary value to Owner */}
+                      {canViewSalaries && (
+                        <TableCell className="text-right">
+                          <Amount value={member.monthly_salary} />
+                        </TableCell>
+                      )}
                       <TableCell>
                         <StatusBadge status={member.is_active ? 'active' : 'inactive'} />
                       </TableCell>
@@ -167,12 +179,14 @@ export default function StaffList() {
                                 View Details
                               </Link>
                             </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link to={`/staff/${member.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
+                            {isOwner && (
+                              <DropdownMenuItem asChild>
+                                <Link to={`/staff/${member.id}/edit`}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit
+                                </Link>
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem asChild>
                               <Link to={`/ledger?staff=${member.id}`}>
                                 <FileText className="mr-2 h-4 w-4" />
