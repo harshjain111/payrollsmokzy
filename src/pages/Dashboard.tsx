@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { OwnerDashboard } from '@/components/dashboards/OwnerDashboard';
+import { AdminDashboard } from '@/components/dashboards/AdminDashboard';
 import { AccountantDashboard } from '@/components/dashboards/AccountantDashboard';
 import { StaffDashboard } from '@/components/dashboards/StaffDashboard';
 import { CADashboard } from '@/components/dashboards/CADashboard';
@@ -24,6 +25,8 @@ export default function Dashboard() {
   switch (userRole) {
     case 'owner':
       return <OwnerDashboard />;
+    case 'admin':
+      return <AdminDashboard />;
     case 'accountant':
       return <AccountantDashboard />;
     case 'staff':

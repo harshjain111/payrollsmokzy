@@ -7,29 +7,27 @@ import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Amount } from '@/components/ui/amount';
-import { StatusBadge } from '@/components/ui/status-badge';
+import { PayoutsWidget } from './PayoutsWidget';
 import {
   FileText,
   CreditCard,
   ClipboardList,
   Plus,
   ChevronRight,
-  Receipt,
   CheckCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import type { LedgerEntry, Expense } from '@/types/database';
+import type { LedgerEntry } from '@/types/database';
 
 export function AccountantDashboard() {
   const { user, accountingMode } = useAuth();
   const [stats, setStats] = useState({
     todayEntries: 0,
     pendingRequests: 0,
-    approvedExpenses: 0,
+    pendingPayouts: 0,
     reimbursedToday: 0,
   });
   const [recentEntries, setRecentEntries] = useState<LedgerEntry[]>([]);
-  const [approvedExpenses, setApprovedExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -57,15 +55,17 @@ export function AccountantDashboard() {
 
       if (requestsError) throw requestsError;
 
-      // Fetch approved expenses (accountant can reimburse these)
-      const { data: approved, error: approvedError } = await supabase
+      // Fetch approved expenses + approved unpaid requests (pending payouts)
+      const { data: approvedExpenses } = await supabase
         .from('expenses')
-        .select('*, staff:staff_public(full_name, employee_id)')
-        .eq('status', 'approved')
-        .order('approved_at', { ascending: false })
-        .limit(5);
+        .select('id')
+        .eq('status', 'approved');
 
-      if (approvedError) throw approvedError;
+      const { data: approvedRequests } = await supabase
+        .from('payment_requests')
+        .select('id')
+        .eq('status', 'approved')
+        .is('paid_at', null);
 
       // Fetch reimbursed expenses today
       const { data: reimbursed, error: reimbursedError } = await supabase
@@ -90,12 +90,11 @@ export function AccountantDashboard() {
       setStats({
         todayEntries: todayPayments?.length || 0,
         pendingRequests: requests?.length || 0,
-        approvedExpenses: approved?.length || 0,
+        pendingPayouts: (approvedExpenses?.length || 0) + (approvedRequests?.length || 0),
         reimbursedToday: reimbursed?.length || 0,
       });
 
       setRecentEntries(entries as LedgerEntry[] || []);
-      setApprovedExpenses(approved as Expense[] || []);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -107,19 +106,19 @@ export function AccountantDashboard() {
     <div className="space-y-8">
       <PageHeader
         title="Accounting Dashboard"
-        description="Record payments and manage expense reimbursements"
+        description="Execute payouts for approved requests and expenses"
       >
         <div className="flex gap-2">
-          <Link to="/expenses/new">
+          <Link to="/requests/new">
             <Button variant="outline">
               <Plus className="mr-2 h-4 w-4" />
-              New Expense
+              New Request
             </Button>
           </Link>
-          <Link to="/payments/new">
+          <Link to="/payouts">
             <Button>
               <CreditCard className="mr-2 h-4 w-4" />
-              Record Payment
+              Payouts
             </Button>
           </Link>
         </div>
@@ -136,74 +135,31 @@ export function AccountantDashboard() {
         <StatCard
           title="Pending Requests"
           value={stats.pendingRequests}
-          subtitle="Awaiting approval (view only)"
+          subtitle="Awaiting approval"
           icon={ClipboardList}
         />
         <StatCard
-          title="Approved Expenses"
-          value={stats.approvedExpenses}
-          subtitle="Ready to reimburse"
-          icon={Receipt}
-          variant={stats.approvedExpenses > 0 ? 'warning' : 'default'}
+          title="Pending Payouts"
+          value={stats.pendingPayouts}
+          subtitle="Ready to pay"
+          icon={CreditCard}
+          variant={stats.pendingPayouts > 0 ? 'warning' : 'default'}
         />
         <StatCard
-          title="Reimbursed Today"
+          title="Paid Today"
           value={stats.reimbursedToday}
-          subtitle="Expenses paid"
+          subtitle="Completed"
           icon={CheckCircle}
           variant="success"
         />
       </div>
 
+      {/* Payouts Widget */}
+      <PayoutsWidget variant="compact" showSalary={false} />
+
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Approved Expenses - Ready to Reimburse */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Ready to Reimburse</CardTitle>
-              <CardDescription>Approved expenses awaiting payment</CardDescription>
-            </div>
-            <Link to="/expenses">
-              <Button variant="ghost" size="sm">
-                View all
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {approvedExpenses.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <CheckCircle className="h-10 w-10 text-success/50 mb-3" />
-                <p className="text-muted-foreground">All caught up!</p>
-                <p className="text-sm text-muted-foreground">No pending reimbursements</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {approvedExpenses.map((expense: any) => (
-                  <div
-                    key={expense.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-secondary/50 transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium text-sm">{expense.staff?.full_name}</p>
-                      <p className="text-xs text-muted-foreground capitalize">
-                        {expense.category?.replace('_', ' ')} • {expense.description?.slice(0, 30)}...
-                      </p>
-                    </div>
-                    <div className="text-right flex items-center gap-3">
-                      <Amount value={expense.amount} size="sm" />
-                      <Link to="/payments/new">
-                        <Button size="sm" variant="outline">
-                          Reimburse
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Payouts Full View */}
+        <PayoutsWidget variant="full" showSalary={false} />
 
         {/* Recent Entries */}
         <Card>
