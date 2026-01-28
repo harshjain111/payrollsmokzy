@@ -19,7 +19,7 @@ import NewRequest from "./pages/NewRequest";
 import Expenses from "./pages/Expenses";
 import NewExpense from "./pages/NewExpense";
 import Settlements from "./pages/Settlements";
-import RecordPayment from "./pages/RecordPayment";
+import Payouts from "./pages/Payouts";
 import Reports from "./pages/Reports";
 import AuditLog from "./pages/AuditLog";
 import NotFound from "./pages/NotFound";
@@ -63,7 +63,7 @@ function AppRoutes() {
       <Route path="/requests/new" element={<ProtectedRoute><NewRequest /></ProtectedRoute>} />
       <Route path="/expenses" element={<ProtectedRoute><Expenses /></ProtectedRoute>} />
       <Route path="/expenses/new" element={<ProtectedRoute><NewExpense /></ProtectedRoute>} />
-      <Route path="/payments/new" element={<ProtectedRoute><RecordPayment /></ProtectedRoute>} />
+      <Route path="/payouts" element={<ProtectedRoute><Payouts /></ProtectedRoute>} />
       <Route path="/settlements" element={<ProtectedRoute><Settlements /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />

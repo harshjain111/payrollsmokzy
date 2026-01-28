@@ -27,7 +27,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, Check, X, Loader2, CreditCard } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, Loader2, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
@@ -117,26 +117,26 @@ export default function Requests() {
         await supabase.rpc('create_notification', {
           _user_id: request.staff.user_id,
           _title: 'Request Approved',
-          _message: `Your payment request of ₹${request.amount.toLocaleString('en-IN')} has been approved.`,
+          _message: `Your payment request of ₹${request.amount.toLocaleString('en-IN')} has been approved and is ready for payout.`,
           _type: 'success',
           _reference_type: 'payment_request',
           _reference_id: request.id,
         });
       }
 
-      // Notify accountants that a request is ready for payment
-      const { data: accountants } = await supabase
+      // Notify accountants that a request is ready for payout
+      const { data: payoutExecutors } = await supabase
         .from('user_roles')
         .select('user_id')
-        .in('role', ['accountant', 'owner']);
+        .in('role', ['accountant', 'owner', 'admin']);
       
-      if (accountants) {
-        for (const acc of accountants) {
-          if (acc.user_id !== user?.id) {
+      if (payoutExecutors) {
+        for (const executor of payoutExecutors) {
+          if (executor.user_id !== user?.id) {
             await supabase.rpc('create_notification', {
-              _user_id: acc.user_id,
-              _title: 'Request Ready for Payment',
-              _message: `Payment request for ${request.staff?.full_name} (₹${request.amount.toLocaleString('en-IN')}) is approved and ready for payment.`,
+              _user_id: executor.user_id,
+              _title: 'Request Ready for Payout',
+              _message: `Advance request for ${request.staff?.full_name} (₹${request.amount.toLocaleString('en-IN')}) is approved and ready in Payouts.`,
               _type: 'info',
               _reference_type: 'payment_request',
               _reference_id: request.id,
@@ -145,7 +145,7 @@ export default function Requests() {
         }
       }
 
-      toast.success('Request approved successfully');
+      toast.success('Request approved - now available in Payouts');
       fetchRequests();
     } catch (error) {
       console.error('Error approving request:', error);
@@ -211,7 +211,7 @@ export default function Requests() {
         title="Payment Requests"
         description={
           canApprove
-            ? "Review and approve payment requests"
+            ? "Review and approve payment requests. Approved requests go to Payouts."
             : "View and create payment requests"
         }
       >
@@ -313,16 +313,16 @@ export default function Requests() {
                             </>
                           )}
                           
-                          {/* Pay button - for approved requests, visible to Owner/Admin/Accountant */}
+                          {/* "Go to Payouts" indicator for approved requests */}
                           {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
-                            <Link to={`/payments/new?request=${request.id}&staff=${request.staff_id}&amount=${request.amount}`}>
+                            <Link to="/payouts">
                               <Button
                                 size="sm"
-                                variant="default"
-                                className="gap-1"
+                                variant="outline"
+                                className="gap-1 text-xs"
                               >
-                                <CreditCard className="h-4 w-4" />
-                                Pay
+                                Payouts
+                                <ArrowRight className="h-3 w-3" />
                               </Button>
                             </Link>
                           )}
