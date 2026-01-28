@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Select,
   SelectContent,
@@ -14,11 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Amount, AmountInput } from '@/components/ui/amount';
+import { Amount } from '@/components/ui/amount';
 import { Separator } from '@/components/ui/separator';
-import { ArrowLeft, Calculator, Check, AlertTriangle } from 'lucide-react';
-import { format, subMonths } from 'date-fns';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Calculator, Check, AlertTriangle, Lock, Info } from 'lucide-react';
+import { format, subMonths, getDaysInMonth, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { SettlementConfirmDialog } from '@/components/settlements/SettlementConfirmDialog';
+import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentConfirmDialog';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
@@ -30,6 +34,12 @@ interface SettlementCalculation {
   advancesOutstanding: number;
   netPayable: number;
   excessAdvance: number;
+}
+
+interface ValidationResult {
+  valid: boolean;
+  error?: string;
+  warning?: boolean;
 }
 
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
@@ -48,11 +58,14 @@ export default function Settlements() {
   const [selectedMonth, setSelectedMonth] = useState<string>(format(subMonths(new Date(), 1), 'yyyy-MM'));
   const [leaveDays, setLeaveDays] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank_transfer');
-  const [isLoading, setIsLoading] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
   const [calculation, setCalculation] = useState<SettlementCalculation | null>(null);
   const [isAlreadySettled, setIsAlreadySettled] = useState(false);
+  const [validation, setValidation] = useState<ValidationResult | null>(null);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showZeroPaymentDialog, setShowZeroPaymentDialog] = useState(false);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isOwner) {
@@ -69,7 +82,7 @@ export default function Settlements() {
 
   useEffect(() => {
     if (selectedStaffId && selectedMonth) {
-      checkSettlementStatus();
+      validateSettlement();
       calculateSettlement();
     }
   }, [selectedStaffId, selectedMonth, leaveDays]);
@@ -89,18 +102,39 @@ export default function Settlements() {
     }
   };
 
-  const checkSettlementStatus = async () => {
+  const validateSettlement = async () => {
     try {
-      const { data, error } = await supabase
+      // Check if already settled
+      const { data: settledData } = await supabase
         .rpc('is_salary_settled', {
+          _staff_id: selectedStaffId,
+          _month: selectedMonth,
+        });
+      
+      setIsAlreadySettled(settledData);
+
+      // Run server-side validation
+      const { data: validationData, error } = await supabase
+        .rpc('validate_settlement', {
           _staff_id: selectedStaffId,
           _month: selectedMonth,
         });
 
       if (error) throw error;
-      setIsAlreadySettled(data);
+      
+      const result = validationData as unknown as ValidationResult;
+      setValidation(result);
+
+      // Generate warnings
+      const newWarnings: string[] = [];
+      
+      if (result.warning) {
+        newWarnings.push('Staff is inactive');
+      }
+
+      setWarnings(newWarnings);
     } catch (error) {
-      console.error('Error checking settlement status:', error);
+      console.error('Error validating settlement:', error);
     }
   };
 
@@ -128,7 +162,8 @@ export default function Settlements() {
       if (advanceError) throw advanceError;
 
       const monthlySalary = Number(salaryData) || 0;
-      const dailySalary = monthlySalary / 30;
+      const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
+      const dailySalary = monthlySalary / 30; // Standard 30-day calculation
       const leaveDeduction = dailySalary * leaveDays;
       const grossSalary = monthlySalary - leaveDeduction;
       const advancesOutstanding = Number(advanceData) || 0;
@@ -141,6 +176,16 @@ export default function Settlements() {
         excessAdvance = Math.abs(netPayable);
         netPayable = 0;
       }
+
+      // Add leave warning
+      const newWarnings = [...warnings.filter(w => !w.includes('leave'))];
+      if (leaveDays > 5) {
+        newWarnings.push(`High leave days (${leaveDays} days) - please verify`);
+      }
+      if (leaveDays > daysInMonth) {
+        newWarnings.push(`Leave days exceed days in month (${daysInMonth})`);
+      }
+      setWarnings(newWarnings);
 
       setCalculation({
         monthlySalary,
@@ -161,6 +206,37 @@ export default function Settlements() {
       });
     } finally {
       setIsCalculating(false);
+    }
+  };
+
+  const handleSettleClick = () => {
+    if (!calculation) return;
+
+    // Validation checks
+    const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
+    
+    if (leaveDays > 30) {
+      toast({
+        title: 'Invalid Leave Days',
+        description: 'Leave days cannot exceed 30.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (leaveDays > daysInMonth) {
+      toast({
+        title: 'Invalid Leave Days',
+        description: `Leave days cannot exceed ${daysInMonth} for this month.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (calculation.netPayable === 0) {
+      setShowZeroPaymentDialog(true);
+    } else {
+      setShowConfirmDialog(true);
     }
   };
 
@@ -185,32 +261,36 @@ export default function Settlements() {
 
       if (voucherError) throw voucherError;
 
-      // Create ledger entry for salary payment
-      const { data: ledgerEntry, error: ledgerError } = await supabase
-        .from('ledger_entries')
-        .insert({
-          staff_id: selectedStaffId,
-          voucher_type: 'settlement',
-          voucher_no: voucherNo,
-          entry_date: new Date().toISOString().split('T')[0],
-          description: `Salary settlement for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`,
-          debit: 0,
-          credit: calculation.netPayable,
-          tag: 'salary',
-          reference_month: selectedMonth,
-          payment_mode: paymentMode,
-          paid_by: user?.id,
-          approved_by: user?.id,
-          is_immutable: true,
-          created_by: user?.id,
-        })
-        .select()
-        .single();
+      // Create ledger entry for salary payment (only if net > 0)
+      let ledgerEntryId = null;
+      if (calculation.netPayable > 0) {
+        const { data: ledgerEntry, error: ledgerError } = await supabase
+          .from('ledger_entries')
+          .insert({
+            staff_id: selectedStaffId,
+            voucher_type: 'settlement',
+            voucher_no: voucherNo,
+            entry_date: new Date().toISOString().split('T')[0],
+            description: `Salary settlement for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`,
+            debit: 0,
+            credit: calculation.netPayable,
+            tag: 'salary',
+            reference_month: selectedMonth,
+            payment_mode: paymentMode,
+            paid_by: user?.id,
+            approved_by: user?.id,
+            is_immutable: true,
+            created_by: user?.id,
+          })
+          .select()
+          .single();
 
-      if (ledgerError) throw ledgerError;
+        if (ledgerError) throw ledgerError;
+        ledgerEntryId = ledgerEntry.id;
+      }
 
       // If there were advances, create adjustment entry
-      if (calculation.advancesOutstanding > 0) {
+      if (calculation.advancesOutstanding > 0 && calculation.grossSalary > 0) {
         const adjustmentAmount = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
         
         const { data: adjustVoucher } = await supabase
@@ -248,7 +328,7 @@ export default function Settlements() {
           status: 'settled',
           settled_at: new Date().toISOString(),
           settled_by: user?.id,
-          ledger_entry_id: ledgerEntry.id,
+          ledger_entry_id: ledgerEntryId,
           created_by: user?.id,
         });
 
@@ -264,6 +344,8 @@ export default function Settlements() {
       setLeaveDays(0);
       setCalculation(null);
       setIsAlreadySettled(false);
+      setShowConfirmDialog(false);
+      setShowZeroPaymentDialog(false);
     } catch (error: any) {
       console.error('Error settling salary:', error);
       toast({
@@ -276,16 +358,18 @@ export default function Settlements() {
     }
   };
 
-  // Generate month options (last 12 months)
+  // Generate month options (last 12 months, excluding future)
   const monthOptions = Array.from({ length: 12 }, (_, i) => {
     const date = subMonths(new Date(), i);
     return {
       value: format(date, 'yyyy-MM'),
       label: format(date, 'MMMM yyyy'),
     };
-  });
+  }).filter(m => m.value <= format(new Date(), 'yyyy-MM'));
 
   const selectedStaff = staff.find(s => s.id === selectedStaffId);
+  const daysInMonth = selectedMonth ? getDaysInMonth(parseISO(selectedMonth + '-01')) : 30;
+  const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && leaveDays <= 30;
 
   return (
     <div className="space-y-6">
@@ -339,36 +423,66 @@ export default function Settlements() {
               </Select>
             </div>
 
+            {/* Validation Messages */}
             {isAlreadySettled && (
-              <div className="flex items-center gap-2 p-3 bg-warning/10 text-warning rounded-lg">
+              <Alert className="border-warning bg-warning/10">
+                <Lock className="h-4 w-4 text-warning" />
+                <AlertDescription className="text-warning">
+                  Salary for this month is already settled and cannot be modified.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {validation && !validation.valid && !isAlreadySettled && (
+              <Alert variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
-                <span className="text-sm font-medium">
-                  Salary for this month is already settled
-                </span>
-              </div>
+                <AlertDescription>{validation.error}</AlertDescription>
+              </Alert>
+            )}
+
+            {warnings.length > 0 && validation?.valid && (
+              <Alert className="border-warning bg-warning/10">
+                <AlertTriangle className="h-4 w-4 text-warning" />
+                <AlertDescription className="text-warning">
+                  {warnings.map((w, i) => (
+                    <div key={i}>{w}</div>
+                  ))}
+                </AlertDescription>
+              </Alert>
             )}
 
             <Separator />
 
             <div className="space-y-2">
-              <Label htmlFor="leaveDays">Leave Days to Deduct</Label>
+              <Label htmlFor="leaveDays">
+                Leave Days to Deduct
+                <Badge variant="outline" className="ml-2">{daysInMonth} days in month</Badge>
+              </Label>
               <Input
                 id="leaveDays"
                 type="number"
                 min="0"
                 max="30"
                 value={leaveDays}
-                onChange={(e) => setLeaveDays(Number(e.target.value) || 0)}
+                onChange={(e) => {
+                  const value = Number(e.target.value) || 0;
+                  setLeaveDays(Math.min(30, Math.max(0, value)));
+                }}
                 placeholder="0"
+                disabled={isAlreadySettled}
               />
               <p className="text-xs text-muted-foreground">
-                Unpaid leave days (max 30)
+                Unpaid leave days (max 30). Daily rate = Salary / 30
               </p>
             </div>
 
             <div className="space-y-2">
               <Label>Payment Mode *</Label>
-              <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
+              <Select 
+                value={paymentMode} 
+                onValueChange={(v) => setPaymentMode(v as PaymentMode)}
+                disabled={isAlreadySettled}
+              >
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -408,7 +522,7 @@ export default function Settlements() {
                     <Amount value={calculation.monthlySalary} className="text-foreground" />
                   </div>
                   <div>
-                    <p className="text-muted-foreground">Daily Rate</p>
+                    <p className="text-muted-foreground">Daily Rate (÷30)</p>
                     <Amount value={calculation.dailySalary} className="text-foreground" />
                   </div>
                 </div>
@@ -457,14 +571,23 @@ export default function Settlements() {
                   )}
                 </div>
 
+                {calculation.netPayable === 0 && calculation.grossSalary > 0 && (
+                  <Alert className="border-info bg-info/10">
+                    <Info className="h-4 w-4 text-info" />
+                    <AlertDescription className="text-info text-xs">
+                      Net payable is ₹0 because advances exceed salary. You'll need to confirm zero payment.
+                    </AlertDescription>
+                  </Alert>
+                )}
+
                 <Button 
                   className="w-full" 
                   size="lg"
-                  onClick={handleSettle}
-                  disabled={isSettling || isAlreadySettled || calculation.netPayable <= 0}
+                  onClick={handleSettleClick}
+                  disabled={!canSettle}
                 >
                   <Check className="mr-2 h-4 w-4" />
-                  {isSettling ? 'Processing...' : 'Confirm & Settle'}
+                  {isAlreadySettled ? 'Already Settled' : 'Review & Settle'}
                 </Button>
               </div>
             ) : (
@@ -475,6 +598,36 @@ export default function Settlements() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Dialogs */}
+      {calculation && selectedStaff && (
+        <>
+          <SettlementConfirmDialog
+            open={showConfirmDialog}
+            onOpenChange={setShowConfirmDialog}
+            onConfirm={handleSettle}
+            staffName={selectedStaff.full_name}
+            month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+            calculation={calculation}
+            paymentMode={paymentMode}
+            isLoading={isSettling}
+          />
+
+          <ZeroPaymentConfirmDialog
+            open={showZeroPaymentDialog}
+            onOpenChange={setShowZeroPaymentDialog}
+            onConfirm={handleSettle}
+            staffName={selectedStaff.full_name}
+            month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+            reason={
+              calculation.advancesOutstanding > calculation.grossSalary
+                ? `Outstanding advances (₹${calculation.advancesOutstanding.toLocaleString('en-IN')}) exceed gross salary`
+                : 'No salary payable after deductions'
+            }
+            isLoading={isSettling}
+          />
+        </>
+      )}
     </div>
   );
 }

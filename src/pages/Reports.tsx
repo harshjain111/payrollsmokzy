@@ -17,6 +17,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Amount } from '@/components/ui/amount';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -24,6 +25,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TableFooter,
 } from '@/components/ui/table';
 import { 
   BarChart3, 
@@ -35,13 +37,22 @@ import {
   Wallet,
   ArrowUpRight,
   Receipt,
+  FileDown,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import {
+  exportLedgerPDF,
+  exportSalaryRegisterPDF,
+  exportPaymentRegisterPDF,
+  exportExpenseReportPDF,
+} from '@/lib/pdf-export';
 import type { Staff } from '@/types/database';
 
-type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary';
+type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary' | 'reconciliation';
 
 interface DateRange {
   from: Date;
@@ -372,16 +383,43 @@ export default function Reports() {
     };
   });
 
+  const handlePDFExport = () => {
+    const selectedStaffName = staff.find(s => s.id === selectedStaffId)?.full_name || 'All Staff';
+    
+    switch (activeReport) {
+      case 'ledger':
+        exportLedgerPDF(reportData, selectedStaffName, dateRange);
+        break;
+      case 'salary':
+        exportSalaryRegisterPDF(reportData, selectedMonth, canViewSalaries);
+        break;
+      case 'payment':
+        exportPaymentRegisterPDF(reportData, dateRange);
+        break;
+      case 'expense':
+        exportExpenseReportPDF(reportData, dateRange);
+        break;
+      default:
+        toast({ title: 'PDF export not available', description: 'Use CSV for this report.', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Reports"
         description="Generate and export accounting reports"
       >
-        <Button onClick={exportToCSV} disabled={reportData.length === 0}>
-          <Download className="mr-2 h-4 w-4" />
-          Export CSV
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={exportToCSV} disabled={reportData.length === 0}>
+            <Download className="mr-2 h-4 w-4" />
+            CSV
+          </Button>
+          <Button onClick={handlePDFExport} disabled={reportData.length === 0 || activeReport === 'summary' || activeReport === 'advance'}>
+            <FileDown className="mr-2 h-4 w-4" />
+            PDF
+          </Button>
+        </div>
       </PageHeader>
 
       <Tabs value={activeReport} onValueChange={(v) => setActiveReport(v as ReportType)}>
