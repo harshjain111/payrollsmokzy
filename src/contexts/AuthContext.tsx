@@ -21,7 +21,11 @@ interface AuthContextType {
   canViewSalaries: boolean;
   canMakePayments: boolean;
   canApproveExpenses: boolean;
+  canApproveRequests: boolean;
   canRecordPayments: boolean;
+  canRecordSalaryPayments: boolean;
+  canRecordAdvancePayments: boolean;
+  canRecordExpensePayments: boolean;
   canAccessSettlements: boolean;
   accountingMode: boolean;
   setAccountingMode: (mode: boolean) => void;
@@ -161,11 +165,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Admin, Accountant, CA cannot view ANY salary data
   const canViewSalaries = isOwner;
   
-  // Payment permissions
+  // Payment permissions - differentiated by type
+  // Owner: full access
+  // Admin: can record payments (advance + expense only, no salary)
+  // Accountant: can record payments (advance + expense only, no salary)
   const canMakePayments = isOwner;
   const canRecordPayments = isOwner || isAdmin || isAccountant;
+  const canRecordSalaryPayments = isOwner; // Only owner can do salary payments/settlements
+  const canRecordAdvancePayments = isOwner || isAdmin || isAccountant;
+  const canRecordExpensePayments = isOwner || isAdmin || isAccountant;
   
-  // Expense approval - Owner and Admin only
+  // Request approval - Owner and Admin only (Accountant cannot approve)
+  const canApproveRequests = isOwner || isAdmin;
+  
+  // Expense approval - Owner and Admin only (Accountant cannot approve)
   const canApproveExpenses = isOwner || isAdmin;
   
   // Settlement access - Owner ONLY
@@ -189,7 +202,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     canViewSalaries,
     canMakePayments,
     canApproveExpenses,
+    canApproveRequests,
     canRecordPayments,
+    canRecordSalaryPayments,
+    canRecordAdvancePayments,
+    canRecordExpensePayments,
     canAccessSettlements,
     accountingMode,
     setAccountingMode,

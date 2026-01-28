@@ -54,7 +54,7 @@ import {
 } from '@/lib/pdf-export';
 import type { Staff } from '@/types/database';
 
-type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary' | 'reconciliation';
+type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary';
 
 interface DateRange {
   from: Date;
@@ -63,7 +63,10 @@ interface DateRange {
 
 export default function Reports() {
   const navigate = useNavigate();
-  const { isOwner, isCA, isAccountant, canViewSalaries } = useAuth();
+  const { isOwner, isCA, isAccountant, isAdmin, canViewSalaries } = useAuth();
+  
+  // Determine if user can see salary-related reports
+  const canSeeSalaryReports = canViewSalaries;
   
   const [activeReport, setActiveReport] = useState<ReportType>('summary');
   const [staff, setStaff] = useState<Staff[]>([]);
@@ -84,7 +87,7 @@ export default function Reports() {
   });
 
   useEffect(() => {
-    if (!isOwner && !isCA && !isAccountant) {
+    if (!isOwner && !isCA && !isAccountant && !isAdmin) {
       toast({
         title: 'Access Denied',
         description: 'You do not have permission to view reports.',
@@ -94,7 +97,7 @@ export default function Reports() {
       return;
     }
     fetchStaff();
-  }, [isOwner, isCA, isAccountant]);
+  }, [isOwner, isCA, isAccountant, isAdmin]);
 
   useEffect(() => {
     fetchReportData();
@@ -435,7 +438,7 @@ export default function Reports() {
       </PageHeader>
 
       <Tabs value={activeReport} onValueChange={(v) => setActiveReport(v as ReportType)}>
-        <TabsList className="grid grid-cols-3 lg:grid-cols-6 gap-1">
+        <TabsList className={cn("grid gap-1", canSeeSalaryReports ? "grid-cols-3 lg:grid-cols-6" : "grid-cols-2 lg:grid-cols-4")}>
           <TabsTrigger value="summary" className="flex items-center gap-1">
             <BarChart3 className="h-4 w-4" />
             <span className="hidden sm:inline">Summary</span>
@@ -444,10 +447,12 @@ export default function Reports() {
             <FileText className="h-4 w-4" />
             <span className="hidden sm:inline">Ledger</span>
           </TabsTrigger>
-          <TabsTrigger value="salary" className="flex items-center gap-1">
-            <Wallet className="h-4 w-4" />
-            <span className="hidden sm:inline">Salary</span>
-          </TabsTrigger>
+          {canSeeSalaryReports && (
+            <TabsTrigger value="salary" className="flex items-center gap-1">
+              <Wallet className="h-4 w-4" />
+              <span className="hidden sm:inline">Salary</span>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="advance" className="flex items-center gap-1">
             <ArrowUpRight className="h-4 w-4" />
             <span className="hidden sm:inline">Advances</span>
@@ -550,22 +555,25 @@ export default function Reports() {
         </Card>
 
         {/* Report Content */}
+        {/* Summary - hide salary-related stats for non-owners */}
         <TabsContent value="summary" className="mt-4">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className={cn("grid gap-4", canSeeSalaryReports ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3")}>
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Active Staff</CardDescription>
                 <CardTitle className="text-2xl">{summaryStats.staffCount}</CardTitle>
               </CardHeader>
             </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Monthly Payroll</CardDescription>
-                <CardTitle className="text-2xl">
-                  <Amount value={summaryStats.totalPayroll} className="text-foreground" />
-                </CardTitle>
-              </CardHeader>
-            </Card>
+            {canSeeSalaryReports && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardDescription>Monthly Payroll</CardDescription>
+                  <CardTitle className="text-2xl">
+                    <Amount value={summaryStats.totalPayroll} className="text-foreground" />
+                  </CardTitle>
+                </CardHeader>
+              </Card>
+            )}
             <Card>
               <CardHeader className="pb-2">
                 <CardDescription>Advances Outstanding</CardDescription>
@@ -636,68 +644,67 @@ export default function Reports() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="salary" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Salary Register - {format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Staff</TableHead>
-                      {canViewSalaries && <TableHead className="text-right">Base Salary</TableHead>}
-                      <TableHead className="text-right">Leave Days</TableHead>
-                      <TableHead className="text-right">Deduction</TableHead>
-                      {canViewSalaries && <TableHead className="text-right">Net Salary</TableHead>}
-                      <TableHead className="text-right">Advances Adj.</TableHead>
-                      <TableHead className="text-right">Paid</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {reportData.map((settlement) => (
-                      <TableRow key={settlement.id}>
-                        <TableCell>{settlement.staff?.full_name}</TableCell>
-                        {canViewSalaries && (
+        {/* Salary Report - Only for owners */}
+        {canSeeSalaryReports && (
+          <TabsContent value="salary" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Salary Register - {format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                  </div>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Staff</TableHead>
+                        <TableHead className="text-right">Base Salary</TableHead>
+                        <TableHead className="text-right">Leave Days</TableHead>
+                        <TableHead className="text-right">Deduction</TableHead>
+                        <TableHead className="text-right">Net Salary</TableHead>
+                        <TableHead className="text-right">Advances Adj.</TableHead>
+                        <TableHead className="text-right">Paid</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {reportData.map((settlement) => (
+                        <TableRow key={settlement.id}>
+                          <TableCell>{settlement.staff?.full_name}</TableCell>
                           <TableCell className="text-right">
                             <Amount value={settlement.base_salary} />
                           </TableCell>
-                        )}
-                        <TableCell className="text-right">{settlement.leave_days}</TableCell>
-                        <TableCell className="text-right">
-                          <Amount value={settlement.leave_deduction} />
-                        </TableCell>
-                        {canViewSalaries && (
+                          <TableCell className="text-right">{settlement.leave_days}</TableCell>
+                          <TableCell className="text-right">
+                            <Amount value={settlement.leave_deduction} />
+                          </TableCell>
                           <TableCell className="text-right">
                             <Amount value={settlement.net_salary} />
                           </TableCell>
-                        )}
-                        <TableCell className="text-right">
-                          <Amount value={settlement.advances_adjusted} />
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          <Amount value={settlement.balance_payable} />
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {reportData.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={canViewSalaries ? 7 : 5} className="text-center py-8 text-muted-foreground">
-                          No settlements for this month
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                          <TableCell className="text-right">
+                            <Amount value={settlement.advances_adjusted} />
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            <Amount value={settlement.balance_payable} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {reportData.length === 0 && (
+                        <TableRow>
+                          <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                            No settlements for this month
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         <TabsContent value="advance" className="mt-4">
           <Card>
