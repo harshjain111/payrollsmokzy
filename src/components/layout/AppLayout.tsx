@@ -30,6 +30,7 @@ import {
   Wallet,
   Receipt,
   History,
+  UserPlus,
 } from 'lucide-react';
 
 interface NavItem {
@@ -50,6 +51,12 @@ const navItems: NavItem[] = [
     href: '/staff',
     icon: Users,
     roles: ['owner'], // Only owner can manage staff (see salaries)
+  },
+  {
+    title: 'Add User',
+    href: '/staff/new',
+    icon: UserPlus,
+    roles: ['owner'], // Only owner can create new users
   },
   {
     title: 'Ledger',
