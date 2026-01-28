@@ -115,12 +115,14 @@ function getNavSections(
     ];
   }
 
-  // Admin - can approve, record payments (no salary)
+  // Admin - can approve, record payments (no salary), add staff
   if (userRole === 'admin') {
     return [
       {
         items: [
           { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+          { title: 'Staff', href: '/staff', icon: Users },
+          { title: 'Add User', href: '/staff/new', icon: UserPlus },
         ],
       },
       {
