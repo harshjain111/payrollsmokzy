@@ -20,6 +20,7 @@ import NewExpense from "./pages/NewExpense";
 import Settlements from "./pages/Settlements";
 import RecordPayment from "./pages/RecordPayment";
 import Reports from "./pages/Reports";
+import AuditLog from "./pages/AuditLog";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -63,6 +64,7 @@ function AppRoutes() {
       <Route path="/payments/new" element={<ProtectedRoute><RecordPayment /></ProtectedRoute>} />
       <Route path="/settlements" element={<ProtectedRoute><Settlements /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+      <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
       
       {/* Catch-all */}
       <Route path="*" element={<NotFound />} />
