@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -125,7 +126,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
         <span className="text-xl font-bold text-primary">Smokzy</span>
-        <div className="w-10" />
+        <NotificationBell />
       </header>
 
       <div className="flex">

@@ -306,6 +306,54 @@ export type Database = {
           },
         ]
       }
+      salary_history: {
+        Row: {
+          change_reason: string | null
+          changed_by: string | null
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          monthly_salary: number
+          staff_id: string
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          effective_from: string
+          effective_to?: string | null
+          id?: string
+          monthly_salary: number
+          staff_id: string
+        }
+        Update: {
+          change_reason?: string | null
+          changed_by?: string | null
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          monthly_salary?: number
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       salary_settlements: {
         Row: {
           advances_adjusted: number | null
@@ -509,6 +557,13 @@ export type Database = {
       }
     }
     Functions: {
+      calculate_running_balance: {
+        Args: { _staff_id: string }
+        Returns: {
+          entry_id: string
+          running_balance: number
+        }[]
+      }
       create_notification: {
         Args: {
           _message: string
@@ -524,6 +579,11 @@ export type Database = {
         Args: { _voucher_type: Database["public"]["Enums"]["voucher_type"] }
         Returns: string
       }
+      get_advances_outstanding: { Args: { _staff_id: string }; Returns: number }
+      get_staff_salary_for_month: {
+        Args: { _month: string; _staff_id: string }
+        Returns: number
+      }
       get_user_staff_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
@@ -533,6 +593,10 @@ export type Database = {
         Returns: boolean
       }
       is_finance_user: { Args: { _user_id: string }; Returns: boolean }
+      is_salary_settled: {
+        Args: { _month: string; _staff_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "owner" | "accountant" | "staff" | "ca"
