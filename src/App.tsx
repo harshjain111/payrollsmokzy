@@ -12,6 +12,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import StaffList from "./pages/StaffList";
 import StaffForm from "./pages/StaffForm";
+import StaffDetails from "./pages/StaffDetails";
 import Ledger from "./pages/Ledger";
 import Requests from "./pages/Requests";
 import NewRequest from "./pages/NewRequest";
@@ -55,6 +56,7 @@ function AppRoutes() {
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/staff" element={<ProtectedRoute><StaffList /></ProtectedRoute>} />
       <Route path="/staff/new" element={<ProtectedRoute><StaffForm /></ProtectedRoute>} />
+      <Route path="/staff/:id" element={<ProtectedRoute><StaffDetails /></ProtectedRoute>} />
       <Route path="/staff/:id/edit" element={<ProtectedRoute><StaffForm /></ProtectedRoute>} />
       <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
