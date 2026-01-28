@@ -50,6 +50,91 @@ export type Database = {
         }
         Relationships: []
       }
+      expenses: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at: string
+          created_by: string | null
+          description: string
+          expense_date: string
+          id: string
+          ledger_entry_id: string | null
+          proof_url: string | null
+          reimbursed_at: string | null
+          reimbursed_by: string | null
+          rejection_reason: string | null
+          staff_id: string
+          status: Database["public"]["Enums"]["expense_status"]
+          submitted_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by?: string | null
+          description: string
+          expense_date?: string
+          id?: string
+          ledger_entry_id?: string | null
+          proof_url?: string | null
+          reimbursed_at?: string | null
+          reimbursed_by?: string | null
+          rejection_reason?: string | null
+          staff_id: string
+          status?: Database["public"]["Enums"]["expense_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category?: Database["public"]["Enums"]["expense_category"]
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          expense_date?: string
+          id?: string
+          ledger_entry_id?: string | null
+          proof_url?: string | null
+          reimbursed_at?: string | null
+          reimbursed_by?: string | null
+          rejection_reason?: string | null
+          staff_id?: string
+          status?: Database["public"]["Enums"]["expense_status"]
+          submitted_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_ledger_entry_id_fkey"
+            columns: ["ledger_entry_id"]
+            isOneToOne: false
+            referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_entries: {
         Row: {
           approved_by: string | null
@@ -127,6 +212,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notifications: {
+        Row: {
+          created_at: string
+          id: string
+          is_read: boolean
+          message: string
+          reference_id: string | null
+          reference_type: string | null
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title: string
+          type?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          message?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       payment_requests: {
         Row: {
@@ -388,6 +509,17 @@ export type Database = {
       }
     }
     Functions: {
+      create_notification: {
+        Args: {
+          _message: string
+          _reference_id?: string
+          _reference_type?: string
+          _title: string
+          _type?: string
+          _user_id: string
+        }
+        Returns: string
+      }
       generate_voucher_no: {
         Args: { _voucher_type: Database["public"]["Enums"]["voucher_type"] }
         Returns: string
@@ -404,6 +536,20 @@ export type Database = {
     }
     Enums: {
       app_role: "owner" | "accountant" | "staff" | "ca"
+      expense_category:
+        | "travel"
+        | "food"
+        | "logistics"
+        | "equipment"
+        | "office_supplies"
+        | "communication"
+        | "other"
+      expense_status:
+        | "draft"
+        | "pending"
+        | "approved"
+        | "rejected"
+        | "reimbursed"
       payment_mode: "cash" | "upi" | "bank_transfer" | "cheque"
       request_status: "pending" | "approved" | "rejected"
       settlement_status: "pending" | "settled"
@@ -413,6 +559,7 @@ export type Database = {
         | "settlement"
         | "advance"
         | "deduction"
+        | "expense"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -541,6 +688,22 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["owner", "accountant", "staff", "ca"],
+      expense_category: [
+        "travel",
+        "food",
+        "logistics",
+        "equipment",
+        "office_supplies",
+        "communication",
+        "other",
+      ],
+      expense_status: [
+        "draft",
+        "pending",
+        "approved",
+        "rejected",
+        "reimbursed",
+      ],
       payment_mode: ["cash", "upi", "bank_transfer", "cheque"],
       request_status: ["pending", "approved", "rejected"],
       settlement_status: ["pending", "settled"],
@@ -550,6 +713,7 @@ export const Constants = {
         "settlement",
         "advance",
         "deduction",
+        "expense",
       ],
     },
   },

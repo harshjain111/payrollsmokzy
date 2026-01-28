@@ -14,6 +14,8 @@ import StaffList from "./pages/StaffList";
 import Ledger from "./pages/Ledger";
 import Requests from "./pages/Requests";
 import NewRequest from "./pages/NewRequest";
+import Expenses from "./pages/Expenses";
+import NewExpense from "./pages/NewExpense";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -82,6 +84,22 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <NewRequest />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute>
+            <Expenses />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/expenses/new"
+        element={
+          <ProtectedRoute>
+            <NewExpense />
           </ProtectedRoute>
         }
       />

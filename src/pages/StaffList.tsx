@@ -106,10 +106,7 @@ export default function StaffList() {
               description={searchQuery ? "Try adjusting your search" : "Add your first team member"}
               action={
                 !searchQuery
-                  ? {
-                      label: "Add Staff",
-                      onClick: () => {},
-                    }
+                  ? <Button onClick={() => {}}>Add Staff</Button>
                   : undefined
               }
             />
