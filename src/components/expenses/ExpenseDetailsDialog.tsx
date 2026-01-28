@@ -27,15 +27,34 @@ export function ExpenseDetailsDialog({
   onOpenChange,
 }: ExpenseDetailsDialogProps) {
   const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [isLoadingProof, setIsLoadingProof] = useState(false);
 
   useEffect(() => {
-    if (expense.proof_url) {
-      const { data } = supabase.storage
-        .from('expense-proofs')
-        .getPublicUrl(expense.proof_url);
-      setProofUrl(data.publicUrl);
-    }
-  }, [expense.proof_url]);
+    const fetchSignedUrl = async () => {
+      if (expense.proof_url && open) {
+        setIsLoadingProof(true);
+        try {
+          // Use signed URL for private bucket
+          const { data, error } = await supabase.storage
+            .from('expense-proofs')
+            .createSignedUrl(expense.proof_url, 3600); // 1 hour expiry
+          
+          if (error) {
+            console.error('Error getting signed URL:', error);
+            return;
+          }
+          
+          setProofUrl(data.signedUrl);
+        } catch (error) {
+          console.error('Error fetching proof URL:', error);
+        } finally {
+          setIsLoadingProof(false);
+        }
+      }
+    };
+
+    fetchSignedUrl();
+  }, [expense.proof_url, open]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -92,13 +111,22 @@ export function ExpenseDetailsDialog({
               <Separator />
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Proof / Receipt</p>
-                <Button variant="outline" size="sm" asChild>
-                  <a href={proofUrl || '#'} target="_blank" rel="noopener noreferrer">
-                    <FileText className="mr-2 h-4 w-4" />
-                    View Attachment
-                    <ExternalLink className="ml-2 h-3 w-3" />
-                  </a>
-                </Button>
+                {isLoadingProof ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                    Loading...
+                  </div>
+                ) : proofUrl ? (
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={proofUrl} target="_blank" rel="noopener noreferrer">
+                      <FileText className="mr-2 h-4 w-4" />
+                      View Attachment
+                      <ExternalLink className="ml-2 h-3 w-3" />
+                    </a>
+                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Unable to load attachment</p>
+                )}
               </div>
             </>
           )}
