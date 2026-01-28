@@ -22,7 +22,7 @@ export interface UserRole {
 
 export interface Staff {
   id: string;
-  user_id: string;
+  user_id: string | null;
   employee_id: string;
   full_name: string;
   email: string;
@@ -39,7 +39,7 @@ export interface Staff {
 
 export interface StaffPublic {
   id: string;
-  user_id: string;
+  user_id: string | null;
   employee_id: string;
   full_name: string;
   email: string;
