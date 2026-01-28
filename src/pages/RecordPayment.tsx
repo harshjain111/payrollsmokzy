@@ -63,6 +63,10 @@ export default function RecordPayment() {
   const navigate = useNavigate();
   const { user, isOwner, isAccountant, isStaff } = useAuth();
   
+  // Determine access
+  const hasAccess = isOwner || isAccountant;
+  const accessDenied = isStaff || !hasAccess;
+  
   // Core state
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
@@ -88,33 +92,17 @@ export default function RecordPayment() {
   // Confirmation dialog
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  // Access control - block staff
+  // Fetch staff on mount
   useEffect(() => {
-    if (isStaff) {
-      toast({
-        title: 'Access Denied',
-        description: 'Staff members cannot record payments.',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
-      return;
+    if (hasAccess) {
+      fetchStaff();
     }
-    
-    if (!isOwner && !isAccountant) {
-      toast({
-        title: 'Access Denied',
-        description: 'Only owners and accountants can record payments.',
-        variant: 'destructive',
-      });
-      navigate('/dashboard');
-      return;
-    }
-    
-    fetchStaff();
-  }, [isOwner, isAccountant, isStaff, navigate]);
+  }, [hasAccess]);
 
   // Fetch staff financials when staff selected
   useEffect(() => {
+    if (!hasAccess) return;
+    
     if (selectedStaffId) {
       fetchStaffFinancials();
       
@@ -130,7 +118,7 @@ export default function RecordPayment() {
       setApprovedExpenses([]);
       setUnsettledMonths([]);
     }
-  }, [selectedStaffId, paymentType]);
+  }, [selectedStaffId, paymentType, hasAccess]);
 
   // Reset expense selection when staff changes
   useEffect(() => {
@@ -147,6 +135,36 @@ export default function RecordPayment() {
       }
     }
   }, [selectedExpenseId, approvedExpenses]);
+
+  // Generate month options for advance (moved before early return)
+  const monthOptions = useMemo(() => 
+    Array.from({ length: 6 }, (_, i) => {
+      const date = subMonths(new Date(), i);
+      return {
+        value: format(date, 'yyyy-MM'),
+        label: format(date, 'MMMM yyyy'),
+      };
+    }), []
+  );
+
+  // Access control - block staff and unauthorized users
+  if (accessDenied) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <AlertCircle className="h-12 w-12 text-destructive" />
+        <h2 className="text-xl font-semibold">Access Denied</h2>
+        <p className="text-muted-foreground">
+          {isStaff 
+            ? 'Staff members cannot record payments.' 
+            : 'Only owners and accountants can record payments.'}
+        </p>
+        <Button onClick={() => navigate('/dashboard')}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+      </div>
+    );
+  }
 
   const fetchStaff = async () => {
     try {
@@ -452,17 +470,6 @@ export default function RecordPayment() {
       setIsSubmitting(false);
     }
   };
-
-  // Generate month options for advance
-  const monthOptions = useMemo(() => 
-    Array.from({ length: 6 }, (_, i) => {
-      const date = subMonths(new Date(), i);
-      return {
-        value: format(date, 'yyyy-MM'),
-        label: format(date, 'MMMM yyyy'),
-      };
-    }), []
-  );
 
   const selectedStaff = staff.find(s => s.id === selectedStaffId);
   const selectedExpense = approvedExpenses.find(e => e.id === selectedExpenseId);
