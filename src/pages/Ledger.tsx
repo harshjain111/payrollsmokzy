@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Amount } from '@/components/ui/amount';
+import { StatCard } from '@/components/ui/stat-card';
 import {
   Select,
   SelectContent,
@@ -22,9 +23,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Download, Filter } from 'lucide-react';
+import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale } from 'lucide-react';
 import { format } from 'date-fns';
-import type { LedgerEntry, Staff, StaffPublic } from '@/types/database';
+import type { LedgerEntry, StaffPublic } from '@/types/database';
 
 export default function Ledger() {
   const [searchParams] = useSearchParams();
@@ -126,7 +127,7 @@ export default function Ledger() {
   const selectedStaffName = staffList.find(s => s.id === selectedStaff)?.full_name;
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader
         title="Ledger"
         description={
@@ -137,26 +138,26 @@ export default function Ledger() {
             : "Staff-wise ledger entries"
         }
       >
-        <Button variant="outline">
+        <Button variant="outline" className="rounded-xl">
           <Download className="mr-2 h-4 w-4" />
           Export
         </Button>
       </PageHeader>
 
       {/* Filters */}
-      <Card className="mb-6">
+      <Card className="rounded-2xl shadow-card border-0">
         <CardContent className="pt-6">
           <div className="flex flex-wrap gap-4">
             {canFilterByStaff && (
               <div className="w-full sm:w-64">
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger>
+                  <SelectTrigger className="rounded-xl">
                     <SelectValue placeholder="Select staff" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="rounded-xl">
                     <SelectItem value="all">All Staff</SelectItem>
                     {staffList.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id || ''}>
                         {s.full_name}
                       </SelectItem>
                     ))}
@@ -166,10 +167,10 @@ export default function Ledger() {
             )}
             <div className="w-full sm:w-48">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-xl">
                   <SelectItem value="all">All Months</SelectItem>
                   {generateMonthOptions().map((m) => (
                     <SelectItem key={m.value} value={m.value}>
@@ -184,41 +185,29 @@ export default function Ledger() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3 mb-6">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Debits
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Amount value={totals.debit} size="lg" className="text-foreground" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Credits
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Amount value={totals.credit} size="lg" className="text-foreground" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Closing Balance
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Amount value={closingBalance} size="lg" showSign />
-          </CardContent>
-        </Card>
+      <div className="grid gap-5 sm:grid-cols-3">
+        <StatCard
+          title="Total Debits"
+          value={`₹${totals.debit.toLocaleString('en-IN')}`}
+          icon={ArrowDownRight}
+          color="orange"
+        />
+        <StatCard
+          title="Total Credits"
+          value={`₹${totals.credit.toLocaleString('en-IN')}`}
+          icon={ArrowUpRight}
+          color="green"
+        />
+        <StatCard
+          title="Closing Balance"
+          value={`${closingBalance >= 0 ? '+' : ''}₹${Math.abs(closingBalance).toLocaleString('en-IN')}`}
+          icon={Scale}
+          color={closingBalance >= 0 ? 'blue' : 'pink'}
+        />
       </div>
 
       {/* Ledger Table */}
-      <Card>
+      <Card className="rounded-2xl shadow-card border-0 overflow-hidden">
         <CardContent className="p-0">
           {entries.length === 0 && !isLoading ? (
             <EmptyState
@@ -230,54 +219,62 @@ export default function Ledger() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-secondary/50">
-                    <TableHead>Date</TableHead>
-                    <TableHead>Voucher</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead className="max-w-[300px]">Description</TableHead>
-                    <TableHead className="text-right">Debit</TableHead>
-                    <TableHead className="text-right">Credit</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="font-semibold">Date</TableHead>
+                    <TableHead className="font-semibold">Voucher</TableHead>
+                    <TableHead className="font-semibold">Type</TableHead>
+                    <TableHead className="font-semibold max-w-[300px]">Description</TableHead>
+                    <TableHead className="font-semibold text-right">Debit</TableHead>
+                    <TableHead className="font-semibold text-right">Credit</TableHead>
+                    <TableHead className="font-semibold text-right">Balance</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell className="whitespace-nowrap">
+                  {entries.map((entry, index) => (
+                    <TableRow key={entry.id} className="group">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {format(new Date(entry.entry_date), 'dd MMM yyyy')}
                       </TableCell>
-                      <TableCell className="voucher-number">
-                        {entry.voucher_no}
+                      <TableCell>
+                        <span className="font-mono text-xs px-2 py-1 rounded-md bg-muted/50">
+                          {entry.voucher_no}
+                        </span>
                       </TableCell>
                       <TableCell>
-                        <span className="capitalize text-sm">
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/5 text-primary capitalize">
                           {entry.voucher_type}
                         </span>
                       </TableCell>
-                      <TableCell className="max-w-[300px] truncate">
-                        {entry.description}
+                      <TableCell className="max-w-[300px]">
+                        <span className="truncate block">{entry.description}</span>
                         {entry.tag && (
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            [{entry.tag}]
+                          <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded mt-1 inline-block">
+                            {entry.tag}
                           </span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono tabular-nums">
                         {entry.debit > 0 ? (
-                          <Amount value={entry.debit} className="text-destructive" />
+                          <span className="text-destructive font-medium">
+                            ₹{Number(entry.debit).toLocaleString('en-IN')}
+                          </span>
                         ) : (
-                          '-'
+                          <span className="text-muted-foreground/50">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono tabular-nums">
                         {entry.credit > 0 ? (
-                          <Amount value={entry.credit} className="text-success" />
+                          <span className="text-success font-medium">
+                            ₹{Number(entry.credit).toLocaleString('en-IN')}
+                          </span>
                         ) : (
-                          '-'
+                          <span className="text-muted-foreground/50">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
-                        <Amount value={entry.running_balance} showSign />
+                      <TableCell className="text-right font-mono tabular-nums font-medium">
+                        <span className={entry.running_balance >= 0 ? 'text-success' : 'text-destructive'}>
+                          {entry.running_balance >= 0 ? '+' : '-'}₹{Math.abs(entry.running_balance).toLocaleString('en-IN')}
+                        </span>
                       </TableCell>
                     </TableRow>
                   ))}

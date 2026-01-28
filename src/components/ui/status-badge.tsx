@@ -13,62 +13,91 @@ interface StatusBadgeProps {
   children?: ReactNode;
 }
 
-const statusConfig: Record<StatusType, { label: string; className: string }> = {
+const statusConfig: Record<StatusType, { label: string; className: string; dot: string }> = {
   pending: {
     label: 'Pending',
-    className: 'bg-warning/10 text-warning border-warning/20',
+    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+    dot: 'bg-amber-500',
   },
   approved: {
     label: 'Approved',
-    className: 'bg-success/10 text-success border-success/20',
+    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
   },
   rejected: {
     label: 'Rejected',
-    className: 'bg-destructive/10 text-destructive border-destructive/20',
+    className: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+    dot: 'bg-red-500',
   },
   settled: {
     label: 'Settled',
-    className: 'bg-success/10 text-success border-success/20',
+    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
   },
   active: {
     label: 'Active',
-    className: 'bg-success/10 text-success border-success/20',
+    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
   },
   inactive: {
     label: 'Inactive',
-    className: 'bg-muted text-muted-foreground border-border',
+    className: 'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400',
+    dot: 'bg-gray-400',
   },
   draft: {
     label: 'Draft',
-    className: 'bg-muted text-muted-foreground border-border',
+    className: 'bg-gray-100 text-gray-600 dark:bg-gray-500/10 dark:text-gray-400',
+    dot: 'bg-gray-400',
   },
   reimbursed: {
     label: 'Reimbursed',
-    className: 'bg-success/10 text-success border-success/20',
+    className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+    dot: 'bg-blue-500',
   },
 };
 
-const variantConfig: Record<BadgeVariant, string> = {
-  default: 'bg-primary/10 text-primary border-primary/20',
-  secondary: 'bg-muted text-muted-foreground border-border',
-  success: 'bg-success/10 text-success border-success/20',
-  warning: 'bg-warning/10 text-warning border-warning/20',
-  destructive: 'bg-destructive/10 text-destructive border-destructive/20',
-  info: 'bg-info/10 text-info border-info/20',
+const variantConfig: Record<BadgeVariant, { className: string; dot: string }> = {
+  default: {
+    className: 'bg-primary/10 text-primary',
+    dot: 'bg-primary',
+  },
+  secondary: {
+    className: 'bg-muted text-muted-foreground',
+    dot: 'bg-muted-foreground',
+  },
+  success: {
+    className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400',
+    dot: 'bg-emerald-500',
+  },
+  warning: {
+    className: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400',
+    dot: 'bg-amber-500',
+  },
+  destructive: {
+    className: 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400',
+    dot: 'bg-red-500',
+  },
+  info: {
+    className: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400',
+    dot: 'bg-blue-500',
+  },
 };
 
 export function StatusBadge({ status, variant, className, children }: StatusBadgeProps) {
   const config = statusConfig[status];
-  const variantClass = variant ? variantConfig[variant] : config?.className;
+  const variantStyle = variant ? variantConfig[variant] : null;
+  const badgeClass = variantStyle?.className || config?.className;
+  const dotClass = variantStyle?.dot || config?.dot;
 
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-        variantClass,
+        'inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium',
+        badgeClass,
         className
       )}
     >
+      <span className={cn('h-1.5 w-1.5 rounded-full', dotClass)} />
       {children || config?.label || status}
     </span>
   );
