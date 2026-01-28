@@ -16,8 +16,8 @@ import {
   Search, 
   Check, 
   X, 
-  CreditCard,
-  Eye 
+  Eye,
+  ArrowRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -26,7 +26,6 @@ import { EXPENSE_CATEGORY_LABELS, EXPENSE_STATUS_LABELS } from '@/types/database
 import { ExpenseDetailsDialog } from '@/components/expenses/ExpenseDetailsDialog';
 import { ApproveExpenseDialog } from '@/components/expenses/ApproveExpenseDialog';
 import { RejectExpenseDialog } from '@/components/expenses/RejectExpenseDialog';
-import { ReimburseExpenseDialog } from '@/components/expenses/ReimburseExpenseDialog';
 
 export default function Expenses() {
   const { 
@@ -46,7 +45,6 @@ export default function Expenses() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
-  const [showReimburseDialog, setShowReimburseDialog] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
@@ -109,11 +107,6 @@ export default function Expenses() {
     setShowRejectDialog(true);
   };
 
-  const handleReimburse = (expense: Expense) => {
-    setSelectedExpense(expense);
-    setShowReimburseDialog(true);
-  };
-
   const getStatusVariant = (status: ExpenseStatus) => {
     switch (status) {
       case 'draft': return 'secondary';
@@ -131,15 +124,12 @@ export default function Expenses() {
   
   // - Only Owner and Admin can approve/reject (NOT Accountant)
   const canApprove = canApproveExpenses;
-  
-  // - Owner, Admin, Accountant can reimburse APPROVED expenses
-  const canReimburse = isOwner || isAdmin || isAccountant;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Expenses"
-        description="Track and manage expense reimbursements"
+        description="Submit and review expense claims. Approved expenses are paid via Payouts."
       >
         {canCreateExpense && (
           <Link to="/expenses/new">
@@ -257,16 +247,14 @@ export default function Expenses() {
                             </>
                           )}
 
-                          {/* Owner/Admin/Accountant can reimburse APPROVED expenses ONLY */}
-                          {canReimburse && expense.status === 'approved' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-primary hover:text-primary"
-                              onClick={() => handleReimburse(expense)}
-                            >
-                              <CreditCard className="h-4 w-4" />
-                            </Button>
+                          {/* Show "Go to Payouts" indicator for approved expenses */}
+                          {expense.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
+                            <Link to="/payouts">
+                              <Button variant="outline" size="sm" className="gap-1 text-xs">
+                                Pay via Payouts
+                                <ArrowRight className="h-3 w-3" />
+                              </Button>
+                            </Link>
                           )}
                         </div>
                       </div>
@@ -279,7 +267,7 @@ export default function Expenses() {
         </TabsContent>
       </Tabs>
 
-      {/* Dialogs */}
+      {/* Dialogs - No reimbursement dialog anymore */}
       {selectedExpense && (
         <>
           <ExpenseDetailsDialog
@@ -297,12 +285,6 @@ export default function Expenses() {
             expense={selectedExpense}
             open={showRejectDialog}
             onOpenChange={setShowRejectDialog}
-            onSuccess={fetchExpenses}
-          />
-          <ReimburseExpenseDialog
-            expense={selectedExpense}
-            open={showReimburseDialog}
-            onOpenChange={setShowReimburseDialog}
             onSuccess={fetchExpenses}
           />
         </>

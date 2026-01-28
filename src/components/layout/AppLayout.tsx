@@ -89,18 +89,23 @@ function getNavSections(
         title: 'Finance',
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
-          { title: 'Payments', href: '/payments/new', icon: CreditCard },
-          { 
-            title: 'Expenses', 
-            href: '/expenses', 
-            icon: Receipt,
-            badge: counts.pendingExpenses + counts.approvedExpenses,
-          },
           { 
             title: 'Requests', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
+          },
+          { 
+            title: 'Expenses', 
+            href: '/expenses', 
+            icon: Receipt,
+            badge: counts.pendingExpenses,
+          },
+          { 
+            title: 'Payouts', 
+            href: '/payouts', 
+            icon: CreditCard,
+            badge: counts.approvedExpenses,
           },
           { title: 'Settlements', href: '/settlements', icon: Calculator },
         ],
@@ -115,7 +120,7 @@ function getNavSections(
     ];
   }
 
-  // Admin - can approve, record payments (no salary), add staff
+  // Admin - can approve, execute payouts (no salary), add staff
   if (userRole === 'admin') {
     return [
       {
@@ -129,18 +134,23 @@ function getNavSections(
         title: 'Finance',
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
-          { title: 'Payments', href: '/payments/new', icon: CreditCard },
-          { 
-            title: 'Expenses', 
-            href: '/expenses', 
-            icon: Receipt,
-            badge: counts.pendingExpenses + counts.approvedExpenses,
-          },
           { 
             title: 'Requests', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
+          },
+          { 
+            title: 'Expenses', 
+            href: '/expenses', 
+            icon: Receipt,
+            badge: counts.pendingExpenses,
+          },
+          { 
+            title: 'Payouts', 
+            href: '/payouts', 
+            icon: CreditCard,
+            badge: counts.approvedExpenses,
           },
         ],
       },
@@ -169,7 +179,7 @@ function getNavSections(
         },
       ];
     } else {
-      // Accounting context (finance operator view)
+      // Accounting context (finance operator view) - No direct payments, only payouts
       return [
         {
           title: 'Accounting',
@@ -180,9 +190,13 @@ function getNavSections(
               title: 'Expenses', 
               href: '/expenses', 
               icon: Receipt,
+            },
+            { 
+              title: 'Payouts', 
+              href: '/payouts', 
+              icon: CreditCard,
               badge: counts.approvedExpenses,
             },
-            { title: 'Payments', href: '/payments/new', icon: CreditCard },
             { title: 'Ledger', href: '/ledger', icon: FileText },
             { title: 'Reports', href: '/reports', icon: BarChart3 },
           ],
