@@ -58,7 +58,7 @@ const navItems: NavItem[] = [
   },
   {
     title: 'Payments',
-    href: '/payments',
+    href: '/payments/new',
     icon: CreditCard,
     roles: ['owner', 'accountant'],
   },
