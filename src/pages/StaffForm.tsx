@@ -185,15 +185,11 @@ export default function StaffForm() {
         toast({ title: 'Staff Updated', description: `${fullName} has been updated successfully.` });
       } else {
         // Create new staff - first create auth user
-        // For now, we'll create the staff record with a placeholder user_id
-        // In production, you'd invite the user via email
-        
-        const tempUserId = crypto.randomUUID();
-        
+        // Create staff without linking to auth user (can be linked later)
         const { data: newStaff, error: staffError } = await supabase
           .from('staff')
           .insert({
-            user_id: tempUserId,
+            user_id: null,
             full_name: fullName.trim(),
             employee_id: employeeId.trim(),
             email: `${employeeId.trim().toLowerCase()}@internal.smokzy.com`,
@@ -223,15 +219,7 @@ export default function StaffForm() {
 
         if (historyError) console.error('Salary history error:', historyError);
 
-        // Create user role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: tempUserId,
-            role: role,
-          });
-
-        if (roleError) console.error('Role creation error:', roleError);
+        // Note: User role will be created when staff is linked to an auth account
 
         toast({ title: 'Staff Created', description: `${fullName} has been added successfully.` });
       }
