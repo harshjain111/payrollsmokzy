@@ -83,7 +83,13 @@ export default function StaffDetails() {
     try {
       setIsDeleting(true);
 
-      // Delete user role first if exists
+      // Delete salary history first (configuration data, safe to delete)
+      await supabase
+        .from('salary_history')
+        .delete()
+        .eq('staff_id', staff.id);
+
+      // Delete user role if exists
       if (staff.user_id) {
         await supabase
           .from('user_roles')
@@ -97,7 +103,12 @@ export default function StaffDetails() {
         .delete()
         .eq('id', staff.id);
 
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('foreign key constraint')) {
+          throw new Error('Cannot delete staff with financial records (ledger entries, expenses, settlements). Please deactivate instead.');
+        }
+        throw error;
+      }
 
       toast({
         title: 'Staff Deleted',
@@ -109,7 +120,7 @@ export default function StaffDetails() {
       console.error('Error deleting staff:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete staff. They may have associated records.',
+        description: error.message || 'Failed to delete staff.',
         variant: 'destructive',
       });
     } finally {
