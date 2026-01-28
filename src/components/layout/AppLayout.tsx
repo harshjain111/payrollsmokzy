@@ -25,11 +25,11 @@ import {
   LogOut,
   Menu,
   X,
-  ChevronRight,
   Calculator,
   User,
   Wallet,
   Receipt,
+  History,
 } from 'lucide-react';
 
 interface NavItem {
@@ -82,6 +82,12 @@ const navItems: NavItem[] = [
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,
+    roles: ['owner', 'ca', 'accountant'],
+  },
+  {
+    title: 'Audit Log',
+    href: '/audit-log',
+    icon: History,
     roles: ['owner', 'ca'],
   },
 ];
@@ -117,15 +123,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       {/* Mobile header */}
-      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b bg-card px-4 lg:hidden">
+      <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-4 lg:hidden">
         <Button
           variant="ghost"
           size="icon"
+          className="rounded-xl"
           onClick={() => setSidebarOpen(!sidebarOpen)}
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </Button>
-        <span className="text-xl font-bold text-primary">Smokzy</span>
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-gradient-primary flex items-center justify-center">
+            <Wallet className="h-4 w-4 text-white" />
+          </div>
+          <span className="text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            Smokzy
+          </span>
+        </div>
         <NotificationBell />
       </header>
 
@@ -133,43 +147,53 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Sidebar */}
         <aside
           className={cn(
-            'fixed inset-y-0 left-0 z-40 w-64 transform bg-sidebar transition-transform duration-200 ease-in-out lg:static lg:translate-x-0',
+            'fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-out lg:static lg:translate-x-0',
+            'bg-gradient-to-b from-[hsl(243,75%,18%)] to-[hsl(243,75%,12%)]',
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           )}
         >
           <div className="flex h-full flex-col">
             {/* Logo */}
-            <div className="flex h-16 items-center gap-2 border-b border-sidebar-border px-6">
-              <Wallet className="h-7 w-7 text-sidebar-primary" />
-              <span className="text-xl font-bold text-sidebar-foreground">Smokzy</span>
+            <div className="flex h-20 items-center gap-3 px-6">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg">
+                <Wallet className="h-5 w-5 text-white" />
+              </div>
+              <div>
+                <span className="text-xl font-bold text-white">Smokzy</span>
+                <p className="text-xs text-white/50">Payroll System</p>
+              </div>
             </div>
 
             {/* Accountant mode toggle */}
             {isAccountant && (
-              <div className="border-b border-sidebar-border p-4">
-                <div className="flex items-center gap-2 rounded-lg bg-sidebar-accent p-2">
+              <div className="px-4 pb-4">
+                <div className="flex items-center gap-1 rounded-xl bg-white/5 p-1">
                   <Button
                     size="sm"
-                    variant={!accountingMode ? 'secondary' : 'ghost'}
+                    variant="ghost"
                     className={cn(
-                      'flex-1 text-xs',
-                      !accountingMode && 'bg-sidebar-primary text-sidebar-primary-foreground'
+                      'flex-1 text-xs rounded-lg h-9 transition-all',
+                      !accountingMode 
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg' 
+                        : 'text-white/60 hover:text-white hover:bg-white/10'
                     )}
                     onClick={() => setAccountingMode(false)}
                   >
-                    <User className="mr-1 h-3 w-3" />
+                    <User className="mr-1.5 h-3.5 w-3.5" />
                     My Account
                   </Button>
                   <Button
                     size="sm"
-                    variant={accountingMode ? 'secondary' : 'ghost'}
+                    variant="ghost"
                     className={cn(
-                      'flex-1 text-xs',
-                      accountingMode && 'bg-sidebar-primary text-sidebar-primary-foreground'
+                      'flex-1 text-xs rounded-lg h-9 transition-all',
+                      accountingMode 
+                        ? 'bg-gradient-to-r from-amber-400 to-orange-500 text-white shadow-lg' 
+                        : 'text-white/60 hover:text-white hover:bg-white/10'
                     )}
                     onClick={() => setAccountingMode(true)}
                   >
-                    <Calculator className="mr-1 h-3 w-3" />
+                    <Calculator className="mr-1.5 h-3.5 w-3.5" />
                     Accounting
                   </Button>
                 </div>
@@ -177,25 +201,38 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             )}
 
             {/* Navigation */}
-            <ScrollArea className="flex-1 px-3 py-4">
+            <ScrollArea className="flex-1 px-4 py-2">
               <nav className="space-y-1">
                 {filteredNavItems.map((item) => {
-                  const isActive = location.pathname === item.href;
+                  const isActive = location.pathname === item.href || 
+                    (item.href !== '/dashboard' && location.pathname.startsWith(item.href));
                   return (
                     <Link
                       key={item.href}
                       to={item.href}
                       onClick={() => setSidebarOpen(false)}
                       className={cn(
-                        'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                        'relative flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-200',
                         isActive
-                          ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                          : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                          ? 'bg-white/10 text-white shadow-lg'
+                          : 'text-white/60 hover:bg-white/5 hover:text-white'
                       )}
                     >
-                      <item.icon className="h-5 w-5" />
-                      {item.title}
-                      {isActive && <ChevronRight className="ml-auto h-4 w-4" />}
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-amber-400 to-orange-500 rounded-r-full" />
+                      )}
+                      <div className={cn(
+                        'p-2 rounded-lg transition-colors',
+                        isActive 
+                          ? 'bg-gradient-to-br from-amber-400/20 to-orange-500/20' 
+                          : 'bg-white/5'
+                      )}>
+                        <item.icon className={cn(
+                          'h-4 w-4',
+                          isActive ? 'text-amber-400' : ''
+                        )} />
+                      </div>
+                      <span>{item.title}</span>
                     </Link>
                   );
                 })}
@@ -203,34 +240,35 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             </ScrollArea>
 
             {/* User menu */}
-            <div className="border-t border-sidebar-border p-4">
+            <div className="p-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-sidebar-accent">
-                    <Avatar className="h-9 w-9">
-                      <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm">
+                  <button className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-all hover:bg-white/5 group">
+                    <Avatar className="h-10 w-10 border-2 border-white/20">
+                      <AvatarFallback className="bg-gradient-to-br from-amber-400 to-orange-500 text-white text-sm font-medium">
                         {getInitials(displayName)}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 overflow-hidden">
-                      <p className="truncate text-sm font-medium text-sidebar-foreground">
+                      <p className="truncate text-sm font-medium text-white">
                         {displayName}
                       </p>
-                      <p className="truncate text-xs text-sidebar-foreground/60">
+                      <p className="truncate text-xs text-white/50">
                         {roleDisplay}
                       </p>
                     </div>
+                    <Settings className="h-4 w-4 text-white/40 group-hover:text-white/60 transition-colors" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="end" className="w-56 rounded-xl">
                   <DropdownMenuLabel>My Account</DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-lg">
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive">
+                  <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-lg">
                     <LogOut className="mr-2 h-4 w-4" />
                     Sign out
                   </DropdownMenuItem>
@@ -243,14 +281,38 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Overlay for mobile */}
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
         )}
 
         {/* Main content */}
         <main className="flex-1 lg:pl-0">
-          <div className="container max-w-7xl py-6 px-4 sm:px-6 lg:px-8 animate-fade-in">
+          {/* Desktop header */}
+          <header className="hidden lg:flex h-16 items-center justify-between border-b border-border/50 bg-card/50 backdrop-blur-sm px-8">
+            <div>
+              <h1 className="text-lg font-semibold text-foreground">
+                {filteredNavItems.find(item => location.pathname.startsWith(item.href))?.title || 'Dashboard'}
+              </h1>
+            </div>
+            <div className="flex items-center gap-4">
+              <NotificationBell />
+              <div className="h-8 w-px bg-border" />
+              <div className="flex items-center gap-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-medium">
+                    {getInitials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden sm:block">
+                  <p className="text-sm font-medium">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{roleDisplay}</p>
+                </div>
+              </div>
+            </div>
+          </header>
+          
+          <div className="py-6 px-4 sm:px-6 lg:px-8 animate-fade-in">
             {children}
           </div>
         </main>
