@@ -21,9 +21,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Users, MoreHorizontal, Edit, Trash2, Link as LinkIcon } from 'lucide-react';
+import { Plus, Search, Users, MoreHorizontal, Edit, Trash2, Link as LinkIcon, Key } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -37,6 +38,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ResetPasswordDialog } from '@/components/users/ResetPasswordDialog';
 import type { AppRole } from '@/types/database';
 
 interface UserWithRole {
@@ -59,6 +61,7 @@ export default function UsersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<UserWithRole | null>(null);
 
   useEffect(() => {
     fetchUsers();
@@ -304,6 +307,11 @@ export default function UsersList() {
                                   Edit Role
                                 </Link>
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
+                                <Key className="mr-2 h-4 w-4" />
+                                Reset Password
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem
@@ -347,6 +355,15 @@ export default function UsersList() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reset Password Dialog */}
+      <ResetPasswordDialog
+        open={!!resetPasswordUser}
+        onOpenChange={(open) => !open && setResetPasswordUser(null)}
+        userId={resetPasswordUser?.user_id || ''}
+        userName={resetPasswordUser?.user_metadata?.full_name || 'User'}
+        onSuccess={fetchUsers}
+      />
     </div>
   );
 }

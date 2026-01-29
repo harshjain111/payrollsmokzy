@@ -26,6 +26,7 @@ import SalariesAdvances from "./pages/SalariesAdvances";
 import Payouts from "./pages/Payouts";
 import Reports from "./pages/Reports";
 import AuditLog from "./pages/AuditLog";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -75,6 +76,7 @@ function AppRoutes() {
       <Route path="/salaries-advances" element={<ProtectedRoute><SalariesAdvances /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Catch-all */}
       <Route path="*" element={<NotFound />} />

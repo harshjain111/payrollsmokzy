@@ -130,6 +130,12 @@ function getNavSections(
           { title: 'Audit Log', href: '/audit-log', icon: History },
         ],
       },
+      {
+        title: 'Account',
+        items: [
+          { title: 'Settings', href: '/settings', icon: Settings },
+        ],
+      },
     ];
   }
 
@@ -177,6 +183,12 @@ function getNavSections(
           { title: 'Reports', href: '/reports', icon: BarChart3 },
         ],
       },
+      {
+        title: 'Account',
+        items: [
+          { title: 'Settings', href: '/settings', icon: Settings },
+        ],
+      },
     ];
   }
 
@@ -192,6 +204,7 @@ function getNavSections(
             { title: 'My Ledger', href: '/ledger', icon: FileText },
             { title: 'My Expenses', href: '/expenses', icon: Receipt },
             { title: 'My Requests', href: '/requests', icon: ClipboardList },
+            { title: 'Settings', href: '/settings', icon: Settings },
           ],
         },
       ];
@@ -216,6 +229,7 @@ function getNavSections(
             },
             { title: 'Ledger', href: '/ledger', icon: FileText },
             { title: 'Reports', href: '/reports', icon: BarChart3 },
+            { title: 'Settings', href: '/settings', icon: Settings },
           ],
         },
       ];
@@ -231,6 +245,7 @@ function getNavSections(
           { title: 'My Ledger', href: '/ledger', icon: FileText },
           { title: 'My Expenses', href: '/expenses', icon: Receipt },
           { title: 'My Requests', href: '/requests', icon: ClipboardList },
+          { title: 'Settings', href: '/settings', icon: Settings },
         ],
       },
     ];
@@ -245,6 +260,7 @@ function getNavSections(
           { title: 'Ledger', href: '/ledger', icon: FileText },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
           { title: 'Audit Log', href: '/audit-log', icon: History },
+          { title: 'Settings', href: '/settings', icon: Settings },
         ],
       },
     ];
