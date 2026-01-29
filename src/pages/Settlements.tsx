@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -21,8 +21,9 @@ import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Calculator, Check, AlertTriangle, Lock, Info, ShieldX } from 'lucide-react';
 import { format, subMonths, getDaysInMonth, parseISO } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import { SettlementConfirmDialog } from '@/components/settlements/SettlementConfirmDialog';
+import { EnhancedSettlementConfirmDialog } from '@/components/settlements/EnhancedSettlementConfirmDialog';
 import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentConfirmDialog';
+import { AdvanceAdjustmentInput } from '@/components/settlements/AdvanceAdjustmentInput';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
@@ -32,8 +33,9 @@ interface SettlementCalculation {
   leaveDeduction: number;
   grossSalary: number;
   advancesOutstanding: number;
+  advanceToAdjust: number;
   netPayable: number;
-  excessAdvance: number;
+  carryForwardAdvance: number;
 }
 
 interface ValidationResult {
@@ -51,12 +53,14 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
 
 export default function Settlements() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, canAccessSettlements } = useAuth();
   
   const [staff, setStaff] = useState<Staff[]>([]);
-  const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [selectedMonth, setSelectedMonth] = useState<string>(format(subMonths(new Date(), 1), 'yyyy-MM'));
+  const [selectedStaffId, setSelectedStaffId] = useState<string>(searchParams.get('staff') || '');
+  const [selectedMonth, setSelectedMonth] = useState<string>(searchParams.get('month') || format(subMonths(new Date(), 1), 'yyyy-MM'));
   const [leaveDays, setLeaveDays] = useState(0);
+  const [advanceToAdjust, setAdvanceToAdjust] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank_transfer');
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
@@ -79,6 +83,23 @@ export default function Settlements() {
       calculateSettlement();
     }
   }, [selectedStaffId, selectedMonth, leaveDays, canAccessSettlements]);
+
+  // Recalculate when advance adjustment changes
+  useEffect(() => {
+    if (calculation && calculation.advancesOutstanding > 0) {
+      const maxAdjustable = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
+      const clampedAdjustment = Math.min(advanceToAdjust, maxAdjustable);
+      const netPayable = calculation.grossSalary - clampedAdjustment;
+      const carryForward = calculation.advancesOutstanding - clampedAdjustment;
+      
+      setCalculation(prev => prev ? {
+        ...prev,
+        advanceToAdjust: clampedAdjustment,
+        netPayable: Math.max(0, netPayable),
+        carryForwardAdvance: carryForward,
+      } : null);
+    }
+  }, [advanceToAdjust]);
 
   // STRICT ACCESS CONTROL: Only Owner can access settlements
   if (!canAccessSettlements) {
@@ -173,13 +194,13 @@ export default function Settlements() {
       const grossSalary = monthlySalary - leaveDeduction;
       const advancesOutstanding = Number(advanceData) || 0;
       
-      let netPayable = grossSalary - advancesOutstanding;
-      let excessAdvance = 0;
+      // Default: adjust full outstanding (up to gross salary)
+      const maxAdjustable = Math.min(advancesOutstanding, grossSalary);
+      const defaultAdjustment = maxAdjustable;
+      setAdvanceToAdjust(defaultAdjustment);
       
-      if (netPayable < 0) {
-        excessAdvance = Math.abs(netPayable);
-        netPayable = 0;
-      }
+      const netPayable = Math.max(0, grossSalary - defaultAdjustment);
+      const carryForwardAdvance = advancesOutstanding - defaultAdjustment;
 
       const newWarnings = [...warnings.filter(w => !w.includes('leave'))];
       if (leaveDays > 5) {
@@ -197,8 +218,9 @@ export default function Settlements() {
         leaveDeduction,
         grossSalary,
         advancesOutstanding,
+        advanceToAdjust: defaultAdjustment,
         netPayable,
-        excessAdvance,
+        carryForwardAdvance,
       });
     } catch (error) {
       console.error('Error calculating settlement:', error);
@@ -210,6 +232,25 @@ export default function Settlements() {
     } finally {
       setIsCalculating(false);
     }
+  };
+
+  const handleAdvanceAdjustmentChange = (amount: number) => {
+    if (!calculation) return;
+    
+    const maxAdjustable = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
+    const clampedAmount = Math.min(maxAdjustable, Math.max(0, amount));
+    
+    setAdvanceToAdjust(clampedAmount);
+    
+    const netPayable = Math.max(0, calculation.grossSalary - clampedAmount);
+    const carryForward = calculation.advancesOutstanding - clampedAmount;
+    
+    setCalculation({
+      ...calculation,
+      advanceToAdjust: clampedAmount,
+      netPayable,
+      carryForwardAdvance: carryForward,
+    });
   };
 
   const handleSettleClick = () => {
@@ -263,6 +304,8 @@ export default function Settlements() {
       if (voucherError) throw voucherError;
 
       let ledgerEntryId = null;
+      
+      // Create salary payout ledger entry (if net payable > 0)
       if (calculation.netPayable > 0) {
         const { data: ledgerEntry, error: ledgerError } = await supabase
           .from('ledger_entries')
@@ -289,9 +332,8 @@ export default function Settlements() {
         ledgerEntryId = ledgerEntry.id;
       }
 
-      if (calculation.advancesOutstanding > 0 && calculation.grossSalary > 0) {
-        const adjustmentAmount = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
-        
+      // Create advance adjustment entry (if advance was adjusted)
+      if (calculation.advanceToAdjust > 0) {
         const { data: adjustVoucher } = await supabase
           .rpc('generate_voucher_no', { _voucher_type: 'journal' });
 
@@ -304,7 +346,7 @@ export default function Settlements() {
             entry_date: new Date().toISOString().split('T')[0],
             description: `Advance adjustment against ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} salary`,
             debit: 0,
-            credit: adjustmentAmount,
+            credit: calculation.advanceToAdjust,
             tag: 'advance',
             reference_month: selectedMonth,
             is_immutable: true,
@@ -312,6 +354,7 @@ export default function Settlements() {
           });
       }
 
+      // Create settlement record with snapshot
       const { error: settlementError } = await supabase
         .from('salary_settlements')
         .insert({
@@ -321,7 +364,9 @@ export default function Settlements() {
           leave_days: calculation.leaveDays,
           leave_deduction: calculation.leaveDeduction,
           net_salary: calculation.grossSalary,
-          advances_adjusted: Math.min(calculation.advancesOutstanding, calculation.grossSalary),
+          advances_adjusted: calculation.advanceToAdjust,
+          opening_advance_balance: calculation.advancesOutstanding,
+          closing_advance_balance: calculation.carryForwardAdvance,
           balance_payable: calculation.netPayable,
           status: 'settled',
           settled_at: new Date().toISOString(),
@@ -337,8 +382,10 @@ export default function Settlements() {
         description: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} has been settled successfully.`,
       });
 
+      // Reset form
       setSelectedStaffId('');
       setLeaveDays(0);
+      setAdvanceToAdjust(0);
       setCalculation(null);
       setIsAlreadySettled(false);
       setShowConfirmDialog(false);
@@ -371,9 +418,9 @@ export default function Settlements() {
     <div className="space-y-6">
       <PageHeader
         title="Salary Settlement"
-        description="Process monthly salary settlements"
+        description="Process monthly salary settlements with partial advance adjustment"
       >
-        <Button variant="ghost" onClick={() => navigate('/dashboard')}>
+        <Button variant="ghost" onClick={() => navigate('/salaries-advances')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Back
         </Button>
@@ -471,6 +518,17 @@ export default function Settlements() {
               </p>
             </div>
 
+            {/* Partial Advance Adjustment */}
+            {calculation && calculation.advancesOutstanding > 0 && !isAlreadySettled && (
+              <AdvanceAdjustmentInput
+                totalAdvanceOutstanding={calculation.advancesOutstanding}
+                grossSalary={calculation.grossSalary}
+                adjustmentAmount={calculation.advanceToAdjust}
+                onAdjustmentChange={handleAdvanceAdjustmentChange}
+                disabled={isAlreadySettled}
+              />
+            )}
+
             <div className="space-y-2">
               <Label>Payment Mode *</Label>
               <Select 
@@ -534,12 +592,24 @@ export default function Settlements() {
                 </div>
                 
                 {calculation.advancesOutstanding > 0 && (
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Advances Outstanding</span>
-                    <span className="text-warning font-medium">
-                      -<Amount value={Math.min(calculation.advancesOutstanding, calculation.grossSalary)} />
-                    </span>
-                  </div>
+                  <>
+                    <div className="flex justify-between items-center py-2 text-sm">
+                      <span className="text-muted-foreground">Opening Advance Balance</span>
+                      <Amount value={calculation.advancesOutstanding} className="text-warning" />
+                    </div>
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-muted-foreground">Advance Adjusted</span>
+                      <span className="text-destructive font-medium">
+                        -<Amount value={calculation.advanceToAdjust} />
+                      </span>
+                    </div>
+                    {calculation.carryForwardAdvance > 0 && (
+                      <div className="flex justify-between items-center py-2 text-sm">
+                        <span className="text-muted-foreground">Carry Forward</span>
+                        <Amount value={calculation.carryForwardAdvance} className="text-warning" />
+                      </div>
+                    )}
+                  </>
                 )}
                 
                 <Separator />
@@ -549,11 +619,11 @@ export default function Settlements() {
                   <Amount value={calculation.netPayable} size="lg" className="font-bold text-primary" />
                 </div>
                 
-                {calculation.excessAdvance > 0 && (
+                {calculation.carryForwardAdvance > 0 && (
                   <Alert className="border-info bg-info/10">
                     <Info className="h-4 w-4 text-info" />
                     <AlertDescription className="text-info">
-                      ₹{calculation.excessAdvance.toLocaleString('en-IN')} advance will remain outstanding after this settlement.
+                      ₹{calculation.carryForwardAdvance.toLocaleString('en-IN')} advance will carry forward to next month.
                     </AlertDescription>
                   </Alert>
                 )}
@@ -582,14 +652,23 @@ export default function Settlements() {
       {/* Confirmation Dialogs */}
       {calculation && selectedStaff && (
         <>
-          <SettlementConfirmDialog
+          <EnhancedSettlementConfirmDialog
             open={showConfirmDialog}
             onOpenChange={setShowConfirmDialog}
             onConfirm={handleSettle}
             isLoading={isSettling}
             staffName={selectedStaff.full_name}
             month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
-            calculation={calculation}
+            snapshot={{
+              baseSalary: calculation.monthlySalary,
+              leaveDays: calculation.leaveDays,
+              leaveDeduction: calculation.leaveDeduction,
+              grossSalary: calculation.grossSalary,
+              openingAdvanceBalance: calculation.advancesOutstanding,
+              advanceAdjusted: calculation.advanceToAdjust,
+              closingAdvanceBalance: calculation.carryForwardAdvance,
+              netPayable: calculation.netPayable,
+            }}
             paymentMode={paymentMode}
           />
           
@@ -600,7 +679,7 @@ export default function Settlements() {
             isLoading={isSettling}
             staffName={selectedStaff.full_name}
             month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
-            reason={`Advances (₹${calculation.advancesOutstanding.toLocaleString('en-IN')}) exceed or equal gross salary`}
+            reason={`Advances adjusted (₹${calculation.advanceToAdjust.toLocaleString('en-IN')}) equal gross salary`}
           />
         </>
       )}

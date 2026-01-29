@@ -107,6 +107,12 @@ function getNavSections(
             icon: CreditCard,
             badge: counts.approvedExpenses,
           },
+        ],
+      },
+      {
+        title: 'Salary',
+        items: [
+          { title: 'Salaries & Advances', href: '/salaries-advances', icon: Wallet },
           { title: 'Settlements', href: '/settlements', icon: Calculator },
         ],
       },

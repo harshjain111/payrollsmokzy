@@ -19,6 +19,7 @@ import NewRequest from "./pages/NewRequest";
 import Expenses from "./pages/Expenses";
 import NewExpense from "./pages/NewExpense";
 import Settlements from "./pages/Settlements";
+import SalariesAdvances from "./pages/SalariesAdvances";
 import Payouts from "./pages/Payouts";
 import Reports from "./pages/Reports";
 import AuditLog from "./pages/AuditLog";
@@ -65,6 +66,7 @@ function AppRoutes() {
       <Route path="/expenses/new" element={<ProtectedRoute><NewExpense /></ProtectedRoute>} />
       <Route path="/payouts" element={<ProtectedRoute><Payouts /></ProtectedRoute>} />
       <Route path="/settlements" element={<ProtectedRoute><Settlements /></ProtectedRoute>} />
+      <Route path="/salaries-advances" element={<ProtectedRoute><SalariesAdvances /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />
       
