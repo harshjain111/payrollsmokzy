@@ -106,7 +106,7 @@ export default function NewExpense() {
         proofUrl = await uploadProof();
       }
 
-      const { error } = await supabase
+      const { data: newExpense, error } = await supabase
         .from('expenses')
         .insert({
           staff_id: staffData.id,
@@ -118,9 +118,34 @@ export default function NewExpense() {
           status: asDraft ? 'draft' as const : 'pending' as const,
           submitted_at: asDraft ? null : new Date().toISOString(),
           created_by: user?.id,
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Notify Owner and Admin about new expense submission
+      if (!asDraft && newExpense) {
+        const { data: approvers } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .in('role', ['owner', 'admin']);
+
+        if (approvers) {
+          for (const approver of approvers) {
+            if (approver.user_id !== user?.id) {
+              await supabase.rpc('create_notification', {
+                _user_id: approver.user_id,
+                _title: 'New Expense Submitted',
+                _message: `${staffData.full_name} has submitted an expense of ₹${amount.toLocaleString('en-IN')} for "${description.slice(0, 50)}${description.length > 50 ? '...' : ''}"`,
+                _type: 'info',
+                _reference_type: 'expense',
+                _reference_id: newExpense.id,
+              });
+            }
+          }
+        }
+      }
 
       toast({
         title: asDraft ? 'Expense saved as draft' : 'Expense submitted',

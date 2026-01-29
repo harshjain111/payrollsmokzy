@@ -18,6 +18,8 @@ interface AuthContextType {
   isStaff: boolean;
   isCA: boolean;
   canManageStaff: boolean;
+  canAddStaff: boolean;
+  canEditStaff: boolean;
   canViewSalaries: boolean;
   canMakePayments: boolean;
   canApproveExpenses: boolean;
@@ -158,7 +160,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isCA = userRole === 'ca';
 
   // Permission helpers - STRICT SALARY CONFIDENTIALITY
+  
+  // Staff management - Owner has full access, Admin/Accountant can add/edit non-salary fields
   const canManageStaff = isOwner;
+  const canAddStaff = isOwner || isAdmin || isAccountant;
+  const canEditStaff = isOwner || isAdmin || isAccountant; // Non-salary fields only for non-owners
   
   // CRITICAL: Only Owner can view salary data
   // Staff can only view their OWN salary (handled at component level)
@@ -199,6 +205,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isStaff,
     isCA,
     canManageStaff,
+    canAddStaff,
+    canEditStaff,
     canViewSalaries,
     canMakePayments,
     canApproveExpenses,

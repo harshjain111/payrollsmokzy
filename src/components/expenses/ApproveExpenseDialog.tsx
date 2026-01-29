@@ -47,7 +47,36 @@ export function ApproveExpenseDialog({
 
       if (error) throw error;
 
-      // TODO: Create notification for accountant
+      // Notify the staff member
+      if (expense.staff?.user_id) {
+        await supabase.rpc('create_notification', {
+          _user_id: expense.staff.user_id,
+          _title: 'Expense Approved',
+          _message: `Your expense of ₹${expense.amount.toLocaleString('en-IN')} has been approved and is awaiting reimbursement.`,
+          _type: 'success',
+          _reference_type: 'expense',
+          _reference_id: expense.id,
+        });
+      }
+
+      // Notify accountants for reimbursement
+      const { data: accountants } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'accountant');
+
+      if (accountants) {
+        for (const accountant of accountants) {
+          await supabase.rpc('create_notification', {
+            _user_id: accountant.user_id,
+            _title: 'Expense Ready for Reimbursement',
+            _message: `An expense of ₹${expense.amount.toLocaleString('en-IN')} by ${expense.staff?.full_name || 'Staff'} has been approved and is ready for reimbursement.`,
+            _type: 'info',
+            _reference_type: 'expense',
+            _reference_id: expense.id,
+          });
+        }
+      }
 
       toast({
         title: 'Expense approved',

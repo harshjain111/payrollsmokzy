@@ -28,7 +28,7 @@ import type { Staff, AppRole } from '@/types/database';
 export default function StaffDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isOwner, canViewSalaries } = useAuth();
+  const { isOwner, canViewSalaries, canEditStaff } = useAuth();
   
   const [staff, setStaff] = useState<Staff | null>(null);
   const [staffRole, setStaffRole] = useState<AppRole | null>(null);
@@ -178,49 +178,49 @@ export default function StaffDetails() {
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
+          {canEditStaff && (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/staff/${staff.id}/edit`}>
+                <Edit className="h-4 w-4 mr-2" />
+                Edit
+              </Link>
+            </Button>
+          )}
           {isOwner && (
-            <>
-              <Button variant="outline" size="sm" asChild>
-                <Link to={`/staff/${staff.id}/edit`}>
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit
-                </Link>
-              </Button>
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="destructive" size="sm">
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to delete <strong>{staff.full_name}</strong>? 
-                      This action cannot be undone. Their login access will also be revoked.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={handleDelete}
-                      disabled={isDeleting}
-                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                      {isDeleting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Deleting...
-                        </>
-                      ) : (
-                        'Delete Staff'
-                      )}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            </>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete <strong>{staff.full_name}</strong>? 
+                    This action cannot be undone. Their login access will also be revoked.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      'Delete Staff'
+                    )}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           )}
         </div>
       </PageHeader>
@@ -231,7 +231,7 @@ export default function StaffDetails() {
           <CardContent className="pt-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
               <Avatar className="h-20 w-20 text-2xl">
-                <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/60 text-primary-foreground">
                   {getInitials(staff.full_name)}
                 </AvatarFallback>
               </Avatar>
