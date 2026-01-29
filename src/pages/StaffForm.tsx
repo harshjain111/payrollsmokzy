@@ -559,20 +559,31 @@ export default function StaffForm() {
 
               <div className="space-y-2">
                 <Label>System Role *</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}>
+                <Select 
+                  value={role} 
+                  onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}
+                  disabled={!isOwner && !isEditing}
+                >
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="accountant">Accountant</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
+                    {isOwner && (
+                      <>
+                        <SelectItem value="accountant">Accountant</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </>
+                    )}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
                   {role === 'staff' && 'Can view own data, submit expenses and payment requests'}
                   {role === 'accountant' && 'Can record payments, reimburse expenses, export reports (no salary visibility)'}
                   {role === 'admin' && 'Can approve expenses and requests, record payments (no salary visibility)'}
+                  {!isOwner && !isEditing && (
+                    <span className="block mt-1 text-warning">Only Owner can assign Admin or Accountant roles</span>
+                  )}
                 </p>
               </div>
             </div>
