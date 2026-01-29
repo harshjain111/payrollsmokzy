@@ -84,6 +84,11 @@ export interface PaymentRequest {
   approved_by?: string;
   approved_at?: string;
   rejection_reason?: string;
+  paid_at?: string;
+  paid_by?: string;
+  ledger_entry_id?: string;
+  payout_type?: 'advance' | 'salary';
+  settlement_id?: string;
   created_at: string;
   updated_at: string;
   staff?: StaffPublic;
@@ -98,10 +103,15 @@ export interface SalarySettlement {
   leave_deduction: number;
   net_salary: number;
   advances_adjusted: number;
+  opening_advance_balance?: number;
+  closing_advance_balance?: number;
   balance_payable: number;
   status: SettlementStatus;
   settled_at?: string;
   settled_by?: string;
+  paid_at?: string;
+  paid_by?: string;
+  payment_mode?: string;
   ledger_entry_id?: string;
   created_at: string;
   updated_at: string;

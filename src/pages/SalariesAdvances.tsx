@@ -28,15 +28,19 @@ import {
   Eye,
   EyeOff,
   Wallet,
-  TrendingUp
+  TrendingUp,
+  CreditCard,
+  ArrowRight
 } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
-import type { Staff } from '@/types/database';
+import type { Staff, SalarySettlement } from '@/types/database';
 
 interface StaffWithFinancials extends Staff {
   totalAdvanceOutstanding: number;
   lastSettlementMonth: string | null;
+  lastSettlementAmount: number | null;
   isCurrentMonthSettled: boolean;
+  salaryPayoutStatus: 'not_settled' | 'pending_payout' | 'paid';
 }
 
 export default function SalariesAdvances() {
@@ -46,7 +50,7 @@ export default function SalariesAdvances() {
   const [staff, setStaff] = useState<StaffWithFinancials[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'settled'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'settled' | 'paid'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(subMonths(new Date(), 1), 'yyyy-MM'));
 
   useEffect(() => {
@@ -73,28 +77,56 @@ export default function SalariesAdvances() {
           const { data: advanceData } = await supabase
             .rpc('get_advances_outstanding', { _staff_id: s.id });
 
-          // Get last settlement
+          // Get last settlement with amount
           const { data: lastSettlement } = await supabase
             .from('salary_settlements')
-            .select('settlement_month')
+            .select('settlement_month, balance_payable, paid_at')
             .eq('staff_id', s.id)
             .eq('status', 'settled')
             .order('settlement_month', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          // Check if current selected month is settled
-          const { data: isSettled } = await supabase
-            .rpc('is_salary_settled', {
-              _staff_id: s.id,
-              _month: selectedMonth,
-            });
+          // Get current month settlement status
+          const { data: currentSettlement } = await supabase
+            .from('salary_settlements')
+            .select('id, status, paid_at')
+            .eq('staff_id', s.id)
+            .eq('settlement_month', selectedMonth)
+            .maybeSingle();
+
+          // Check for pending salary payout request
+          let salaryPayoutStatus: 'not_settled' | 'pending_payout' | 'paid' = 'not_settled';
+          
+          if (currentSettlement) {
+            if (currentSettlement.paid_at) {
+              salaryPayoutStatus = 'paid';
+            } else {
+              // Check if there's a pending salary payout request
+              const { data: payoutRequest } = await supabase
+                .from('payment_requests')
+                .select('id, paid_at')
+                .eq('payout_type', 'salary')
+                .eq('settlement_id', currentSettlement.id)
+                .maybeSingle();
+
+              if (payoutRequest?.paid_at) {
+                salaryPayoutStatus = 'paid';
+              } else if (payoutRequest) {
+                salaryPayoutStatus = 'pending_payout';
+              } else {
+                salaryPayoutStatus = 'pending_payout'; // Settlement done but no payout yet
+              }
+            }
+          }
 
           return {
             ...s,
             totalAdvanceOutstanding: Number(advanceData) || 0,
             lastSettlementMonth: lastSettlement?.settlement_month || null,
-            isCurrentMonthSettled: isSettled || false,
+            lastSettlementAmount: lastSettlement?.balance_payable || null,
+            isCurrentMonthSettled: !!currentSettlement,
+            salaryPayoutStatus,
           } as StaffWithFinancials;
         })
       );
@@ -120,16 +152,22 @@ export default function SalariesAdvances() {
       s.employee_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.department?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
     
-    const matchesFilter = filterStatus === 'all' ||
-      (filterStatus === 'settled' && s.isCurrentMonthSettled) ||
-      (filterStatus === 'pending' && !s.isCurrentMonthSettled);
+    let matchesFilter = true;
+    if (filterStatus === 'settled') {
+      matchesFilter = s.isCurrentMonthSettled && s.salaryPayoutStatus !== 'paid';
+    } else if (filterStatus === 'pending') {
+      matchesFilter = !s.isCurrentMonthSettled;
+    } else if (filterStatus === 'paid') {
+      matchesFilter = s.salaryPayoutStatus === 'paid';
+    }
 
     return matchesSearch && matchesFilter;
   });
 
-  const totalPendingPayouts = filteredStaff.filter(s => !s.isCurrentMonthSettled).length;
+  const totalPendingSettlements = staff.filter(s => !s.isCurrentMonthSettled).length;
+  const totalPendingPayouts = staff.filter(s => s.salaryPayoutStatus === 'pending_payout').length;
   const totalAdvancesOutstanding = staff.reduce((sum, s) => sum + s.totalAdvanceOutstanding, 0);
-  const totalSettled = filteredStaff.filter(s => s.isCurrentMonthSettled).length;
+  const totalPaid = staff.filter(s => s.salaryPayoutStatus === 'paid').length;
 
   return (
     <div className="space-y-6">
@@ -139,13 +177,13 @@ export default function SalariesAdvances() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Pending Settlements</p>
-                <p className="text-2xl font-bold text-warning">{totalPendingPayouts}</p>
+                <p className="text-2xl font-bold text-warning">{totalPendingSettlements}</p>
               </div>
               <Clock className="h-8 w-8 text-warning/30" />
             </div>
@@ -156,8 +194,20 @@ export default function SalariesAdvances() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Settled This Month</p>
-                <p className="text-2xl font-bold text-success">{totalSettled}</p>
+                <p className="text-sm text-muted-foreground">Pending Payouts</p>
+                <p className="text-2xl font-bold text-info">{totalPendingPayouts}</p>
+              </div>
+              <CreditCard className="h-8 w-8 text-info/30" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Salaries Paid</p>
+                <p className="text-2xl font-bold text-success">{totalPaid}</p>
               </div>
               <CheckCircle2 className="h-8 w-8 text-success/30" />
             </div>
@@ -168,7 +218,7 @@ export default function SalariesAdvances() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-muted-foreground">Total Advances Outstanding</p>
+                <p className="text-sm text-muted-foreground">Advances Outstanding</p>
                 <Amount value={totalAdvancesOutstanding} className="text-2xl font-bold" />
               </div>
               <TrendingUp className="h-8 w-8 text-primary/30" />
@@ -202,14 +252,15 @@ export default function SalariesAdvances() {
           </SelectContent>
         </Select>
 
-        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as 'all' | 'pending' | 'settled')}>
-          <SelectTrigger className="w-[150px]">
+        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+          <SelectTrigger className="w-[180px]">
             <SelectValue placeholder="Filter" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Staff</SelectItem>
-            <SelectItem value="pending">Pending</SelectItem>
-            <SelectItem value="settled">Settled</SelectItem>
+            <SelectItem value="pending">Pending Settlement</SelectItem>
+            <SelectItem value="settled">Pending Payout</SelectItem>
+            <SelectItem value="paid">Paid</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -245,6 +296,7 @@ export default function SalariesAdvances() {
               isOwner={isOwner}
               onSettleSalary={() => navigate(`/settlements?staff=${s.id}&month=${selectedMonth}`)}
               onViewLedger={() => navigate(`/ledger?staff=${s.id}`)}
+              onExecutePayout={() => navigate('/payouts')}
             />
           ))}
         </div>
@@ -260,6 +312,7 @@ interface StaffTileProps {
   isOwner: boolean;
   onSettleSalary: () => void;
   onViewLedger: () => void;
+  onExecutePayout: () => void;
 }
 
 function StaffTile({ 
@@ -268,10 +321,36 @@ function StaffTile({
   canViewSalaries, 
   isOwner,
   onSettleSalary, 
-  onViewLedger 
+  onViewLedger,
+  onExecutePayout
 }: StaffTileProps) {
   const navigate = useNavigate();
   const monthLabel = format(new Date(selectedMonth + '-01'), 'MMM yyyy');
+
+  const getStatusBadge = () => {
+    if (staff.salaryPayoutStatus === 'paid') {
+      return (
+        <Badge variant="default" className="bg-success text-success-foreground">
+          <CheckCircle2 className="h-3 w-3 mr-1" />
+          Paid
+        </Badge>
+      );
+    }
+    if (staff.salaryPayoutStatus === 'pending_payout') {
+      return (
+        <Badge variant="default" className="bg-info text-info-foreground">
+          <CreditCard className="h-3 w-3 mr-1" />
+          Pending Payout
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="secondary" className="bg-warning text-warning-foreground">
+        <Clock className="h-3 w-3 mr-1" />
+        Not Settled
+      </Badge>
+    );
+  };
 
   return (
     <Card className="hover:shadow-md transition-shadow">
@@ -283,12 +362,7 @@ function StaffTile({
               {staff.employee_id} • {staff.department || 'No Dept'}
             </p>
           </div>
-          <Badge 
-            variant={staff.isCurrentMonthSettled ? 'default' : 'secondary'}
-            className={staff.isCurrentMonthSettled ? 'bg-success' : 'bg-warning text-warning-foreground'}
-          >
-            {staff.isCurrentMonthSettled ? 'Settled' : 'Pending'}
-          </Badge>
+          {getStatusBadge()}
         </div>
       </CardHeader>
       
@@ -306,15 +380,7 @@ function StaffTile({
           )}
         </div>
 
-        {/* Salary Due - Owner only */}
-        {canViewSalaries && !staff.isCurrentMonthSettled && (
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Salary Due ({monthLabel})</span>
-            <Amount value={staff.monthly_salary} className="font-medium text-primary" />
-          </div>
-        )}
-
-        {/* Advance Outstanding - visible to all who can access this page */}
+        {/* Advance Outstanding */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Advance Outstanding</span>
           <Amount 
@@ -326,12 +392,19 @@ function StaffTile({
         {/* Last Settlement */}
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Last Settlement</span>
-          <span className="text-sm">
-            {staff.lastSettlementMonth 
-              ? format(new Date(staff.lastSettlementMonth + '-01'), 'MMM yyyy')
-              : 'Never'
-            }
-          </span>
+          <div className="text-right">
+            <span className="text-sm">
+              {staff.lastSettlementMonth 
+                ? format(new Date(staff.lastSettlementMonth + '-01'), 'MMM yyyy')
+                : 'Never'
+              }
+            </span>
+            {staff.lastSettlementAmount && canViewSalaries && (
+              <div className="text-xs text-muted-foreground">
+                <Amount value={staff.lastSettlementAmount} size="sm" />
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Actions */}
@@ -347,11 +420,23 @@ function StaffTile({
             </Button>
           )}
           
+          {isOwner && staff.salaryPayoutStatus === 'pending_payout' && (
+            <Button 
+              size="sm"
+              variant="default"
+              onClick={onExecutePayout}
+              className="flex-1 bg-info hover:bg-info/90"
+            >
+              <CreditCard className="mr-1.5 h-3.5 w-3.5" />
+              Pay
+            </Button>
+          )}
+          
           <Button 
             size="sm" 
             variant="outline" 
             onClick={onViewLedger}
-            className={isOwner && !staff.isCurrentMonthSettled ? '' : 'flex-1'}
+            className={!staff.isCurrentMonthSettled || staff.salaryPayoutStatus === 'pending_payout' ? '' : 'flex-1'}
           >
             <FileText className="mr-1.5 h-3.5 w-3.5" />
             Ledger
