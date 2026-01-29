@@ -620,7 +620,7 @@ export default function Reports() {
                   <TableBody>
                     {reportData.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell>{format(new Date(entry.entry_date), 'dd MMM yyyy')}</TableCell>
+                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
                         <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
                         <TableCell>{entry.staff?.full_name}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{entry.description}</TableCell>
@@ -651,7 +651,7 @@ export default function Reports() {
           <TabsContent value="salary" className="mt-4">
             <Card>
               <CardHeader>
-                <CardTitle>Salary Register - {format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}</CardTitle>
+                <CardTitle>Salary Register - {selectedMonth ? format(new Date(selectedMonth + '-01'), 'MMMM yyyy') : ''}</CardTitle>
               </CardHeader>
               <CardContent>
                 {isLoading ? (
@@ -783,7 +783,7 @@ export default function Reports() {
                   <TableBody>
                     {reportData.map((expense) => (
                       <TableRow key={expense.id}>
-                        <TableCell>{format(new Date(expense.expense_date), 'dd MMM yyyy')}</TableCell>
+                        <TableCell>{expense.expense_date ? format(new Date(expense.expense_date), 'dd MMM yyyy') : '-'}</TableCell>
                         <TableCell>{expense.staff?.full_name}</TableCell>
                         <TableCell className="capitalize">{expense.category?.replace('_', ' ')}</TableCell>
                         <TableCell className="max-w-[200px] truncate">{expense.description}</TableCell>
@@ -831,7 +831,7 @@ export default function Reports() {
                   <TableBody>
                     {reportData.map((entry) => (
                       <TableRow key={entry.id}>
-                        <TableCell>{format(new Date(entry.entry_date), 'dd MMM yyyy')}</TableCell>
+                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
                         <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
                         <TableCell>{entry.staff?.full_name}</TableCell>
                         <TableCell className="capitalize">{entry.voucher_type}</TableCell>
