@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Wallet, Eye, EyeOff, Loader2, Phone } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -24,9 +25,14 @@ export default function Auth() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(() => {
+    return localStorage.getItem('rememberMe') === 'true';
+  });
 
   // Login form
-  const [loginPhone, setLoginPhone] = useState('');
+  const [loginPhone, setLoginPhone] = useState(() => {
+    return rememberMe ? localStorage.getItem('savedPhone') || '' : '';
+  });
   const [loginPassword, setLoginPassword] = useState('');
 
   useEffect(() => {
@@ -68,6 +74,15 @@ export default function Auth() {
         toast.error(error.message);
       }
     } else {
+      // Handle Remember Me
+      if (rememberMe) {
+        localStorage.setItem('rememberMe', 'true');
+        localStorage.setItem('savedPhone', cleanPhone);
+      } else {
+        localStorage.removeItem('rememberMe');
+        localStorage.removeItem('savedPhone');
+      }
+      
       toast.success('Welcome back!');
       navigate('/dashboard');
     }
@@ -150,6 +165,21 @@ export default function Auth() {
                     )}
                   </Button>
                 </div>
+              </div>
+
+              {/* Remember Me */}
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked === true)}
+                />
+                <Label 
+                  htmlFor="remember-me" 
+                  className="text-sm font-normal cursor-pointer select-none"
+                >
+                  Remember me
+                </Label>
               </div>
 
               <Button
