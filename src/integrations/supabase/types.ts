@@ -375,6 +375,7 @@ export type Database = {
           advances_adjusted: number | null
           balance_payable: number
           base_salary: number
+          closing_advance_balance: number | null
           created_at: string
           created_by: string | null
           id: string
@@ -382,6 +383,7 @@ export type Database = {
           leave_deduction: number | null
           ledger_entry_id: string | null
           net_salary: number
+          opening_advance_balance: number | null
           settled_at: string | null
           settled_by: string | null
           settlement_month: string
@@ -393,6 +395,7 @@ export type Database = {
           advances_adjusted?: number | null
           balance_payable: number
           base_salary: number
+          closing_advance_balance?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -400,6 +403,7 @@ export type Database = {
           leave_deduction?: number | null
           ledger_entry_id?: string | null
           net_salary: number
+          opening_advance_balance?: number | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month: string
@@ -411,6 +415,7 @@ export type Database = {
           advances_adjusted?: number | null
           balance_payable?: number
           base_salary?: number
+          closing_advance_balance?: number | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -418,6 +423,7 @@ export type Database = {
           leave_deduction?: number | null
           ledger_entry_id?: string | null
           net_salary?: number
+          opening_advance_balance?: number | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month?: string
