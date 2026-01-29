@@ -100,6 +100,8 @@ export default function Reports() {
   }, [isOwner, isCA, isAccountant, isAdmin]);
 
   useEffect(() => {
+    // Clear report data when switching tabs to prevent rendering old data with wrong structure
+    setReportData([]);
     fetchReportData();
   }, [activeReport, selectedStaffId, selectedMonth, dateRange]);
 
