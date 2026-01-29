@@ -494,8 +494,9 @@ function AppSidebar() {
 }
 
 function AppHeader() {
-  const { user, staffData, userRole, isAccountant, accountingMode } = useAuth();
+  const { user, staffData, userRole, isAccountant, accountingMode, signOut } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const counts = useNotificationCounts();
@@ -522,6 +523,11 @@ function AppHeader() {
 
   // Add context indicator for accountant
   const contextLabel = isAccountant ? (accountingMode ? '(Accounting)' : '(Personal)') : '';
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
 
   return (
     <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-4 lg:px-6">
@@ -554,17 +560,38 @@ function AppHeader() {
         <NotificationBell />
         <div className="hidden sm:flex items-center gap-3">
           <div className="h-6 w-px bg-border" />
-          <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-medium">
-                {getInitials(displayName)}
-              </AvatarFallback>
-            </Avatar>
-            <div className="hidden md:block">
-              <p className="text-sm font-medium leading-none">{displayName}</p>
-              <p className="text-xs text-muted-foreground">{roleDisplay}</p>
-            </div>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors cursor-pointer">
+                <Avatar className="h-8 w-8">
+                  <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white text-xs font-medium">
+                    {getInitials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block text-left">
+                  <p className="text-sm font-medium leading-none">{displayName}</p>
+                  <p className="text-xs text-muted-foreground">{roleDisplay}</p>
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 rounded-lg">
+              <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
+                <User className="mr-2 h-3.5 w-3.5" />
+                Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
+                <Settings className="mr-2 h-3.5 w-3.5" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm cursor-pointer">
+                <LogOut className="mr-2 h-3.5 w-3.5" />
+                Sign out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>
