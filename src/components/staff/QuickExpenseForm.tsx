@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import {
   Dialog,
@@ -50,12 +51,16 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
   const { staffData } = useAuth();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState<ExpenseCategory | null>(null);
+  const [description, setDescription] = useState('');
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Description is required for "other" category
+  const isDescriptionRequired = category === 'other';
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -86,6 +91,12 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
       return;
     }
 
+    // Require description for "other" category
+    if (isDescriptionRequired && !description.trim()) {
+      toast.error(t('description_required'));
+      return;
+    }
+
     if (!staffData?.id) {
       toast.error(t('error_occurred'));
       return;
@@ -111,11 +122,16 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         }
       }
 
+      // Use custom description for "other", otherwise use category label
+      const expenseDescription = isDescriptionRequired && description.trim() 
+        ? description.trim() 
+        : t(category);
+
       const { error } = await supabase.from('expenses').insert({
         staff_id: staffData.id,
         amount: numAmount,
         category,
-        description: t(category),
+        description: expenseDescription,
         status: 'pending',
         submitted_at: new Date().toISOString(),
         proof_url: proofUrl,
@@ -128,6 +144,7 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         setShowSuccess(false);
         setAmount('');
         setCategory(null);
+        setDescription('');
         setPhoto(null);
         setPhotoPreview(null);
         onOpenChange(false);
@@ -214,6 +231,25 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
               ))}
             </div>
           </div>
+
+          {/* Description Input - Shows when "Other" is selected */}
+          {isDescriptionRequired && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                {t('description')} *
+              </label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder={t('enter_description')}
+                className="min-h-[80px] text-base"
+                autoFocus={category === 'other'}
+              />
+              <p className="text-xs text-muted-foreground">
+                {t('description_required_hint')}
+              </p>
+            </div>
+          )}
 
           {/* Photo Upload */}
           <div className="space-y-2">

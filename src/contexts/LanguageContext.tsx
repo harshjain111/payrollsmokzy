@@ -62,6 +62,12 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'Please enter a valid amount',
     'error_occurred': 'Something went wrong. Try again.',
+    'description_required': 'Description is required for this category',
+    
+    // Description
+    'description': 'Description',
+    'enter_description': 'Describe the expense...',
+    'description_required_hint': 'Required when selecting "Other" category',
     
     // Language
     'language': 'Language',
@@ -127,6 +133,12 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'सही रकम डालें',
     'error_occurred': 'कुछ गड़बड़ हो गई। फिर से कोशिश करें।',
+    'description_required': 'इस कैटेगरी के लिए विवरण जरूरी है',
+    
+    // Description
+    'description': 'विवरण',
+    'enter_description': 'खर्च का विवरण दें...',
+    'description_required_hint': '"अन्य" चुनने पर जरूरी है',
     
     // Language
     'language': 'भाषा',
@@ -192,6 +204,12 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'সঠিক পৰিমাণ দিয়ক',
     'error_occurred': 'কিবা সমস্যা হ\'ল। আকৌ চেষ্টা কৰক।',
+    'description_required': 'এই শ্ৰেণীৰ বাবে বিৱৰণ আৱশ্যক',
+    
+    // Description
+    'description': 'বিৱৰণ',
+    'enter_description': 'খৰচৰ বিৱৰণ দিয়ক...',
+    'description_required_hint': '"অন্যান্য" বাছিলে আৱশ্যক',
     
     // Language
     'language': 'ভাষা',
