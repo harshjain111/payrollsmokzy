@@ -13,6 +13,8 @@ import Dashboard from "./pages/Dashboard";
 import StaffList from "./pages/StaffList";
 import StaffForm from "./pages/StaffForm";
 import StaffDetails from "./pages/StaffDetails";
+import UsersList from "./pages/UsersList";
+import UserForm from "./pages/UserForm";
 import Ledger from "./pages/Ledger";
 import Requests from "./pages/Requests";
 import NewRequest from "./pages/NewRequest";
@@ -59,6 +61,9 @@ function AppRoutes() {
       <Route path="/staff/new" element={<ProtectedRoute><StaffForm /></ProtectedRoute>} />
       <Route path="/staff/:id" element={<ProtectedRoute><StaffDetails /></ProtectedRoute>} />
       <Route path="/staff/:id/edit" element={<ProtectedRoute><StaffForm /></ProtectedRoute>} />
+      <Route path="/users" element={<ProtectedRoute><UsersList /></ProtectedRoute>} />
+      <Route path="/users/new" element={<ProtectedRoute><UserForm /></ProtectedRoute>} />
+      <Route path="/users/:id/edit" element={<ProtectedRoute><UserForm /></ProtectedRoute>} />
       <Route path="/ledger" element={<ProtectedRoute><Ledger /></ProtectedRoute>} />
       <Route path="/requests" element={<ProtectedRoute><Requests /></ProtectedRoute>} />
       <Route path="/requests/new" element={<ProtectedRoute><NewRequest /></ProtectedRoute>} />

@@ -81,8 +81,13 @@ function getNavSections(
       {
         items: [
           { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-          { title: 'Staff', href: '/staff', icon: Users },
-          { title: 'Add User', href: '/staff/new', icon: UserPlus },
+        ],
+      },
+      {
+        title: 'Management',
+        items: [
+          { title: 'Users', href: '/users', icon: Users },
+          { title: 'Staff', href: '/staff', icon: Briefcase },
         ],
       },
       {
@@ -132,8 +137,12 @@ function getNavSections(
       {
         items: [
           { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-          { title: 'Staff', href: '/staff', icon: Users },
-          { title: 'Add User', href: '/staff/new', icon: UserPlus },
+        ],
+      },
+      {
+        title: 'Management',
+        items: [
+          { title: 'Staff', href: '/staff', icon: Briefcase },
         ],
       },
       {

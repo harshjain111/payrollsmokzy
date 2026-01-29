@@ -41,11 +41,14 @@ import {
 import type { Staff } from '@/types/database';
 
 export default function StaffList() {
-  const { canViewSalaries, isOwner } = useAuth();
+  const { canViewSalaries, isOwner, isAdmin, isAccountant } = useAuth();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  // Owner, Admin, and Accountant can add staff
+  const canAddStaff = isOwner || isAdmin || isAccountant;
 
   useEffect(() => {
     fetchStaff();
@@ -141,7 +144,7 @@ export default function StaffList() {
         title="Staff Management"
         description="Manage your team members and their details"
       >
-        {isOwner && (
+        {canAddStaff && (
           <Link to="/staff/new">
             <Button>
               <Plus className="mr-2 h-4 w-4" />
@@ -175,7 +178,7 @@ export default function StaffList() {
               title="No staff found"
               description={searchQuery ? "Try adjusting your search" : "Add your first team member"}
               action={
-                !searchQuery && isOwner
+                !searchQuery && canAddStaff
                   ? <Link to="/staff/new"><Button>Add Staff</Button></Link>
                   : undefined
               }

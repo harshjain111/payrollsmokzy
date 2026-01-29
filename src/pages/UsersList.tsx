@@ -1,0 +1,352 @@
+import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { EmptyState } from '@/components/layout/EmptyState';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Plus, Search, Users, MoreHorizontal, Edit, Trash2, Link as LinkIcon } from 'lucide-react';
+import { format } from 'date-fns';
+import { toast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import type { AppRole } from '@/types/database';
+
+interface UserWithRole {
+  id: string;
+  user_id: string;
+  role: AppRole;
+  created_at: string;
+  user_metadata?: {
+    full_name?: string;
+    phone?: string;
+  };
+  email?: string;
+  staff_id?: string;
+  staff_name?: string;
+}
+
+export default function UsersList() {
+  const { isOwner } = useAuth();
+  const [users, setUsers] = useState<UserWithRole[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      // Fetch user roles with staff info
+      const { data: rolesData, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (rolesError) throw rolesError;
+
+      // Get staff info for users that are linked to staff
+      const { data: staffData } = await supabase
+        .from('staff')
+        .select('id, user_id, full_name, phone, email');
+
+      const staffMap = new Map(staffData?.map(s => [s.user_id, s]) || []);
+
+      const usersWithData: UserWithRole[] = (rolesData || []).map(role => {
+        const staff = staffMap.get(role.user_id);
+        return {
+          id: role.id,
+          user_id: role.user_id,
+          role: role.role as AppRole,
+          created_at: role.created_at,
+          user_metadata: {
+            full_name: staff?.full_name,
+            phone: staff?.phone,
+          },
+          email: staff?.email,
+          staff_id: staff?.id,
+          staff_name: staff?.full_name,
+        };
+      });
+
+      setUsers(usersWithData);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load users.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const filteredUsers = users.filter(u =>
+    (u.user_metadata?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.user_metadata?.phone || '').includes(searchQuery) ||
+    (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.role.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const getInitials = (name?: string) => {
+    if (!name) return 'U';
+    return name
+      .split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+  };
+
+  const getRoleBadgeVariant = (role: AppRole): "default" | "secondary" | "destructive" | "outline" => {
+    switch (role) {
+      case 'owner': return 'default';
+      case 'admin': return 'secondary';
+      default: return 'outline';
+    }
+  };
+
+  const getRoleLabel = (role: AppRole) => {
+    return role.charAt(0).toUpperCase() + role.slice(1);
+  };
+
+  const handleDelete = async (user: UserWithRole) => {
+    if (user.role === 'owner') {
+      toast({
+        title: 'Cannot Delete',
+        description: 'Owner accounts cannot be deleted.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      setDeletingId(user.id);
+
+      // Delete user role
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'User Deleted',
+        description: 'User access has been removed.',
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete user.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (!isOwner) {
+    return (
+      <EmptyState
+        icon={Users}
+        title="Access Denied"
+        description="Only owners can manage users"
+      />
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="User Management"
+        description="Manage user accounts and role assignments"
+      >
+        <Link to="/users/new">
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Add User
+          </Button>
+        </Link>
+      </PageHeader>
+
+      {/* Search */}
+      <Card className="mb-6">
+        <CardContent className="pt-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, phone, email, or role..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Users Table */}
+      <Card>
+        <CardContent className="p-0">
+          {filteredUsers.length === 0 && !isLoading ? (
+            <EmptyState
+              icon={Users}
+              title="No users found"
+              description={searchQuery ? "Try adjusting your search" : "Add your first user"}
+              action={
+                !searchQuery
+                  ? <Link to="/users/new"><Button>Add User</Button></Link>
+                  : undefined
+              }
+            />
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-secondary/50">
+                    <TableHead>User</TableHead>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Linked Staff</TableHead>
+                    <TableHead>Created</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredUsers.map((user) => (
+                    <TableRow key={user.id} className="hover:bg-secondary/30">
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-9 w-9">
+                            <AvatarFallback className="bg-primary/10 text-primary text-sm">
+                              {getInitials(user.user_metadata?.full_name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="font-medium">
+                              {user.user_metadata?.full_name || 'Unknown'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              {user.email || '-'}
+                            </p>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {user.user_metadata?.phone || '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={getRoleBadgeVariant(user.role)}>
+                          {getRoleLabel(user.role)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {user.staff_id ? (
+                          <Link 
+                            to={`/staff/${user.staff_id}`}
+                            className="flex items-center gap-1 text-primary hover:underline"
+                          >
+                            <LinkIcon className="h-3 w-3" />
+                            {user.staff_name}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">Not linked</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {format(new Date(user.created_at), 'dd MMM yyyy')}
+                      </TableCell>
+                      <TableCell>
+                        {user.role !== 'owner' && (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link to={`/users/${user.user_id}/edit`}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit Role
+                                </Link>
+                              </DropdownMenuItem>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    onSelect={(e) => e.preventDefault()}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remove Access
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Remove User Access</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to remove access for{' '}
+                                      <strong>{user.user_metadata?.full_name || 'this user'}</strong>?
+                                      They will no longer be able to login.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDelete(user)}
+                                      disabled={deletingId === user.id}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      {deletingId === user.id ? 'Removing...' : 'Remove'}
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
