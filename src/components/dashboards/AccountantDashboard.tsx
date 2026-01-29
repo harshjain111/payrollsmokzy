@@ -96,11 +96,11 @@ export function AccountantDashboard() {
         title="Accounting Dashboard"
         description="Execute payouts for approved requests and expenses"
       >
-        <div className="flex gap-2">
-          <Link to="/requests/new">
+        <div className="flex flex-wrap gap-2">
+          <Link to="/staff/new">
             <Button variant="outline">
-              <Plus className="mr-2 h-4 w-4" />
-              New Request
+              <UserPlus className="mr-2 h-4 w-4" />
+              Add Staff
             </Button>
           </Link>
           <Link to="/payouts">
