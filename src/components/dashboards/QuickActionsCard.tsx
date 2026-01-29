@@ -41,38 +41,38 @@ export function QuickActionsCard({
 }: QuickActionsCardProps) {
   return (
     <Card className="rounded-2xl shadow-card border-0">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg font-semibold flex items-center gap-2">
-          <Zap className="h-5 w-5 text-primary" />
+      <CardHeader className="pb-2 px-4 sm:px-6">
+        <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
+          <Zap className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
           {title}
         </CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <CardDescription className="text-xs sm:text-sm">{description}</CardDescription>
       </CardHeader>
-      <CardContent className="grid gap-3">
+      <CardContent className="grid gap-2 sm:gap-3 px-4 sm:px-6">
         {actions.map((action) => (
           <Link key={action.href} to={action.href}>
             <Button
               variant="outline"
-              className="w-full justify-start h-auto py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all"
+              className="w-full justify-start h-auto py-3 sm:py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all active:scale-[0.98]"
             >
               <div
                 className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center mr-3 shrink-0',
+                  'w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-2 sm:mr-3 shrink-0',
                   variantStyles[action.variant || 'primary']
                 )}
               >
-                <action.icon className="h-5 w-5" />
+                <action.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="text-left flex-1 min-w-0">
-                <p className="font-medium">{action.label}</p>
-                <p className="text-xs text-muted-foreground truncate">
+                <p className="font-medium text-sm sm:text-base">{action.label}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                   {action.description}
                 </p>
               </div>
               {action.badge !== undefined && (typeof action.badge === 'string' || action.badge > 0) && (
                 <Badge
                   className={cn(
-                    'text-xs ml-2 shrink-0',
+                    'text-[10px] sm:text-xs ml-1.5 sm:ml-2 shrink-0 px-1.5 sm:px-2',
                     badgeVariantStyles[action.badgeVariant || 'default']
                   )}
                 >

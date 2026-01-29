@@ -70,15 +70,16 @@ export function OwnerDashboard() {
   ];
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8 pb-6">
       <PageHeader
         title="Dashboard"
         description={`Overview for ${currentMonth}`}
       >
         <Link to="/staff/new">
-          <Button className="rounded-xl shadow-lg">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Staff
+          <Button className="rounded-xl shadow-lg text-sm sm:text-base px-3 sm:px-4">
+            <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Add Staff</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </Link>
       </PageHeader>
@@ -116,9 +117,9 @@ export function OwnerDashboard() {
       </div>
 
       {/* Action Tiles - Clickable */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Action Required</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-2 sm:space-y-3">
+        <h2 className="text-base sm:text-lg font-semibold text-foreground">Action Required</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           <ActionTile
             title="Pending Approvals"
             count={totalPendingApprovals}
@@ -150,7 +151,7 @@ export function OwnerDashboard() {
       </div>
 
       {/* Secondary Stats Tiles */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
         <ActionTile
           title="Pending Expenses"
           count={stats.pendingExpenses}
@@ -181,7 +182,7 @@ export function OwnerDashboard() {
       </div>
 
       {/* Quick Actions & Reports */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <QuickActionsCard actions={quickActions} />
 
         <QuickActionsCard
