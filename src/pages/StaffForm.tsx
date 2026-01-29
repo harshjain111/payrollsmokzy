@@ -33,10 +33,10 @@ export default function StaffForm() {
   
   // Determine who can access this page
   // Owner: full access (add/edit with salary)
-  // Admin/Accountant: can add staff without salary
+  // Admin/Accountant: can add staff without salary, can edit non-salary fields
   const canAddStaff = isOwner || isAdmin || isAccountant;
   const canSetSalary = isOwner;
-  const canEditStaff = isOwner; // Only owner can edit existing staff
+  const canEditStaff = isOwner || isAdmin || isAccountant; // Non-salary fields for non-owners
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(isEditing);
@@ -67,21 +67,21 @@ export default function StaffForm() {
 
   useEffect(() => {
     // Access control
-    if (!canAddStaff) {
+    if (!canAddStaff && !isEditing) {
       toast({
         title: 'Access Denied',
-        description: 'You do not have permission to manage staff.',
+        description: 'You do not have permission to add staff.',
         variant: 'destructive',
       });
       navigate('/dashboard');
       return;
     }
     
-    // Only owner can edit existing staff
+    // Check edit permissions
     if (isEditing && !canEditStaff) {
       toast({
         title: 'Access Denied',
-        description: 'Only owners can edit staff information.',
+        description: 'You do not have permission to edit staff.',
         variant: 'destructive',
       });
       navigate('/staff');
@@ -191,20 +191,27 @@ export default function StaffForm() {
       setIsSubmitting(true);
 
       if (isEditing) {
-        // Update existing staff (Owner only)
+        // Update existing staff
+        // Non-owners can only update non-salary fields
+        const updateData: Record<string, unknown> = {
+          full_name: fullName.trim(),
+          employee_id: employeeId.trim(),
+          phone: formatPhoneInput(phone) || null,
+          email: email.trim() || null,
+          department: department.trim() || null,
+          designation: designation.trim() || null,
+          date_of_joining: format(dateOfJoining, 'yyyy-MM-dd'),
+          is_active: isActive,
+        };
+        
+        // Only owner can update salary
+        if (canSetSalary) {
+          updateData.monthly_salary = monthlySalary;
+        }
+        
         const { error: staffError } = await supabase
           .from('staff')
-          .update({
-            full_name: fullName.trim(),
-            employee_id: employeeId.trim(),
-            phone: formatPhoneInput(phone) || null,
-            email: email.trim() || null,
-            department: department.trim() || null,
-            designation: designation.trim() || null,
-            monthly_salary: monthlySalary,
-            date_of_joining: format(dateOfJoining, 'yyyy-MM-dd'),
-            is_active: isActive,
-          })
+          .update(updateData)
           .eq('id', id);
 
         if (staffError) throw staffError;
@@ -219,8 +226,8 @@ export default function StaffForm() {
           if (roleError) console.error('Role update error:', roleError);
         }
 
-        // If salary changed, record in salary history
-        if (salaryChanged) {
+        // If salary changed (and owner updated it), record in salary history
+        if (salaryChanged && canSetSalary) {
           // Close previous salary history record
           await supabase
             .from('salary_history')

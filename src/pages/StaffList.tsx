@@ -41,7 +41,7 @@ import {
 import type { Staff } from '@/types/database';
 
 export default function StaffList() {
-  const { canViewSalaries, isOwner, isAdmin, isAccountant } = useAuth();
+  const { canViewSalaries, isOwner, isAdmin, isAccountant, canEditStaff } = useAuth();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -223,7 +223,11 @@ export default function StaffList() {
                       {/* SALARY CONFIDENTIALITY: Only show salary value to Owner */}
                       {canViewSalaries && (
                         <TableCell className="text-right">
-                          <Amount value={member.monthly_salary} />
+                          {member.monthly_salary > 0 ? (
+                            <Amount value={member.monthly_salary} />
+                          ) : (
+                            <span className="text-warning text-sm font-medium">Salary not set</span>
+                          )}
                         </TableCell>
                       )}
                       <TableCell>
@@ -246,7 +250,7 @@ export default function StaffList() {
                                 View Details
                               </Link>
                             </DropdownMenuItem>
-                            {isOwner && (
+                            {canEditStaff && (
                               <DropdownMenuItem asChild>
                                 <Link to={`/staff/${member.id}/edit`}>
                                   <Edit className="mr-2 h-4 w-4" />

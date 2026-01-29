@@ -59,7 +59,17 @@ export function RejectExpenseDialog({
 
       if (error) throw error;
 
-      // TODO: Create notification for staff
+      // Notify the staff member about rejection
+      if (expense.staff?.user_id) {
+        await supabase.rpc('create_notification', {
+          _user_id: expense.staff.user_id,
+          _title: 'Expense Rejected',
+          _message: `Your expense of ₹${expense.amount.toLocaleString('en-IN')} has been rejected. Reason: ${reason.trim()}`,
+          _type: 'error',
+          _reference_type: 'expense',
+          _reference_id: expense.id,
+        });
+      }
 
       toast({
         title: 'Expense rejected',
