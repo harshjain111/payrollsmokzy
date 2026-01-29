@@ -235,92 +235,150 @@ export default function Ledger() {
               description="Ledger entries will appear here once transactions are recorded"
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/30 hover:bg-muted/30">
-                    <TableHead className="font-semibold">Date</TableHead>
-                    <TableHead className="font-semibold">Voucher</TableHead>
-                    <TableHead className="font-semibold">Type</TableHead>
-                    <TableHead className="font-semibold max-w-[300px]">Description</TableHead>
-                    <TableHead className="font-semibold text-right">Debit</TableHead>
-                    <TableHead className="font-semibold text-right">Credit</TableHead>
-                    <TableHead className="font-semibold text-right">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleEntries.map((entry) => {
-                    const isMasked = shouldMaskEntry(entry);
-                    
-                    return (
-                      <TableRow key={entry.id} className="group">
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {format(new Date(entry.entry_date), 'dd MMM yyyy')}
-                        </TableCell>
-                        <TableCell>
-                          <span className="font-mono text-xs px-2 py-1 rounded-md bg-muted/50">
-                            {entry.voucher_no}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/5 text-primary capitalize">
-                            {entry.voucher_type}
-                          </span>
-                        </TableCell>
-                        <TableCell className="max-w-[300px]">
+            <>
+              {/* Mobile Card View */}
+              <div className="block lg:hidden divide-y">
+                {visibleEntries.map((entry) => {
+                  const isMasked = shouldMaskEntry(entry);
+                  return (
+                    <div key={entry.id} className="p-4 space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/5 text-primary capitalize">
+                              {entry.voucher_type}
+                            </span>
+                            {entry.tag && (
+                              <span className="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                                {entry.tag}
+                              </span>
+                            )}
+                          </div>
                           {isMasked ? (
-                            <span className="flex items-center gap-2 text-muted-foreground">
+                            <p className="text-sm text-muted-foreground flex items-center gap-1">
                               <Lock className="h-3 w-3" />
                               <span className="italic">Salary entry (hidden)</span>
-                            </span>
+                            </p>
                           ) : (
-                            <>
-                              <span className="truncate block">{entry.description}</span>
-                              {entry.tag && (
-                                <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded mt-1 inline-block">
-                                  {entry.tag}
-                                </span>
-                              )}
-                            </>
+                            <p className="text-sm line-clamp-2">{entry.description}</p>
                           )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {format(new Date(entry.entry_date), 'dd MMM yyyy')} • {entry.voucher_no}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
                           {isMasked ? (
-                            <span className="text-muted-foreground">***</span>
+                            <span className="text-muted-foreground font-mono">***</span>
                           ) : entry.debit > 0 ? (
-                            <span className="text-destructive font-medium">
-                              ₹{Number(entry.debit).toLocaleString('en-IN')}
+                            <span className="text-destructive font-medium font-mono">
+                              -₹{Number(entry.debit).toLocaleString('en-IN')}
                             </span>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">
-                          {isMasked ? (
-                            <span className="text-muted-foreground">***</span>
                           ) : entry.credit > 0 ? (
-                            <span className="text-success font-medium">
-                              ₹{Number(entry.credit).toLocaleString('en-IN')}
+                            <span className="text-success font-medium font-mono">
+                              +₹{Number(entry.credit).toLocaleString('en-IN')}
                             </span>
-                          ) : (
-                            <span className="text-muted-foreground/50">-</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums font-medium">
-                          {isMasked ? (
-                            <span className="text-muted-foreground">***</span>
-                          ) : (
-                            <span className={entry.running_balance >= 0 ? 'text-success' : 'text-destructive'}>
-                              {entry.running_balance >= 0 ? '+' : '-'}₹{Math.abs(entry.running_balance).toLocaleString('en-IN')}
+                          ) : null}
+                          <p className={`text-xs font-mono mt-0.5 ${
+                            isMasked ? 'text-muted-foreground' :
+                            entry.running_balance >= 0 ? 'text-success' : 'text-destructive'
+                          }`}>
+                            {isMasked ? '***' : `Bal: ₹${Math.abs(entry.running_balance).toLocaleString('en-IN')}`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden lg:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="font-semibold">Date</TableHead>
+                      <TableHead className="font-semibold">Voucher</TableHead>
+                      <TableHead className="font-semibold">Type</TableHead>
+                      <TableHead className="font-semibold max-w-[300px]">Description</TableHead>
+                      <TableHead className="font-semibold text-right">Debit</TableHead>
+                      <TableHead className="font-semibold text-right">Credit</TableHead>
+                      <TableHead className="font-semibold text-right">Balance</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {visibleEntries.map((entry) => {
+                      const isMasked = shouldMaskEntry(entry);
+                      
+                      return (
+                        <TableRow key={entry.id} className="group">
+                          <TableCell className="whitespace-nowrap text-muted-foreground">
+                            {format(new Date(entry.entry_date), 'dd MMM yyyy')}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-xs px-2 py-1 rounded-md bg-muted/50">
+                              {entry.voucher_no}
                             </span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-medium bg-primary/5 text-primary capitalize">
+                              {entry.voucher_type}
+                            </span>
+                          </TableCell>
+                          <TableCell className="max-w-[300px]">
+                            {isMasked ? (
+                              <span className="flex items-center gap-2 text-muted-foreground">
+                                <Lock className="h-3 w-3" />
+                                <span className="italic">Salary entry (hidden)</span>
+                              </span>
+                            ) : (
+                              <>
+                                <span className="truncate block">{entry.description}</span>
+                                {entry.tag && (
+                                  <span className="text-xs text-muted-foreground bg-muted/50 px-2 py-0.5 rounded mt-1 inline-block">
+                                    {entry.tag}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            {isMasked ? (
+                              <span className="text-muted-foreground">***</span>
+                            ) : entry.debit > 0 ? (
+                              <span className="text-destructive font-medium">
+                                ₹{Number(entry.debit).toLocaleString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums">
+                            {isMasked ? (
+                              <span className="text-muted-foreground">***</span>
+                            ) : entry.credit > 0 ? (
+                              <span className="text-success font-medium">
+                                ₹{Number(entry.credit).toLocaleString('en-IN')}
+                              </span>
+                            ) : (
+                              <span className="text-muted-foreground/50">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-mono tabular-nums font-medium">
+                            {isMasked ? (
+                              <span className="text-muted-foreground">***</span>
+                            ) : (
+                              <span className={entry.running_balance >= 0 ? 'text-success' : 'text-destructive'}>
+                                {entry.running_balance >= 0 ? '+' : '-'}₹{Math.abs(entry.running_balance).toLocaleString('en-IN')}
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

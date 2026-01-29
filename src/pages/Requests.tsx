@@ -225,12 +225,12 @@ export default function Requests() {
         )}
       </PageHeader>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
-        <TabsList>
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected</TabsTrigger>
-          <TabsTrigger value="all">All</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4 md:mb-6">
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+          <TabsTrigger value="pending" className="flex-shrink-0">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="flex-shrink-0">Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className="flex-shrink-0">Rejected</TabsTrigger>
+          <TabsTrigger value="all" className="flex-shrink-0">All</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -247,92 +247,150 @@ export default function Requests() {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-secondary/50">
-                    <TableHead>Date</TableHead>
-                    <TableHead>Staff</TableHead>
-                    <TableHead className="max-w-[300px]">Reason</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {requests.map((request) => (
-                    <TableRow key={request.id}>
-                      <TableCell className="whitespace-nowrap">
-                        {format(new Date(request.created_at), 'dd MMM yyyy')}
-                      </TableCell>
-                      <TableCell>
-                        <div>
-                          <p className="font-medium">{request.staff?.full_name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {request.staff?.employee_id}
-                          </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="max-w-[300px]">
-                        <p className="truncate">{request.reason}</p>
-                        {request.rejection_reason && (
-                          <p className="text-xs text-destructive mt-1">
-                            Rejected: {request.rejection_reason}
-                          </p>
+            <>
+              {/* Mobile Card View */}
+              <div className="block md:hidden divide-y">
+                {requests.map((request) => (
+                  <div key={request.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium">{request.staff?.full_name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {request.staff?.employee_id} • {format(new Date(request.created_at), 'dd MMM yyyy')}
+                        </p>
+                      </div>
+                      <StatusBadge status={request.status} />
+                    </div>
+                    <p className="text-sm text-muted-foreground line-clamp-2">{request.reason}</p>
+                    {request.rejection_reason && (
+                      <p className="text-xs text-destructive">
+                        Rejected: {request.rejection_reason}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between pt-2">
+                      <Amount value={request.amount} size="lg" />
+                      <div className="flex gap-2">
+                        {canApprove && request.status === 'pending' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-success hover:text-success h-9 w-9 p-0"
+                              onClick={() => handleApprove(request)}
+                              disabled={isProcessing}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-destructive hover:text-destructive h-9 w-9 p-0"
+                              onClick={() => setSelectedRequest(request)}
+                              disabled={isProcessing}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
                         )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Amount value={request.amount} />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={request.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {/* Approve/Reject buttons - only for Owner/Admin on pending */}
-                          {canApprove && request.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-success hover:text-success"
-                                onClick={() => handleApprove(request)}
-                                disabled={isProcessing}
-                              >
-                                <Check className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => setSelectedRequest(request)}
-                                disabled={isProcessing}
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                          
-                          {/* "Go to Payouts" indicator for approved requests */}
-                          {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
-                            <Link to="/payouts">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="gap-1 text-xs"
-                              >
-                                Payouts
-                                <ArrowRight className="h-3 w-3" />
-                              </Button>
-                            </Link>
-                          )}
-                        </div>
-                      </TableCell>
+                        {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
+                          <Link to="/payouts">
+                            <Button size="sm" variant="outline" className="gap-1">
+                              Payouts
+                              <ArrowRight className="h-3 w-3" />
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-secondary/50">
+                      <TableHead>Date</TableHead>
+                      <TableHead>Staff</TableHead>
+                      <TableHead className="max-w-[300px]">Reason</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {requests.map((request) => (
+                      <TableRow key={request.id}>
+                        <TableCell className="whitespace-nowrap">
+                          {format(new Date(request.created_at), 'dd MMM yyyy')}
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{request.staff?.full_name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {request.staff?.employee_id}
+                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="max-w-[300px]">
+                          <p className="truncate">{request.reason}</p>
+                          {request.rejection_reason && (
+                            <p className="text-xs text-destructive mt-1">
+                              Rejected: {request.rejection_reason}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Amount value={request.amount} />
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={request.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            {canApprove && request.status === 'pending' && (
+                              <>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-success hover:text-success"
+                                  onClick={() => handleApprove(request)}
+                                  disabled={isProcessing}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => setSelectedRequest(request)}
+                                  disabled={isProcessing}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                            {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
+                              <Link to="/payouts">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="gap-1 text-xs"
+                                >
+                                  Payouts
+                                  <ArrowRight className="h-3 w-3" />
+                                </Button>
+                              </Link>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>
