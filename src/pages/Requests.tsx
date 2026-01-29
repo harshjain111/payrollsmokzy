@@ -206,31 +206,32 @@ export default function Requests() {
   const canCreateRequest = isStaff || isAccountant || isAdmin || isOwner;
 
   return (
-    <div>
+    <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Payment Requests"
         description={
           canApprove
-            ? "Review and approve payment requests. Approved requests go to Payouts."
+            ? "Review and approve payment requests"
             : "View and create payment requests"
         }
       >
         {canCreateRequest && (
           <Link to="/requests/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Request
+            <Button className="text-sm sm:text-base px-3 sm:px-4">
+              <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">New Request</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </Link>
         )}
       </PageHeader>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4 md:mb-6">
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
-          <TabsTrigger value="pending" className="flex-shrink-0">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="flex-shrink-0">Approved</TabsTrigger>
-          <TabsTrigger value="rejected" className="flex-shrink-0">Rejected</TabsTrigger>
-          <TabsTrigger value="all" className="flex-shrink-0">All</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+          <TabsTrigger value="pending" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Rejected</TabsTrigger>
+          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -251,31 +252,31 @@ export default function Requests() {
               {/* Mobile Card View */}
               <div className="block md:hidden divide-y">
                 {requests.map((request) => (
-                  <div key={request.id} className="p-4 space-y-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <p className="font-medium">{request.staff?.full_name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {request.staff?.employee_id} • {format(new Date(request.created_at), 'dd MMM yyyy')}
+                  <div key={request.id} className="p-3 sm:p-4 space-y-2 sm:space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm sm:text-base truncate">{request.staff?.full_name}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">
+                          {request.staff?.employee_id} • {format(new Date(request.created_at), 'dd MMM')}
                         </p>
                       </div>
                       <StatusBadge status={request.status} />
                     </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">{request.reason}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{request.reason}</p>
                     {request.rejection_reason && (
-                      <p className="text-xs text-destructive">
+                      <p className="text-[10px] sm:text-xs text-destructive line-clamp-1">
                         Rejected: {request.rejection_reason}
                       </p>
                     )}
-                    <div className="flex items-center justify-between pt-2">
+                    <div className="flex items-center justify-between pt-1 sm:pt-2">
                       <Amount value={request.amount} size="lg" />
-                      <div className="flex gap-2">
+                      <div className="flex gap-1 sm:gap-2">
                         {canApprove && request.status === 'pending' && (
                           <>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-success hover:text-success h-9 w-9 p-0"
+                              className="text-success hover:text-success h-8 w-8 sm:h-9 sm:w-9 p-0"
                               onClick={() => handleApprove(request)}
                               disabled={isProcessing}
                             >
@@ -284,7 +285,7 @@ export default function Requests() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-destructive hover:text-destructive h-9 w-9 p-0"
+                              className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9 p-0"
                               onClick={() => setSelectedRequest(request)}
                               disabled={isProcessing}
                             >
@@ -294,7 +295,7 @@ export default function Requests() {
                         )}
                         {request.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
                           <Link to="/payouts">
-                            <Button size="sm" variant="outline" className="gap-1">
+                            <Button size="sm" variant="outline" className="gap-1 h-8 text-xs px-2">
                               Payouts
                               <ArrowRight className="h-3 w-3" />
                             </Button>

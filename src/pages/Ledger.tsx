@@ -146,7 +146,7 @@ export default function Ledger() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Ledger"
         description={
@@ -157,23 +157,23 @@ export default function Ledger() {
             : "Staff-wise ledger entries"
         }
       >
-        <Button variant="outline" className="rounded-xl">
-          <Download className="mr-2 h-4 w-4" />
-          Export
+        <Button variant="outline" className="rounded-xl text-xs sm:text-sm px-2 sm:px-4">
+          <Download className="mr-1 sm:mr-2 h-4 w-4" />
+          <span className="hidden sm:inline">Export</span>
         </Button>
       </PageHeader>
 
       {/* Filters */}
       <Card className="rounded-2xl shadow-card border-0">
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
+        <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             {canFilterByStaff && (
               <div className="w-full sm:w-64">
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger className="rounded-xl">
+                  <SelectTrigger className="rounded-xl text-sm">
                     <SelectValue placeholder="Select staff" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl">
+                  <SelectContent className="rounded-xl bg-popover">
                     <SelectItem value="all">All Staff</SelectItem>
                     {staffList.map((s) => (
                       <SelectItem key={s.id} value={s.id || ''}>
@@ -186,10 +186,10 @@ export default function Ledger() {
             )}
             <div className="w-full sm:w-48">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="rounded-xl">
+                <SelectTrigger className="rounded-xl text-sm">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl">
+                <SelectContent className="rounded-xl bg-popover">
                   <SelectItem value="all">All Months</SelectItem>
                   {generateMonthOptions().map((m) => (
                     <SelectItem key={m.value} value={m.value}>
@@ -204,21 +204,21 @@ export default function Ledger() {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid gap-5 sm:grid-cols-3">
+      <div className="grid gap-3 sm:gap-5 grid-cols-3">
         <StatCard
-          title="Total Debits"
+          title="Debits"
           value={`₹${totals.debit.toLocaleString('en-IN')}`}
           icon={ArrowDownRight}
           color="orange"
         />
         <StatCard
-          title="Total Credits"
+          title="Credits"
           value={`₹${totals.credit.toLocaleString('en-IN')}`}
           icon={ArrowUpRight}
           color="green"
         />
         <StatCard
-          title="Closing Balance"
+          title="Balance"
           value={`${closingBalance >= 0 ? '+' : ''}₹${Math.abs(closingBalance).toLocaleString('en-IN')}`}
           icon={Scale}
           color={closingBalance >= 0 ? 'blue' : 'pink'}
@@ -241,44 +241,44 @@ export default function Ledger() {
                 {visibleEntries.map((entry) => {
                   const isMasked = shouldMaskEntry(entry);
                   return (
-                    <div key={entry.id} className="p-4 space-y-2">
-                      <div className="flex items-start justify-between gap-3">
+                    <div key={entry.id} className="p-3 sm:p-4 space-y-1.5 sm:space-y-2">
+                      <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-primary/5 text-primary capitalize">
+                          <div className="flex items-center gap-1.5 sm:gap-2 mb-1 flex-wrap">
+                            <span className="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium bg-primary/5 text-primary capitalize">
                               {entry.voucher_type}
                             </span>
                             {entry.tag && (
-                              <span className="text-xs text-muted-foreground bg-muted/50 px-1.5 py-0.5 rounded">
+                              <span className="text-[10px] sm:text-xs text-muted-foreground bg-muted/50 px-1 sm:px-1.5 py-0.5 rounded">
                                 {entry.tag}
                               </span>
                             )}
                           </div>
                           {isMasked ? (
-                            <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
                               <Lock className="h-3 w-3" />
-                              <span className="italic">Salary entry (hidden)</span>
+                              <span className="italic">Salary (hidden)</span>
                             </p>
                           ) : (
-                            <p className="text-sm line-clamp-2">{entry.description}</p>
+                            <p className="text-xs sm:text-sm line-clamp-2">{entry.description}</p>
                           )}
-                          <p className="text-xs text-muted-foreground mt-1">
-                            {format(new Date(entry.entry_date), 'dd MMM yyyy')} • {entry.voucher_no}
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
+                            {format(new Date(entry.entry_date), 'dd MMM')} • {entry.voucher_no}
                           </p>
                         </div>
                         <div className="text-right shrink-0">
                           {isMasked ? (
-                            <span className="text-muted-foreground font-mono">***</span>
+                            <span className="text-muted-foreground font-mono text-sm">***</span>
                           ) : entry.debit > 0 ? (
-                            <span className="text-destructive font-medium font-mono">
+                            <span className="text-destructive font-medium font-mono text-xs sm:text-sm">
                               -₹{Number(entry.debit).toLocaleString('en-IN')}
                             </span>
                           ) : entry.credit > 0 ? (
-                            <span className="text-success font-medium font-mono">
+                            <span className="text-success font-medium font-mono text-xs sm:text-sm">
                               +₹{Number(entry.credit).toLocaleString('en-IN')}
                             </span>
                           ) : null}
-                          <p className={`text-xs font-mono mt-0.5 ${
+                          <p className={`text-[10px] sm:text-xs font-mono mt-0.5 ${
                             isMasked ? 'text-muted-foreground' :
                             entry.running_balance >= 0 ? 'text-success' : 'text-destructive'
                           }`}>

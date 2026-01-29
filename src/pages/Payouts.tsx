@@ -408,10 +408,10 @@ export default function Payouts() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Payouts"
-        description="Execute approved payments only. No manual entry allowed."
+        description="Execute approved payments"
       />
 
       {/* Summary Cards */}
@@ -461,18 +461,18 @@ export default function Payouts() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
-          <TabsTrigger value="all" className="flex-shrink-0">
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
             All ({totalPending})
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="flex-shrink-0">
+          <TabsTrigger value="expenses" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
             Expenses ({approvedExpenses.length})
           </TabsTrigger>
-          <TabsTrigger value="advances" className="flex-shrink-0">
+          <TabsTrigger value="advances" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
             Advances ({approvedAdvances.length})
           </TabsTrigger>
           {canRecordSalaryPayments && (
-            <TabsTrigger value="salary" className="flex-shrink-0">
+            <TabsTrigger value="salary" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
               Salary ({pendingSalaries.length})
             </TabsTrigger>
           )}
@@ -490,45 +490,52 @@ export default function Payouts() {
               description="All approved items have been paid. Check the Requests page to approve new items."
             />
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {payoutItems.map((item) => {
                 const TypeIcon = getTypeIcon(item.type);
                 return (
                   <Card key={`${item.type}-${item.id}`} className="hover:shadow-md transition-shadow">
-                    <CardContent className="p-4">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                          <div className="p-2 rounded-lg bg-muted">
-                            <TypeIcon className="h-5 w-5 text-muted-foreground" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Badge variant={getTypeBadgeVariant(item.type)}>
-                                {getTypeLabel(item.type)}
-                              </Badge>
-                              {item.category && (
-                                <span className="text-xs text-muted-foreground">
-                                  {item.category}
-                                </span>
-                              )}
+                    <CardContent className="p-3 sm:p-4">
+                      <div className="flex flex-col gap-3">
+                        {/* Top row: Type badge + Amount */}
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2 sm:gap-3">
+                            <div className="p-1.5 sm:p-2 rounded-lg bg-muted shrink-0">
+                              <TypeIcon className="h-4 w-4 sm:h-5 sm:w-5 text-muted-foreground" />
                             </div>
-                            <p className="font-medium">{item.staffName}</p>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {item.description}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Approved: {item.date ? format(new Date(item.date), 'dd MMM yyyy') : '-'}
-                            </p>
+                            <div>
+                              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                                <Badge variant={getTypeBadgeVariant(item.type)} className="text-[10px] sm:text-xs">
+                                  {getTypeLabel(item.type)}
+                                </Badge>
+                                {item.category && (
+                                  <span className="text-[10px] sm:text-xs text-muted-foreground">
+                                    {item.category}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="font-medium text-sm sm:text-base mt-0.5">{item.staffName}</p>
+                            </div>
                           </div>
+                          <Amount value={item.amount} className="text-base sm:text-lg font-semibold shrink-0" />
                         </div>
                         
-                        <div className="flex items-center gap-4">
-                          <Amount value={item.amount} className="text-lg font-semibold" />
+                        {/* Description */}
+                        <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">
+                          {item.description}
+                        </p>
+                        
+                        {/* Bottom row: Date + Pay button */}
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">
+                            Approved: {item.date ? format(new Date(item.date), 'dd MMM') : '-'}
+                          </p>
                           <Button 
                             onClick={() => openPayoutDialog(item)}
-                            className="shrink-0"
+                            size="sm"
+                            className="shrink-0 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
                           >
-                            <CreditCard className="mr-2 h-4 w-4" />
+                            <CreditCard className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             Pay
                           </Button>
                         </div>
@@ -544,45 +551,45 @@ export default function Payouts() {
 
       {/* Payout Confirmation Dialog */}
       <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Execute Payout</DialogTitle>
-            <DialogDescription>
-              Confirm payment details before executing
+            <DialogTitle className="text-base sm:text-lg">Execute Payout</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Confirm payment details
             </DialogDescription>
           </DialogHeader>
 
           {selectedItem && (
-            <div className="space-y-4">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-2 text-xs sm:text-sm">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Type</span>
-                  <Badge variant={getTypeBadgeVariant(selectedItem.type)}>
+                  <Badge variant={getTypeBadgeVariant(selectedItem.type)} className="text-[10px] sm:text-xs">
                     {getTypeLabel(selectedItem.type)}
                   </Badge>
                 </div>
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Staff</span>
-                  <span className="font-medium">{selectedItem.staffName}</span>
+                  <span className="font-medium text-right truncate max-w-[150px] sm:max-w-[200px]">{selectedItem.staffName}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Description</span>
-                  <span className="text-right max-w-[200px] truncate">{selectedItem.description}</span>
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-muted-foreground shrink-0">Description</span>
+                  <span className="text-right line-clamp-2 text-[10px] sm:text-xs">{selectedItem.description}</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between">
+                <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Amount</span>
-                  <Amount value={selectedItem.amount} className="text-lg font-bold text-primary" />
+                  <Amount value={selectedItem.amount} className="text-base sm:text-lg font-bold text-primary" />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label>Payment Mode</Label>
+                <Label className="text-xs sm:text-sm">Payment Mode</Label>
                 <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-popover">
                     {PAYMENT_MODES.map((mode) => (
                       <SelectItem key={mode.value} value={mode.value}>
                         {mode.label}
@@ -592,19 +599,19 @@ export default function Payouts() {
                 </Select>
               </div>
 
-              <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+              <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-[10px] sm:text-sm text-muted-foreground">
                 <p>
-                  This action will create an immutable ledger entry and mark the {selectedItem.type} as paid.
+                  Creates an immutable ledger entry and marks as paid.
                 </p>
               </div>
             </div>
           )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedItem(null)} disabled={isProcessing}>
+          <DialogFooter className="flex-col sm:flex-row gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSelectedItem(null)} disabled={isProcessing} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleExecutePayout} disabled={isProcessing}>
+            <Button onClick={handleExecutePayout} disabled={isProcessing} className="w-full sm:w-auto">
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -613,7 +620,7 @@ export default function Payouts() {
               ) : (
                 <>
                   <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Confirm Payment
+                  Confirm
                 </>
               )}
             </Button>
