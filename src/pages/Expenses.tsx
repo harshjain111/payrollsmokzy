@@ -126,16 +126,17 @@ export default function Expenses() {
   const canApprove = canApproveExpenses;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Expenses"
-        description="Submit and review expense claims. Approved expenses are paid via Payouts."
+        description="Submit and review expense claims"
       >
         {canCreateExpense && (
           <Link to="/expenses/new">
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              New Expense
+            <Button className="text-sm sm:text-base px-3 sm:px-4">
+              <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">New Expense</span>
+              <span className="sm:hidden">New</span>
             </Button>
           </Link>
         )}
@@ -156,16 +157,16 @@ export default function Expenses() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
-          <TabsTrigger value="all" className="flex-shrink-0">All</TabsTrigger>
-          {isStaff && <TabsTrigger value="draft" className="flex-shrink-0">Drafts</TabsTrigger>}
-          <TabsTrigger value="pending" className="flex-shrink-0">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="flex-shrink-0">Approved</TabsTrigger>
-          <TabsTrigger value="reimbursed" className="flex-shrink-0">Paid</TabsTrigger>
-          <TabsTrigger value="rejected" className="flex-shrink-0">Rejected</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
+          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
+          {isStaff && <TabsTrigger value="draft" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Drafts</TabsTrigger>}
+          <TabsTrigger value="pending" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Approved</TabsTrigger>
+          <TabsTrigger value="reimbursed" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Paid</TabsTrigger>
+          <TabsTrigger value="rejected" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Rejected</TabsTrigger>
         </TabsList>
 
-        <TabsContent value={activeTab} className="mt-6">
+        <TabsContent value={activeTab} className="mt-4 sm:mt-6">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -189,37 +190,42 @@ export default function Expenses() {
               }
             />
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {filteredExpenses.map((expense) => (
                 <Card key={expense.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex flex-col gap-3">
+                      {/* Top row: Status + Category */}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <StatusBadge 
                             status={expense.status} 
                             variant={getStatusVariant(expense.status)}
                           >
                             {EXPENSE_STATUS_LABELS[expense.status]}
                           </StatusBadge>
-                          <span className="text-xs text-muted-foreground">
+                          <span className="text-[10px] sm:text-xs text-muted-foreground">
                             {EXPENSE_CATEGORY_LABELS[expense.category]}
                           </span>
                         </div>
-                        <p className="font-medium truncate">{expense.description}</p>
-                        <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                          <span>{expense.staff?.full_name}</span>
-                          <span>{format(new Date(expense.expense_date), 'dd MMM yyyy')}</span>
-                        </div>
+                        <Amount value={expense.amount} size="lg" className="text-foreground shrink-0" />
                       </div>
-
-                      <div className="flex items-center gap-4">
-                        <Amount value={expense.amount} size="lg" className="text-foreground" />
+                      
+                      {/* Description */}
+                      <p className="font-medium text-sm sm:text-base line-clamp-2">{expense.description}</p>
+                      
+                      {/* Bottom row: Staff + Date + Actions */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                          <span className="truncate max-w-[120px] sm:max-w-none">{expense.staff?.full_name}</span>
+                          <span>{format(new Date(expense.expense_date), 'dd MMM')}</span>
+                        </div>
                         
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2">
                           <Button
                             variant="ghost"
                             size="icon"
+                            className="h-8 w-8 sm:h-9 sm:w-9"
                             onClick={() => handleViewDetails(expense)}
                           >
                             <Eye className="h-4 w-4" />
@@ -231,7 +237,7 @@ export default function Expenses() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-success hover:text-success"
+                                className="text-success hover:text-success h-8 w-8 sm:h-9 sm:w-9"
                                 onClick={() => handleApprove(expense)}
                               >
                                 <Check className="h-4 w-4" />
@@ -239,7 +245,7 @@ export default function Expenses() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="text-destructive hover:text-destructive"
+                                className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9"
                                 onClick={() => handleReject(expense)}
                               >
                                 <X className="h-4 w-4" />
@@ -250,8 +256,8 @@ export default function Expenses() {
                           {/* Show "Go to Payouts" indicator for approved expenses */}
                           {expense.status === 'approved' && (isOwner || isAdmin || isAccountant) && (
                             <Link to="/payouts">
-                              <Button variant="outline" size="sm" className="gap-1 text-xs">
-                                Pay via Payouts
+                              <Button variant="outline" size="sm" className="gap-1 text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3">
+                                <span className="hidden sm:inline">Pay via </span>Payouts
                                 <ArrowRight className="h-3 w-3" />
                               </Button>
                             </Link>
