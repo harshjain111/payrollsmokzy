@@ -56,11 +56,12 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [customCategory, setCustomCategory] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
-  // Description is required for "other" category
-  const isDescriptionRequired = category === 'other';
+  // Custom category name is required for "other" category
+  const isOtherCategory = category === 'other';
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -91,8 +92,14 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
       return;
     }
 
-    // Require description for "other" category
-    if (isDescriptionRequired && !description.trim()) {
+    // Require custom category name for "other" category
+    if (isOtherCategory && !customCategory.trim()) {
+      toast.error(t('category_name_required'));
+      return;
+    }
+
+    // Description is always required
+    if (!description.trim()) {
       toast.error(t('description_required'));
       return;
     }
@@ -122,16 +129,14 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         }
       }
 
-      // Use custom description for "other", otherwise use category label
-      const expenseDescription = isDescriptionRequired && description.trim() 
-        ? description.trim() 
-        : t(category);
+      // Use custom category name for "other", otherwise use category label
+      const categoryLabel = isOtherCategory ? customCategory.trim() : t(category);
 
       const { error } = await supabase.from('expenses').insert({
         staff_id: staffData.id,
         amount: numAmount,
         category,
-        description: expenseDescription,
+        description: description.trim(),
         status: 'pending',
         submitted_at: new Date().toISOString(),
         proof_url: proofUrl,
@@ -145,6 +150,7 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         setAmount('');
         setCategory(null);
         setDescription('');
+        setCustomCategory('');
         setPhoto(null);
         setPhotoPreview(null);
         onOpenChange(false);
@@ -232,29 +238,39 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
             </div>
           </div>
 
-          {/* Description Input - Shows when "Other" is selected */}
-          {isDescriptionRequired && (
+          {/* Custom Category Input - Shows when "Other" is selected */}
+          {isOtherCategory && (
             <div className="space-y-2">
               <label className="text-sm font-medium text-muted-foreground">
-                {t('description')} *
+                {t('category_name')} *
               </label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder={t('enter_description')}
-                className="min-h-[80px] text-base"
-                autoFocus={category === 'other'}
+              <Input
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                placeholder={t('enter_category_name')}
+                className="h-12 text-base"
+                autoFocus
               />
-              <p className="text-xs text-muted-foreground">
-                {t('description_required_hint')}
-              </p>
             </div>
           )}
+
+          {/* Description Input - Always visible */}
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-muted-foreground">
+              {t('description')} *
+            </label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t('enter_description')}
+              className="min-h-[80px] text-base"
+            />
+          </div>
 
           {/* Photo Upload */}
           <div className="space-y-2">
             <label className="text-sm font-medium text-muted-foreground">
-              {t('photo')}
+              {t('upload_receipt')}
             </label>
             
             {photoPreview ? (

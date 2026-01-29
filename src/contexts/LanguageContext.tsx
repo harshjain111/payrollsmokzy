@@ -40,7 +40,8 @@ const translations: Record<Language, Record<string, string>> = {
     'select_category': 'Select category',
     'photo': 'Photo',
     'take_photo': 'Take Photo',
-    'upload_photo': 'Upload Photo',
+    'upload_photo': 'Upload',
+    'upload_receipt': 'Upload picture of receipt/proof',
     'submit': 'Submit',
     'cancel': 'Cancel',
     'submitting': 'Submitting...',
@@ -62,12 +63,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'Please enter a valid amount',
     'error_occurred': 'Something went wrong. Try again.',
-    'description_required': 'Description is required for this category',
+    'description_required': 'Description is required',
+    'category_name_required': 'Please enter category name',
     
-    // Description
+    // Description & Category
     'description': 'Description',
     'enter_description': 'Describe the expense...',
-    'description_required_hint': 'Required when selecting "Other" category',
+    'category_name': 'Category Name',
+    'enter_category_name': 'Enter category name...',
     
     // Language
     'language': 'Language',
@@ -111,7 +114,8 @@ const translations: Record<Language, Record<string, string>> = {
     'select_category': 'कैटेगरी चुनें',
     'photo': 'फोटो',
     'take_photo': 'फोटो खींचें',
-    'upload_photo': 'फोटो अपलोड करें',
+    'upload_photo': 'अपलोड',
+    'upload_receipt': 'रसीद/प्रूफ की फोटो अपलोड करें',
     'submit': 'भेजें',
     'cancel': 'रद्द करें',
     'submitting': 'भेज रहे हैं...',
@@ -133,12 +137,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'सही रकम डालें',
     'error_occurred': 'कुछ गड़बड़ हो गई। फिर से कोशिश करें।',
-    'description_required': 'इस कैटेगरी के लिए विवरण जरूरी है',
+    'description_required': 'विवरण जरूरी है',
+    'category_name_required': 'कैटेगरी का नाम डालें',
     
-    // Description
+    // Description & Category
     'description': 'विवरण',
     'enter_description': 'खर्च का विवरण दें...',
-    'description_required_hint': '"अन्य" चुनने पर जरूरी है',
+    'category_name': 'कैटेगरी का नाम',
+    'enter_category_name': 'कैटेगरी का नाम लिखें...',
     
     // Language
     'language': 'भाषा',
@@ -182,7 +188,8 @@ const translations: Record<Language, Record<string, string>> = {
     'select_category': 'শ্ৰেণী বাছক',
     'photo': 'ফটো',
     'take_photo': 'ফটো তোলক',
-    'upload_photo': 'ফটো আপলোড কৰক',
+    'upload_photo': 'আপলোড',
+    'upload_receipt': 'ৰছিদ/প্ৰমাণৰ ফটো আপলোড কৰক',
     'submit': 'দাখিল কৰক',
     'cancel': 'বাতিল কৰক',
     'submitting': 'দাখিল কৰি আছে...',
@@ -204,12 +211,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Errors
     'enter_valid_amount': 'সঠিক পৰিমাণ দিয়ক',
     'error_occurred': 'কিবা সমস্যা হ\'ল। আকৌ চেষ্টা কৰক।',
-    'description_required': 'এই শ্ৰেণীৰ বাবে বিৱৰণ আৱশ্যক',
+    'description_required': 'বিৱৰণ আৱশ্যক',
+    'category_name_required': 'শ্ৰেণীৰ নাম দিয়ক',
     
-    // Description
+    // Description & Category
     'description': 'বিৱৰণ',
     'enter_description': 'খৰচৰ বিৱৰণ দিয়ক...',
-    'description_required_hint': '"অন্যান্য" বাছিলে আৱশ্যক',
+    'category_name': 'শ্ৰেণীৰ নাম',
+    'enter_category_name': 'শ্ৰেণীৰ নাম লিখক...',
     
     // Language
     'language': 'ভাষা',
