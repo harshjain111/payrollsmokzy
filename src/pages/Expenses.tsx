@@ -156,13 +156,13 @@ export default function Expenses() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          {isStaff && <TabsTrigger value="draft">Drafts</TabsTrigger>}
-          <TabsTrigger value="pending">Pending</TabsTrigger>
-          <TabsTrigger value="approved">Approved</TabsTrigger>
-          <TabsTrigger value="reimbursed">Reimbursed</TabsTrigger>
-          <TabsTrigger value="rejected">Rejected</TabsTrigger>
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+          <TabsTrigger value="all" className="flex-shrink-0">All</TabsTrigger>
+          {isStaff && <TabsTrigger value="draft" className="flex-shrink-0">Drafts</TabsTrigger>}
+          <TabsTrigger value="pending" className="flex-shrink-0">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="flex-shrink-0">Approved</TabsTrigger>
+          <TabsTrigger value="reimbursed" className="flex-shrink-0">Paid</TabsTrigger>
+          <TabsTrigger value="rejected" className="flex-shrink-0">Rejected</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-6">

@@ -177,92 +177,94 @@ export default function SalariesAdvances() {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4 lg:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Pending Settlements</p>
-                <p className="text-2xl font-bold text-warning">{totalPendingSettlements}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Pending</p>
+                <p className="text-xl sm:text-2xl font-bold text-warning">{totalPendingSettlements}</p>
               </div>
-              <Clock className="h-8 w-8 text-warning/30" />
+              <Clock className="hidden sm:block h-8 w-8 text-warning/30" />
             </div>
           </CardContent>
         </Card>
         
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4 lg:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Pending Payouts</p>
-                <p className="text-2xl font-bold text-info">{totalPendingPayouts}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Payouts</p>
+                <p className="text-xl sm:text-2xl font-bold text-info">{totalPendingPayouts}</p>
               </div>
-              <CreditCard className="h-8 w-8 text-info/30" />
+              <CreditCard className="hidden sm:block h-8 w-8 text-info/30" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4 lg:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Salaries Paid</p>
-                <p className="text-2xl font-bold text-success">{totalPaid}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Paid</p>
+                <p className="text-xl sm:text-2xl font-bold text-success">{totalPaid}</p>
               </div>
-              <CheckCircle2 className="h-8 w-8 text-success/30" />
+              <CheckCircle2 className="hidden sm:block h-8 w-8 text-success/30" />
             </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
+          <CardContent className="p-4 lg:pt-6">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div>
-                <p className="text-sm text-muted-foreground">Advances Outstanding</p>
-                <Amount value={totalAdvancesOutstanding} className="text-2xl font-bold" />
+                <p className="text-xs sm:text-sm text-muted-foreground">Advances</p>
+                <Amount value={totalAdvancesOutstanding} className="text-xl sm:text-2xl font-bold" />
               </div>
-              <TrendingUp className="h-8 w-8 text-primary/30" />
+              <TrendingUp className="hidden sm:block h-8 w-8 text-primary/30" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, ID, or department..."
+            placeholder="Search..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-9"
           />
         </div>
         
-        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select month" />
-          </SelectTrigger>
-          <SelectContent>
-            {monthOptions.map((month) => (
-              <SelectItem key={month.value} value={month.value}>
-                {month.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex gap-2">
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Month" />
+            </SelectTrigger>
+            <SelectContent>
+              {monthOptions.map((month) => (
+                <SelectItem key={month.value} value={month.value}>
+                  {month.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Filter" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Staff</SelectItem>
-            <SelectItem value="pending">Pending Settlement</SelectItem>
-            <SelectItem value="settled">Pending Payout</SelectItem>
-            <SelectItem value="paid">Paid</SelectItem>
-          </SelectContent>
-        </Select>
+          <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
+            <SelectTrigger className="w-full sm:w-[140px]">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="pending">Pending</SelectItem>
+              <SelectItem value="settled">Payout</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {/* Staff Grid */}

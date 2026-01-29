@@ -408,18 +408,18 @@ export default function Settlements() {
   const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && leaveDays <= 30;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       <PageHeader
         title="Salary Settlement"
-        description="Process monthly salary settlements with partial advance adjustment"
+        description="Process monthly settlements"
       >
-        <Button variant="ghost" onClick={() => navigate('/salaries-advances')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+        <Button variant="ghost" size="sm" onClick={() => navigate('/salaries-advances')}>
+          <ArrowLeft className="mr-1 h-4 w-4" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
       </PageHeader>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 md:gap-6 lg:grid-cols-2">
         {/* Selection Panel */}
         <Card>
           <CardHeader>

@@ -1,6 +1,8 @@
+import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationCounts } from '@/hooks/useNotificationCounts';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -265,9 +267,16 @@ function AppSidebar() {
   const { userRole, staffData, signOut, isAccountant, accountingMode, setAccountingMode, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { state } = useSidebar();
+  const { state, setOpenMobile, isMobile } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const counts = useNotificationCounts();
+
+  // Auto-close sidebar on mobile when route changes
+  useEffect(() => {
+    if (isMobile) {
+      setOpenMobile(false);
+    }
+  }, [location.pathname, isMobile, setOpenMobile]);
 
   const navSections = getNavSections(userRole, accountingMode, isAccountant, counts);
 

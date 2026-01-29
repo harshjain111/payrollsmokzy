@@ -415,43 +415,43 @@ export default function Payouts() {
       />
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-primary/10">
-                <Receipt className="h-5 w-5 text-primary" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="p-2 md:p-3 rounded-lg bg-primary/10">
+                <Receipt className="h-4 w-4 md:h-5 md:w-5 text-primary" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Approved Expenses</p>
-                <p className="text-2xl font-bold">{approvedExpenses.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Expenses</p>
+                <p className="text-xl md:text-2xl font-bold">{approvedExpenses.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-lg bg-accent/50">
-                <Banknote className="h-5 w-5 text-accent-foreground" />
+          <CardContent className="p-4 md:pt-6">
+            <div className="flex items-center gap-3 md:gap-4">
+              <div className="p-2 md:p-3 rounded-lg bg-accent/50">
+                <Banknote className="h-4 w-4 md:h-5 md:w-5 text-accent-foreground" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Approved Advances</p>
-                <p className="text-2xl font-bold">{approvedAdvances.length}</p>
+                <p className="text-xs md:text-sm text-muted-foreground">Advances</p>
+                <p className="text-xl md:text-2xl font-bold">{approvedAdvances.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
         {canRecordSalaryPayments && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 rounded-lg bg-secondary">
-                  <Wallet className="h-5 w-5 text-secondary-foreground" />
+          <Card className="col-span-2 md:col-span-1">
+            <CardContent className="p-4 md:pt-6">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="p-2 md:p-3 rounded-lg bg-secondary">
+                  <Wallet className="h-4 w-4 md:h-5 md:w-5 text-secondary-foreground" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pending Salaries</p>
-                  <p className="text-2xl font-bold">{pendingSalaries.length}</p>
+                  <p className="text-xs md:text-sm text-muted-foreground">Salaries</p>
+                  <p className="text-xl md:text-2xl font-bold">{pendingSalaries.length}</p>
                 </div>
               </div>
             </CardContent>
@@ -461,18 +461,18 @@ export default function Payouts() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-        <TabsList>
-          <TabsTrigger value="all">
+        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap">
+          <TabsTrigger value="all" className="flex-shrink-0">
             All ({totalPending})
           </TabsTrigger>
-          <TabsTrigger value="expenses">
+          <TabsTrigger value="expenses" className="flex-shrink-0">
             Expenses ({approvedExpenses.length})
           </TabsTrigger>
-          <TabsTrigger value="advances">
+          <TabsTrigger value="advances" className="flex-shrink-0">
             Advances ({approvedAdvances.length})
           </TabsTrigger>
           {canRecordSalaryPayments && (
-            <TabsTrigger value="salary">
+            <TabsTrigger value="salary" className="flex-shrink-0">
               Salary ({pendingSalaries.length})
             </TabsTrigger>
           )}
