@@ -63,21 +63,22 @@ export function AdminDashboard() {
   ];
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-4 sm:space-y-6 md:space-y-8 pb-6">
       <PageHeader
         title="Admin Dashboard"
         description={`Operations overview for ${currentMonth}`}
       >
         <Link to="/staff/new">
-          <Button className="rounded-xl shadow-lg">
-            <UserPlus className="mr-2 h-4 w-4" />
-            Add Staff
+          <Button className="rounded-xl shadow-lg text-sm sm:text-base px-3 sm:px-4">
+            <UserPlus className="mr-1.5 sm:mr-2 h-4 w-4" />
+            <span className="hidden sm:inline">Add Staff</span>
+            <span className="sm:hidden">Add</span>
           </Button>
         </Link>
       </PageHeader>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Active Staff"
           value={stats.activeStaff}
@@ -110,9 +111,9 @@ export function AdminDashboard() {
       </div>
 
       {/* Action Tiles - Primary Focus */}
-      <div className="space-y-3">
-        <h2 className="text-lg font-semibold text-foreground">Action Required</h2>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="space-y-2 sm:space-y-3">
+        <h2 className="text-base sm:text-lg font-semibold text-foreground">Action Required</h2>
+        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
           <ActionTile
             title="Expense Requests Pending"
             count={stats.pendingExpenses}
@@ -144,7 +145,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Secondary Tiles */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2">
         <ActionTile
           title="Requests Awaiting Owner"
           count={0}
@@ -166,7 +167,7 @@ export function AdminDashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <QuickActionsCard actions={quickActions} />
 
         <QuickActionsCard
