@@ -37,7 +37,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
-import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic, SalarySettlement } from '@/types/database';
+import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
@@ -51,17 +51,15 @@ interface ApprovedExpense extends Expense {
   staff: StaffPublic;
 }
 
-interface ApprovedRequest extends PaymentRequest {
+interface ApprovedRequest extends Omit<PaymentRequest, 'payout_type' | 'settlement_id'> {
   staff: StaffPublic;
-}
-
-interface PendingSalary extends SalarySettlement {
-  staff: StaffPublic;
+  payout_type?: string | null;
+  settlement_id?: string | null;
 }
 
 type PayoutItem = {
   id: string;
-  type: 'expense' | 'request' | 'salary';
+  type: 'expense' | 'advance' | 'salary';
   staffName: string;
   staffId: string;
   employeeId: string;
@@ -71,6 +69,7 @@ type PayoutItem = {
   category?: string;
   date: string;
   referenceMonth?: string;
+  settlementId?: string;
 };
 
 export default function Payouts() {
@@ -79,10 +78,10 @@ export default function Payouts() {
   // Access check - Staff cannot execute payouts
   const canExecutePayout = isOwner || isAdmin || isAccountant;
   
-  const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'requests' | 'salary'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'advances' | 'salary'>('all');
   const [approvedExpenses, setApprovedExpenses] = useState<ApprovedExpense[]>([]);
-  const [approvedRequests, setApprovedRequests] = useState<ApprovedRequest[]>([]);
-  const [pendingSalaries, setPendingSalaries] = useState<PendingSalary[]>([]);
+  const [approvedAdvances, setApprovedAdvances] = useState<ApprovedRequest[]>([]);
+  const [pendingSalaries, setPendingSalaries] = useState<ApprovedRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Payout dialog state
@@ -114,33 +113,36 @@ export default function Payouts() {
       if (expensesError) throw expensesError;
       setApprovedExpenses((expensesData || []) as unknown as ApprovedExpense[]);
 
-      // Fetch approved requests (not yet paid - tracked via paid_at column)
-      const { data: requestsData, error: requestsError } = await supabase
+      // Fetch approved ADVANCE requests (payout_type = 'advance' or null, not yet paid)
+      const { data: advanceData, error: advanceError } = await supabase
         .from('payment_requests')
         .select(`
           *,
           staff:staff_id(*)
         `)
         .eq('status', 'approved')
-        .is('paid_at', null) // Only show unpaid requests
+        .is('paid_at', null)
+        .or('payout_type.is.null,payout_type.eq.advance')
         .order('approved_at', { ascending: true });
 
-      if (requestsError) throw requestsError;
-      setApprovedRequests((requestsData || []) as unknown as ApprovedRequest[]);
+      if (advanceError) throw advanceError;
+      setApprovedAdvances((advanceData || []) as unknown as ApprovedRequest[]);
 
-      // Fetch pending salary settlements (Owner only)
+      // Fetch pending SALARY payout requests (Owner only, payout_type = 'salary')
       if (canRecordSalaryPayments) {
         const { data: salaryData, error: salaryError } = await supabase
-          .from('salary_settlements')
+          .from('payment_requests')
           .select(`
             *,
             staff:staff_id(*)
           `)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true });
+          .eq('status', 'approved')
+          .eq('payout_type', 'salary')
+          .is('paid_at', null)
+          .order('approved_at', { ascending: true });
 
         if (salaryError) throw salaryError;
-        setPendingSalaries((salaryData || []) as unknown as PendingSalary[]);
+        setPendingSalaries((salaryData || []) as unknown as ApprovedRequest[]);
       }
     } catch (error) {
       console.error('Error fetching approved items:', error);
@@ -168,12 +170,12 @@ export default function Payouts() {
         voucherType = 'expense';
         tag = 'expense';
         credit = selectedItem.amount; // Reimbursement is credit
-      } else if (selectedItem.type === 'request') {
+      } else if (selectedItem.type === 'advance') {
         voucherType = 'advance';
         tag = 'advance';
         debit = selectedItem.amount; // Advance is debit (staff owes)
       } else {
-        // salary
+        // salary payout
         voucherType = 'settlement';
         tag = 'salary';
         credit = selectedItem.amount; // Salary payment is credit
@@ -185,7 +187,7 @@ export default function Payouts() {
 
       if (voucherError) throw voucherError;
 
-      // Create ledger entry
+      // Create ledger entry (THIS is where ledger entry is created for salary!)
       const { data: ledgerEntry, error: ledgerError } = await supabase
         .from('ledger_entries')
         .insert({
@@ -221,8 +223,8 @@ export default function Payouts() {
           .eq('id', selectedItem.id);
 
         if (updateError) throw updateError;
-      } else if (selectedItem.type === 'request') {
-        // Mark request as paid using paid_at tracking column
+      } else if (selectedItem.type === 'advance' || selectedItem.type === 'salary') {
+        // Mark request as paid
         const { error: updateError } = await supabase
           .from('payment_requests')
           .update({
@@ -233,31 +235,36 @@ export default function Payouts() {
           .eq('id', selectedItem.id);
 
         if (updateError) throw updateError;
-      } else if (selectedItem.type === 'salary') {
-        const { error: updateError } = await supabase
-          .from('salary_settlements')
-          .update({
-            status: 'settled',
-            settled_at: new Date().toISOString(),
-            settled_by: user.id,
-            ledger_entry_id: ledgerEntry.id,
-          })
-          .eq('id', selectedItem.id);
 
-        if (updateError) throw updateError;
+        // For salary payouts, also update the settlement record
+        if (selectedItem.type === 'salary' && selectedItem.settlementId) {
+          const { error: settlementError } = await supabase
+            .from('salary_settlements')
+            .update({
+              paid_at: new Date().toISOString(),
+              paid_by: user.id,
+              payment_mode: paymentMode,
+              ledger_entry_id: ledgerEntry.id,
+            })
+            .eq('id', selectedItem.settlementId);
+
+          if (settlementError) {
+            console.error('Error updating settlement:', settlementError);
+          }
+        }
       }
 
       // Notify the staff member
       if (selectedItem.staffUserId) {
         const typeLabel = selectedItem.type === 'expense' 
           ? 'Expense Reimbursed' 
-          : selectedItem.type === 'request' 
+          : selectedItem.type === 'advance' 
             ? 'Advance Paid' 
             : 'Salary Paid';
         
         const message = selectedItem.type === 'expense'
           ? `Your expense of ₹${selectedItem.amount.toLocaleString('en-IN')} has been reimbursed.`
-          : selectedItem.type === 'request'
+          : selectedItem.type === 'advance'
             ? `Your advance request of ₹${selectedItem.amount.toLocaleString('en-IN')} has been paid.`
             : `Your salary of ₹${selectedItem.amount.toLocaleString('en-IN')} has been paid.`;
 
@@ -318,12 +325,12 @@ export default function Payouts() {
       });
     }
 
-    // Add requests
-    if (activeTab === 'all' || activeTab === 'requests') {
-      approvedRequests.forEach(request => {
+    // Add advance requests
+    if (activeTab === 'all' || activeTab === 'advances') {
+      approvedAdvances.forEach(request => {
         items.push({
           id: request.id,
-          type: 'request',
+          type: 'advance',
           staffName: request.staff?.full_name || 'Unknown',
           staffId: request.staff_id,
           employeeId: request.staff?.employee_id || '',
@@ -335,9 +342,13 @@ export default function Payouts() {
       });
     }
 
-    // Add salary settlements (Owner only)
+    // Add salary payout requests (Owner only)
     if ((activeTab === 'all' || activeTab === 'salary') && canRecordSalaryPayments) {
       pendingSalaries.forEach(salary => {
+        // Extract reference month from reason (format: "Salary for MMMM yyyy")
+        const monthMatch = salary.reason.match(/Salary for (.+)/);
+        const refMonth = monthMatch ? monthMatch[1] : '';
+        
         items.push({
           id: salary.id,
           type: 'salary',
@@ -345,10 +356,10 @@ export default function Payouts() {
           staffId: salary.staff_id,
           employeeId: salary.staff?.employee_id || '',
           staffUserId: salary.staff?.user_id,
-          amount: salary.balance_payable,
-          description: `Salary for ${format(new Date(salary.settlement_month + '-01'), 'MMMM yyyy')}`,
-          date: salary.created_at,
-          referenceMonth: salary.settlement_month,
+          amount: salary.amount,
+          description: salary.reason,
+          date: salary.approved_at || salary.created_at,
+          settlementId: salary.settlement_id,
         });
       });
     }
@@ -357,7 +368,7 @@ export default function Payouts() {
   };
 
   const payoutItems = getPayoutItems();
-  const totalPending = approvedExpenses.length + approvedRequests.length + (canRecordSalaryPayments ? pendingSalaries.length : 0);
+  const totalPending = approvedExpenses.length + approvedAdvances.length + (canRecordSalaryPayments ? pendingSalaries.length : 0);
 
   // Access denied for staff
   if (isStaff || !canExecutePayout) {
@@ -375,7 +386,7 @@ export default function Payouts() {
   const getTypeIcon = (type: PayoutItem['type']) => {
     switch (type) {
       case 'expense': return Receipt;
-      case 'request': return Banknote;
+      case 'advance': return Banknote;
       case 'salary': return Wallet;
     }
   };
@@ -383,8 +394,16 @@ export default function Payouts() {
   const getTypeBadgeVariant = (type: PayoutItem['type']) => {
     switch (type) {
       case 'expense': return 'outline';
-      case 'request': return 'secondary';
+      case 'advance': return 'secondary';
       case 'salary': return 'default';
+    }
+  };
+
+  const getTypeLabel = (type: PayoutItem['type']) => {
+    switch (type) {
+      case 'expense': return 'Expense';
+      case 'advance': return 'Advance';
+      case 'salary': return 'Salary';
     }
   };
 
@@ -418,7 +437,7 @@ export default function Payouts() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Approved Advances</p>
-                <p className="text-2xl font-bold">{approvedRequests.length}</p>
+                <p className="text-2xl font-bold">{approvedAdvances.length}</p>
               </div>
             </div>
           </CardContent>
@@ -449,8 +468,8 @@ export default function Payouts() {
           <TabsTrigger value="expenses">
             Expenses ({approvedExpenses.length})
           </TabsTrigger>
-          <TabsTrigger value="requests">
-            Advances ({approvedRequests.length})
+          <TabsTrigger value="advances">
+            Advances ({approvedAdvances.length})
           </TabsTrigger>
           {canRecordSalaryPayments && (
             <TabsTrigger value="salary">
@@ -485,7 +504,7 @@ export default function Payouts() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
                               <Badge variant={getTypeBadgeVariant(item.type)}>
-                                {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
+                                {getTypeLabel(item.type)}
                               </Badge>
                               {item.category && (
                                 <span className="text-xs text-muted-foreground">
@@ -498,16 +517,19 @@ export default function Payouts() {
                               {item.description}
                             </p>
                             <p className="text-xs text-muted-foreground mt-1">
-                              Approved: {format(new Date(item.date), 'dd MMM yyyy')}
+                              Approved: {item.date ? format(new Date(item.date), 'dd MMM yyyy') : '-'}
                             </p>
                           </div>
                         </div>
-
+                        
                         <div className="flex items-center gap-4">
-                          <Amount value={item.amount} size="lg" className="text-foreground" />
-                          <Button onClick={() => openPayoutDialog(item)} className="gap-2">
-                            <CreditCard className="h-4 w-4" />
-                            Pay Now
+                          <Amount value={item.amount} className="text-lg font-semibold" />
+                          <Button 
+                            onClick={() => openPayoutDialog(item)}
+                            className="shrink-0"
+                          >
+                            <CreditCard className="mr-2 h-4 w-4" />
+                            Pay
                           </Button>
                         </div>
                       </div>
@@ -521,55 +543,37 @@ export default function Payouts() {
       </Tabs>
 
       {/* Payout Confirmation Dialog */}
-      <Dialog open={!!selectedItem} onOpenChange={() => setSelectedItem(null)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              Execute Payout
-              {selectedItem && (
-                <Badge variant={getTypeBadgeVariant(selectedItem.type)}>
-                  {selectedItem.type.charAt(0).toUpperCase() + selectedItem.type.slice(1)}
-                </Badge>
-              )}
-            </DialogTitle>
+            <DialogTitle>Execute Payout</DialogTitle>
             <DialogDescription>
-              Confirm payment details before executing.
+              Confirm payment details before executing
             </DialogDescription>
           </DialogHeader>
 
           {selectedItem && (
-            <div className="space-y-4 py-2">
-              <div className="rounded-lg bg-muted p-4 space-y-3">
-                <div className="flex justify-between items-center">
+            <div className="space-y-4">
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Type</span>
+                  <Badge variant={getTypeBadgeVariant(selectedItem.type)}>
+                    {getTypeLabel(selectedItem.type)}
+                  </Badge>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Staff</span>
-                  <span className="font-medium">
-                    {selectedItem.staffName} ({selectedItem.employeeId})
-                  </span>
+                  <span className="font-medium">{selectedItem.staffName}</span>
                 </div>
-                
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Description</span>
+                  <span className="text-right max-w-[200px] truncate">{selectedItem.description}</span>
+                </div>
                 <Separator />
-                
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between">
                   <span className="text-muted-foreground">Amount</span>
-                  <Amount value={selectedItem.amount} size="lg" />
+                  <Amount value={selectedItem.amount} className="text-lg font-bold text-primary" />
                 </div>
-                
-                <Separator />
-                
-                <div>
-                  <span className="text-muted-foreground text-sm">Description</span>
-                  <p className="text-sm mt-1">{selectedItem.description}</p>
-                </div>
-
-                {selectedItem.referenceMonth && (
-                  <>
-                    <Separator />
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Reference Month</span>
-                      <span>{format(new Date(selectedItem.referenceMonth + '-01'), 'MMMM yyyy')}</span>
-                    </div>
-                  </>
-                )}
               </div>
 
               <div className="space-y-2">
@@ -588,18 +592,16 @@ export default function Payouts() {
                 </Select>
               </div>
 
-              <p className="text-xs text-muted-foreground">
-                This action will create a ledger entry and cannot be undone.
-              </p>
+              <div className="p-3 rounded-lg bg-muted/50 text-sm text-muted-foreground">
+                <p>
+                  This action will create an immutable ledger entry and mark the {selectedItem.type} as paid.
+                </p>
+              </div>
             </div>
           )}
 
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setSelectedItem(null)}
-              disabled={isProcessing}
-            >
+            <Button variant="outline" onClick={() => setSelectedItem(null)} disabled={isProcessing}>
               Cancel
             </Button>
             <Button onClick={handleExecutePayout} disabled={isProcessing}>
@@ -610,8 +612,8 @@ export default function Payouts() {
                 </>
               ) : (
                 <>
-                  Confirm Payout
-                  <ArrowRight className="ml-2 h-4 w-4" />
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Confirm Payment
                 </>
               )}
             </Button>

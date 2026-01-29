@@ -259,9 +259,11 @@ export type Database = {
           ledger_entry_id: string | null
           paid_at: string | null
           paid_by: string | null
+          payout_type: string | null
           reason: string
           rejection_reason: string | null
           requested_by: string
+          settlement_id: string | null
           staff_id: string
           status: Database["public"]["Enums"]["request_status"] | null
           updated_at: string
@@ -275,9 +277,11 @@ export type Database = {
           ledger_entry_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
+          payout_type?: string | null
           reason: string
           rejection_reason?: string | null
           requested_by: string
+          settlement_id?: string | null
           staff_id: string
           status?: Database["public"]["Enums"]["request_status"] | null
           updated_at?: string
@@ -291,9 +295,11 @@ export type Database = {
           ledger_entry_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
+          payout_type?: string | null
           reason?: string
           rejection_reason?: string | null
           requested_by?: string
+          settlement_id?: string | null
           staff_id?: string
           status?: Database["public"]["Enums"]["request_status"] | null
           updated_at?: string
@@ -304,6 +310,13 @@ export type Database = {
             columns: ["ledger_entry_id"]
             isOneToOne: false
             referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_settlement_id_fkey"
+            columns: ["settlement_id"]
+            isOneToOne: false
+            referencedRelation: "salary_settlements"
             referencedColumns: ["id"]
           },
           {
@@ -384,6 +397,9 @@ export type Database = {
           ledger_entry_id: string | null
           net_salary: number
           opening_advance_balance: number | null
+          paid_at: string | null
+          paid_by: string | null
+          payment_mode: string | null
           settled_at: string | null
           settled_by: string | null
           settlement_month: string
@@ -404,6 +420,9 @@ export type Database = {
           ledger_entry_id?: string | null
           net_salary: number
           opening_advance_balance?: number | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_mode?: string | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month: string
@@ -424,6 +443,9 @@ export type Database = {
           ledger_entry_id?: string | null
           net_salary?: number
           opening_advance_balance?: number | null
+          paid_at?: string | null
+          paid_by?: string | null
+          payment_mode?: string | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month?: string

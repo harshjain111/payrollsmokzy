@@ -298,41 +298,34 @@ export default function Settlements() {
     try {
       setIsSettling(true);
 
-      const { data: voucherNo, error: voucherError } = await supabase
-        .rpc('generate_voucher_no', { _voucher_type: 'settlement' });
+      // Step 1: Create IMMUTABLE settlement record (calculation & locking ONLY)
+      // NO ledger entry at this stage - ledger entry created only when salary is PAID
+      const { data: settlementRecord, error: settlementError } = await supabase
+        .from('salary_settlements')
+        .insert({
+          staff_id: selectedStaffId,
+          settlement_month: selectedMonth,
+          base_salary: calculation.monthlySalary,
+          leave_days: calculation.leaveDays,
+          leave_deduction: calculation.leaveDeduction,
+          net_salary: calculation.grossSalary,
+          advances_adjusted: calculation.advanceToAdjust,
+          opening_advance_balance: calculation.advancesOutstanding,
+          closing_advance_balance: calculation.carryForwardAdvance,
+          balance_payable: calculation.netPayable,
+          status: 'settled', // Calculation is locked
+          settled_at: new Date().toISOString(),
+          settled_by: user?.id,
+          ledger_entry_id: null, // NO ledger entry yet - created on payout
+          created_by: user?.id,
+        })
+        .select()
+        .single();
 
-      if (voucherError) throw voucherError;
+      if (settlementError) throw settlementError;
 
-      let ledgerEntryId = null;
-      
-      // Create salary payout ledger entry (if net payable > 0)
-      if (calculation.netPayable > 0) {
-        const { data: ledgerEntry, error: ledgerError } = await supabase
-          .from('ledger_entries')
-          .insert({
-            staff_id: selectedStaffId,
-            voucher_type: 'settlement',
-            voucher_no: voucherNo,
-            entry_date: new Date().toISOString().split('T')[0],
-            description: `Salary settlement for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`,
-            debit: 0,
-            credit: calculation.netPayable,
-            tag: 'salary',
-            reference_month: selectedMonth,
-            payment_mode: paymentMode,
-            paid_by: user?.id,
-            approved_by: user?.id,
-            is_immutable: true,
-            created_by: user?.id,
-          })
-          .select()
-          .single();
-
-        if (ledgerError) throw ledgerError;
-        ledgerEntryId = ledgerEntry.id;
-      }
-
-      // Create advance adjustment entry (if advance was adjusted)
+      // Step 2: Create advance adjustment ledger entry ONLY if advance was adjusted
+      // This is separate from salary payout and happens immediately
       if (calculation.advanceToAdjust > 0) {
         const { data: adjustVoucher } = await supabase
           .rpc('generate_voucher_no', { _voucher_type: 'journal' });
@@ -354,32 +347,29 @@ export default function Settlements() {
           });
       }
 
-      // Create settlement record with snapshot
-      const { error: settlementError } = await supabase
-        .from('salary_settlements')
-        .insert({
-          staff_id: selectedStaffId,
-          settlement_month: selectedMonth,
-          base_salary: calculation.monthlySalary,
-          leave_days: calculation.leaveDays,
-          leave_deduction: calculation.leaveDeduction,
-          net_salary: calculation.grossSalary,
-          advances_adjusted: calculation.advanceToAdjust,
-          opening_advance_balance: calculation.advancesOutstanding,
-          closing_advance_balance: calculation.carryForwardAdvance,
-          balance_payable: calculation.netPayable,
-          status: 'settled',
-          settled_at: new Date().toISOString(),
-          settled_by: user?.id,
-          ledger_entry_id: ledgerEntryId,
-          created_by: user?.id,
-        });
+      // Step 3: Auto-create salary payout request (if net payable > 0)
+      // This request will appear in Payouts page for Owner to execute
+      if (calculation.netPayable > 0) {
+        const { error: payoutRequestError } = await supabase
+          .from('payment_requests')
+          .insert({
+            staff_id: selectedStaffId,
+            requested_by: user?.id,
+            amount: calculation.netPayable,
+            reason: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`,
+            status: 'approved', // Pre-approved since owner created it
+            approved_by: user?.id,
+            approved_at: new Date().toISOString(),
+            payout_type: 'salary',
+            settlement_id: settlementRecord.id,
+          });
 
-      if (settlementError) throw settlementError;
+        if (payoutRequestError) throw payoutRequestError;
+      }
 
       toast({
         title: 'Salary Settled',
-        description: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} has been settled successfully.`,
+        description: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} has been locked. Go to Payouts to execute payment.`,
       });
 
       // Reset form
@@ -390,6 +380,9 @@ export default function Settlements() {
       setIsAlreadySettled(false);
       setShowConfirmDialog(false);
       setShowZeroPaymentDialog(false);
+      
+      // Navigate to payouts
+      navigate('/payouts');
     } catch (error: any) {
       console.error('Error settling salary:', error);
       toast({
