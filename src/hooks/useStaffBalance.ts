@@ -1,0 +1,252 @@
+/**
+ * Single Source of Truth: Staff Balance Hook
+ * 
+ * This hook calculates staff balance EXCLUSIVELY from journal_lines.
+ * All balance displays (Admin Ledger, Staff Dashboard, Widgets) MUST use this hook.
+ * 
+ * Formula: Staff Balance = (Payable Cr - Payable Dr) - (Advance Dr - Advance Cr)
+ * - Positive balance = Company owes staff
+ * - Negative balance = Staff owes company (outstanding advance)
+ */
+
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+
+interface StaffBalanceData {
+  // Net balance (positive = company owes staff, negative = staff owes company)
+  netBalance: number;
+  
+  // Component breakdowns
+  payableBalance: number;   // Staff Payable: Cr - Dr (what company owes)
+  advanceBalance: number;   // Staff Advances: Dr - Cr (what staff owes)
+  
+  // Raw totals for display
+  payableCredit: number;
+  payableDebit: number;
+  advanceDebit: number;
+  advanceCredit: number;
+  
+  // Derived values for UI
+  advanceOutstanding: number;  // Positive if staff owes company
+  salaryPayable: number;       // Positive if company owes staff (net of advances)
+  
+  isLoading: boolean;
+  error: string | null;
+}
+
+export function useStaffBalance(staffId: string | null | undefined): StaffBalanceData {
+  const [data, setData] = useState<StaffBalanceData>({
+    netBalance: 0,
+    payableBalance: 0,
+    advanceBalance: 0,
+    payableCredit: 0,
+    payableDebit: 0,
+    advanceDebit: 0,
+    advanceCredit: 0,
+    advanceOutstanding: 0,
+    salaryPayable: 0,
+    isLoading: true,
+    error: null,
+  });
+
+  const fetchBalance = useCallback(async () => {
+    if (!staffId) {
+      setData(prev => ({ ...prev, isLoading: false }));
+      return;
+    }
+
+    try {
+      // Query journal_lines with account information
+      // CRITICAL: This is the SINGLE SOURCE OF TRUTH for all balance calculations
+      const { data: lines, error } = await supabase
+        .from('journal_lines')
+        .select(`
+          debit,
+          credit,
+          account:account_id(code)
+        `)
+        .eq('staff_id', staffId);
+
+      if (error) throw error;
+
+      // Calculate per-account totals
+      // Account 2000 = Staff Payable (Liability)
+      // Account 1200 = Staff Advances (Asset/Receivable)
+      let payableCredit = 0;
+      let payableDebit = 0;
+      let advanceDebit = 0;
+      let advanceCredit = 0;
+
+      (lines || []).forEach((line: any) => {
+        const code = line.account?.code;
+        const debit = Number(line.debit) || 0;
+        const credit = Number(line.credit) || 0;
+
+        if (code === '2000') { // Staff Payable
+          payableCredit += credit;
+          payableDebit += debit;
+        } else if (code === '1200') { // Staff Advances
+          advanceDebit += debit;
+          advanceCredit += credit;
+        }
+      });
+
+      // Calculate balances using the correct formula
+      // Payable: Credit = we owe staff, Debit = we've paid
+      const payableBalance = payableCredit - payableDebit;
+      
+      // Advances: Debit = staff owes us, Credit = advance was cleared/adjusted
+      const advanceBalance = advanceDebit - advanceCredit;
+      
+      // Net Staff Balance = What we owe them - What they owe us
+      const netBalance = payableBalance - advanceBalance;
+      
+      // Derived values for UI
+      const advanceOutstanding = Math.max(0, advanceBalance); // Only show positive (they owe us)
+      const salaryPayable = Math.max(0, netBalance); // Only show positive (we owe them)
+
+      setData({
+        netBalance,
+        payableBalance,
+        advanceBalance,
+        payableCredit,
+        payableDebit,
+        advanceDebit,
+        advanceCredit,
+        advanceOutstanding,
+        salaryPayable,
+        isLoading: false,
+        error: null,
+      });
+    } catch (err: any) {
+      console.error('Error fetching staff balance:', err);
+      setData(prev => ({
+        ...prev,
+        isLoading: false,
+        error: err.message || 'Failed to fetch balance',
+      }));
+    }
+  }, [staffId]);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
+
+  return data;
+}
+
+/**
+ * Hook to get multiple staff balances at once (for Admin views)
+ */
+export function useAllStaffBalances() {
+  const [balances, setBalances] = useState<Map<string, StaffBalanceData>>(new Map());
+  const [aggregateBalance, setAggregateBalance] = useState({
+    netBalance: 0,
+    totalPayable: 0,
+    totalAdvances: 0,
+    isLoading: true,
+    error: null as string | null,
+  });
+
+  const fetchAllBalances = useCallback(async () => {
+    try {
+      // Query ALL staff journal lines with account information
+      const { data: lines, error } = await supabase
+        .from('journal_lines')
+        .select(`
+          staff_id,
+          debit,
+          credit,
+          account:account_id(code)
+        `)
+        .not('staff_id', 'is', null);
+
+      if (error) throw error;
+
+      // Group by staff and calculate balances
+      const staffMap = new Map<string, {
+        payableCredit: number;
+        payableDebit: number;
+        advanceDebit: number;
+        advanceCredit: number;
+      }>();
+
+      (lines || []).forEach((line: any) => {
+        if (!line.staff_id) return;
+        
+        const existing = staffMap.get(line.staff_id) || {
+          payableCredit: 0,
+          payableDebit: 0,
+          advanceDebit: 0,
+          advanceCredit: 0,
+        };
+
+        const code = line.account?.code;
+        const debit = Number(line.debit) || 0;
+        const credit = Number(line.credit) || 0;
+
+        if (code === '2000') {
+          existing.payableCredit += credit;
+          existing.payableDebit += debit;
+        } else if (code === '1200') {
+          existing.advanceDebit += debit;
+          existing.advanceCredit += credit;
+        }
+
+        staffMap.set(line.staff_id, existing);
+      });
+
+      // Convert to balance data
+      const newBalances = new Map<string, StaffBalanceData>();
+      let totalNetBalance = 0;
+      let totalPayable = 0;
+      let totalAdvances = 0;
+
+      staffMap.forEach((data, staffId) => {
+        const payableBalance = data.payableCredit - data.payableDebit;
+        const advanceBalance = data.advanceDebit - data.advanceCredit;
+        const netBalance = payableBalance - advanceBalance;
+
+        newBalances.set(staffId, {
+          netBalance,
+          payableBalance,
+          advanceBalance,
+          payableCredit: data.payableCredit,
+          payableDebit: data.payableDebit,
+          advanceDebit: data.advanceDebit,
+          advanceCredit: data.advanceCredit,
+          advanceOutstanding: Math.max(0, advanceBalance),
+          salaryPayable: Math.max(0, netBalance),
+          isLoading: false,
+          error: null,
+        });
+
+        totalNetBalance += netBalance;
+        totalPayable += payableBalance;
+        totalAdvances += advanceBalance;
+      });
+
+      setBalances(newBalances);
+      setAggregateBalance({
+        netBalance: totalNetBalance,
+        totalPayable,
+        totalAdvances,
+        isLoading: false,
+        error: null,
+      });
+    } catch (err: any) {
+      console.error('Error fetching all staff balances:', err);
+      setAggregateBalance(prev => ({
+        ...prev,
+        isLoading: false,
+        error: err.message || 'Failed to fetch balances',
+      }));
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchAllBalances();
+  }, [fetchAllBalances]);
+
+  return { balances, aggregateBalance, refetch: fetchAllBalances };
+}
