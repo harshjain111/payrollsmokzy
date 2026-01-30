@@ -136,10 +136,11 @@ export default function Expenses() {
   };
 
   // Permission checks:
-  // - Only Staff and Owner can create expenses (staff for self, owner can create for anyone)
-  const canCreateExpense = isStaff || isOwner;
+  // Staff can create expenses for themselves
+  // Owner, Admin, Accountant (in accounting mode) can create expenses for any staff
+  const canCreateExpense = isStaff || isOwner || isAdmin || (isAccountant && accountingMode);
   
-  // - Only Owner and Admin can approve/reject (NOT Accountant)
+  // Only Owner and Admin can approve/reject (NOT Accountant)
   const canApprove = canApproveExpenses;
 
   return (

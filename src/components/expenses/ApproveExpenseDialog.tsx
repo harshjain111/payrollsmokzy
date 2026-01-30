@@ -33,6 +33,17 @@ export function ApproveExpenseDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleApprove = async () => {
+    // Prevent self-approval - cannot approve own expense submissions
+    if (expense.created_by === user?.id) {
+      toast({
+        title: 'Cannot approve',
+        description: 'You cannot approve your own expense submissions.',
+        variant: 'destructive',
+      });
+      onOpenChange(false);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 

@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -18,22 +18,64 @@ import {
 import { AmountInput } from '@/components/ui/amount';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Upload, ArrowLeft, Send, Save } from 'lucide-react';
+import { CalendarIcon, Upload, ArrowLeft, Send, Save, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import type { ExpenseCategory } from '@/types/database';
+import type { ExpenseCategory, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 
 export default function NewExpense() {
   const navigate = useNavigate();
-  const { user, staffData } = useAuth();
+  const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Staff selector for Admin/Accountant
+  const [staffList, setStaffList] = useState<StaffPublic[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<string>('');
+  const [isFetchingStaff, setIsFetchingStaff] = useState(true);
+  
+  // Form fields
   const [amount, setAmount] = useState(0);
   const [category, setCategory] = useState<ExpenseCategory>('other');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [proofFile, setProofFile] = useState<File | null>(null);
+
+  // Staff creating for themselves
+  // Accountant in personal mode also creates for themselves
+  const isPersonalRequest = isStaff || (isAccountant && !accountingMode);
+  
+  // Admin, Owner, Accountant (in accounting mode) can create for any staff
+  const canRequestForOthers = isOwner || isAdmin || (isAccountant && accountingMode);
+
+  useEffect(() => {
+    if (isPersonalRequest && staffData?.id) {
+      setSelectedStaff(staffData.id);
+      setIsFetchingStaff(false);
+    } else if (canRequestForOthers) {
+      fetchStaffList();
+    } else {
+      setIsFetchingStaff(false);
+    }
+  }, [isPersonalRequest, staffData?.id, canRequestForOthers]);
+
+  const fetchStaffList = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('staff_public')
+        .select('*')
+        .eq('is_active', true)
+        .order('full_name');
+
+      if (error) throw error;
+      setStaffList(data as StaffPublic[] || []);
+    } catch (error) {
+      console.error('Error fetching staff:', error);
+    } finally {
+      setIsFetchingStaff(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -70,10 +112,10 @@ export default function NewExpense() {
   };
 
   const handleSubmit = async (asDraft: boolean) => {
-    if (!staffData) {
+    if (!selectedStaff) {
       toast({
         title: 'Error',
-        description: 'Staff data not found',
+        description: 'Please select a staff member',
         variant: 'destructive',
       });
       return;
@@ -109,7 +151,7 @@ export default function NewExpense() {
       const { data: newExpense, error } = await supabase
         .from('expenses')
         .insert({
-          staff_id: staffData.id,
+          staff_id: selectedStaff,
           amount,
           category,
           description: description.trim(),
@@ -124,6 +166,11 @@ export default function NewExpense() {
 
       if (error) throw error;
 
+      // Get staff name for notification
+      const staffName = isPersonalRequest 
+        ? staffData?.full_name 
+        : staffList.find(s => s.id === selectedStaff)?.full_name || 'Staff';
+
       // Notify Owner and Admin about new expense submission
       if (!asDraft && newExpense) {
         const { data: approvers } = await supabase
@@ -137,7 +184,7 @@ export default function NewExpense() {
               await supabase.rpc('create_notification', {
                 _user_id: approver.user_id,
                 _title: 'New Expense Submitted',
-                _message: `${staffData.full_name} has submitted an expense of ₹${amount.toLocaleString('en-IN')} for "${description.slice(0, 50)}${description.length > 50 ? '...' : ''}"`,
+                _message: `${staffName} has submitted an expense of ₹${amount.toLocaleString('en-IN')} for "${description.slice(0, 50)}${description.length > 50 ? '...' : ''}"`,
                 _type: 'info',
                 _reference_type: 'expense',
                 _reference_id: newExpense.id,
@@ -150,8 +197,8 @@ export default function NewExpense() {
       toast({
         title: asDraft ? 'Expense saved as draft' : 'Expense submitted',
         description: asDraft 
-          ? 'Your expense has been saved. You can submit it later.'
-          : 'Your expense has been submitted for approval.',
+          ? 'The expense has been saved. It can be submitted later.'
+          : 'The expense has been submitted for approval.',
       });
 
       navigate('/expenses');
@@ -171,7 +218,10 @@ export default function NewExpense() {
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Expense"
-        description="Record an expense for reimbursement"
+        description={isPersonalRequest 
+          ? "Record an expense for reimbursement"
+          : "Submit an expense request on behalf of a staff member"
+        }
       >
         <Button variant="ghost" size="sm" onClick={() => navigate('/expenses')}>
           <ArrowLeft className="mr-1.5 h-4 w-4" />
@@ -182,8 +232,41 @@ export default function NewExpense() {
       <Card className="max-w-2xl">
         <CardHeader className="p-4 sm:p-6">
           <CardTitle className="text-base sm:text-lg">Expense Details</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
+            {isPersonalRequest 
+              ? 'Fill in the details for your expense claim'
+              : 'Create an expense request on behalf of a staff member'
+            }
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
+          {/* Staff Selection - for Admin/Owner/Accountant in accounting mode */}
+          {canRequestForOthers && (
+            <div className="space-y-2">
+              <Label htmlFor="staff" className="text-sm">Staff Member *</Label>
+              <Select value={selectedStaff} onValueChange={setSelectedStaff}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select staff member" />
+                </SelectTrigger>
+                <SelectContent>
+                  {staffList.map((s) => (
+                    <SelectItem key={s.id} value={s.id || ''}>
+                      {s.full_name} ({s.employee_id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Personal request indicator */}
+          {isPersonalRequest && staffData && (
+            <div className="p-3 sm:p-4 bg-secondary rounded-lg">
+              <p className="text-xs sm:text-sm text-muted-foreground">Submitting for</p>
+              <p className="font-medium text-sm sm:text-base">{staffData.full_name}</p>
+            </div>
+          )}
+
           {/* Amount */}
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-sm">Amount *</Label>
@@ -256,7 +339,7 @@ export default function NewExpense() {
 
           {/* Proof Upload */}
           <div className="space-y-2">
-            <Label htmlFor="proof" className="text-sm">Proof / Receipt (optional)</Label>
+            <Label htmlFor="proof" className="text-sm">Upload picture of receipt or proof of expense</Label>
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <Input
                 id="proof"
@@ -272,28 +355,39 @@ export default function NewExpense() {
               )}
             </div>
             <p className="text-[10px] sm:text-xs text-muted-foreground">
-              Upload a receipt or proof (max 5MB, images or PDF)
+              Max 5MB, images or PDF
             </p>
           </div>
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2 sm:pt-4">
-            <Button
-              variant="outline"
-              onClick={() => handleSubmit(true)}
-              disabled={isSubmitting}
-              className="flex-1 h-11"
-            >
-              <Save className="mr-1.5 h-4 w-4" />
-              <span className="text-sm">Save as Draft</span>
-            </Button>
+            {isPersonalRequest && (
+              <Button
+                variant="outline"
+                onClick={() => handleSubmit(true)}
+                disabled={isSubmitting}
+                className="flex-1 h-11"
+              >
+                <Save className="mr-1.5 h-4 w-4" />
+                <span className="text-sm">Save as Draft</span>
+              </Button>
+            )}
             <Button
               onClick={() => handleSubmit(false)}
               disabled={isSubmitting}
               className="flex-1 h-11"
             >
-              <Send className="mr-1.5 h-4 w-4" />
-              <span className="text-sm">Submit for Approval</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                  <span className="text-sm">Submitting...</span>
+                </>
+              ) : (
+                <>
+                  <Send className="mr-1.5 h-4 w-4" />
+                  <span className="text-sm">Submit for Approval</span>
+                </>
+              )}
             </Button>
           </div>
         </CardContent>

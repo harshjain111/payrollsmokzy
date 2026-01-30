@@ -35,6 +35,17 @@ export function RejectExpenseDialog({
   const [reason, setReason] = useState('');
 
   const handleReject = async () => {
+    // Prevent self-rejection - cannot reject own expense submissions
+    if (expense.created_by === user?.id) {
+      toast({
+        title: 'Cannot reject',
+        description: 'You cannot reject your own expense submissions.',
+        variant: 'destructive',
+      });
+      onOpenChange(false);
+      return;
+    }
+
     if (!reason.trim()) {
       toast({
         title: 'Reason required',

@@ -106,6 +106,12 @@ export default function Requests() {
   };
 
   const handleApprove = async (request: RequestWithStaff) => {
+    // Prevent self-approval - Admin/Owner cannot approve their own requests
+    if (request.requested_by === user?.id) {
+      toast.error('You cannot approve your own requests');
+      return;
+    }
+
     setIsProcessing(true);
     try {
       const { error } = await supabase

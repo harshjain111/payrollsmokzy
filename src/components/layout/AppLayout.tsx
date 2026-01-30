@@ -215,6 +215,7 @@ function getNavSections(
           title: 'Accounting',
           items: [
             { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { title: 'Staff', href: '/staff', icon: Briefcase },
             { title: 'Requests', href: '/requests', icon: ClipboardList },
             { 
               title: 'Expenses', 

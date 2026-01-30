@@ -39,6 +39,20 @@ export function AdminDashboard() {
       badgeVariant: 'destructive',
     },
     {
+      label: 'Request Advance',
+      description: 'Create advance request for any staff',
+      icon: Banknote,
+      href: '/requests/new',
+      variant: 'accent',
+    },
+    {
+      label: 'Request Expense',
+      description: 'Submit expense for any staff member',
+      icon: Receipt,
+      href: '/expenses/new',
+      variant: 'accent',
+    },
+    {
       label: 'Add Staff',
       description: 'Register new employee (no salary)',
       icon: UserPlus,
