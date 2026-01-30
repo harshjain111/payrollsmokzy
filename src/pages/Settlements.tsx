@@ -191,7 +191,9 @@ export default function Settlements() {
 
       const monthlySalary = Number(salaryData) || 0;
       const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
-      const dailySalary = monthlySalary / 30;
+      // CRITICAL FIX: Use actual days in month for per-day calculation (not hardcoded 30)
+      // This ensures accurate leave deduction for 28/29/30/31 day months
+      const dailySalary = monthlySalary / daysInMonth;
       const leaveDeduction = dailySalary * leaveDays;
       const grossSalary = monthlySalary - leaveDeduction;
       const advancesOutstanding = Number(advanceData) || 0;

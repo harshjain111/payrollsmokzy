@@ -64,7 +64,8 @@ export function useDashboardStats() {
         approvedExpensesResult,
         approvedRequestsResult,
         pendingSalariesResult,
-        ledgerAdvancesResult,
+        // CRITICAL: Use journal_lines as SINGLE SOURCE OF TRUTH for advances
+        journalAdvancesResult,
         completedTodayResult,
       ] = await Promise.all([
         // Active staff and missing salary
@@ -94,15 +95,21 @@ export function useDashboardStats() {
               .eq('status', 'pending')
           : Promise.resolve({ data: [] }),
         
-        // Advances outstanding
+        // CRITICAL FIX: Advances outstanding from journal_lines (SINGLE SOURCE OF TRUTH)
+        // Account code 1200 = Staff Advances
+        // Balance = Sum(Debit) - Sum(Credit) = Outstanding advances
         supabase
-          .from('ledger_entries')
-          .select('debit, credit')
-          .eq('tag', 'advance'),
+          .from('journal_lines')
+          .select(`
+            debit,
+            credit,
+            account:account_id(code)
+          `)
+          .not('staff_id', 'is', null),
         
-        // Completed payments today
+        // Completed payments today (from journal_entries, not legacy ledger)
         supabase
-          .from('ledger_entries')
+          .from('journal_entries')
           .select('id')
           .gte('created_at', `${today}T00:00:00`),
       ]);
@@ -117,13 +124,22 @@ export function useDashboardStats() {
       const approvedExpenses = approvedExpensesResult.data || [];
       const approvedRequests = approvedRequestsResult.data || [];
       const pendingSalaries = pendingSalariesResult.data || [];
-      const ledgerAdvances = ledgerAdvancesResult.data || [];
       const completedToday = completedTodayResult.data || [];
 
-      const advancesOutstanding = ledgerAdvances.reduce(
-        (sum, entry) => sum + Number(entry.debit || 0) - Number(entry.credit || 0),
-        0
-      );
+      // Calculate advances outstanding from journal_lines (SINGLE SOURCE OF TRUTH)
+      // Staff Advances account (1200): Debit = given, Credit = adjusted/cleared
+      let totalAdvanceDebit = 0;
+      let totalAdvanceCredit = 0;
+      
+      (journalAdvancesResult.data || []).forEach((line: any) => {
+        const accountCode = line.account?.code;
+        if (accountCode === '1200') { // Staff Advances account
+          totalAdvanceDebit += Number(line.debit) || 0;
+          totalAdvanceCredit += Number(line.credit) || 0;
+        }
+      });
+      
+      const advancesOutstanding = totalAdvanceDebit - totalAdvanceCredit;
 
       setStats({
         activeStaff: activeStaff.length,

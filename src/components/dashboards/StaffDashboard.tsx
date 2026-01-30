@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useStaffBalance } from '@/hooks/useStaffBalance';
 import { LanguageToggle } from '@/components/staff/LanguageToggle';
 import { QuickAdvanceForm } from '@/components/staff/QuickAdvanceForm';
 import { QuickExpenseForm } from '@/components/staff/QuickExpenseForm';
@@ -36,37 +37,27 @@ export function StaffDashboard() {
   const { staffData } = useAuth();
   const { t } = useLanguage();
   
+  // CRITICAL: Use journal_lines as SINGLE SOURCE OF TRUTH for balance
+  // This ensures Staff Dashboard matches Admin Ledger exactly
+  const balanceData = useStaffBalance(staffData?.id);
+  
   const [showSalary, setShowSalary] = useState(false);
-  const [advanceOutstanding, setAdvanceOutstanding] = useState(0);
   const [recentItems, setRecentItems] = useState<RecentItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
   const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   useEffect(() => {
     if (staffData?.id) {
-      fetchDashboardData();
+      fetchRecentItems();
     }
   }, [staffData?.id]);
 
-  const fetchDashboardData = async () => {
+  const fetchRecentItems = async () => {
     if (!staffData?.id) return;
 
     try {
-      // Fetch advance outstanding from ledger
-      const { data: ledgerData } = await supabase
-        .from('ledger_entries')
-        .select('debit, credit, tag')
-        .eq('staff_id', staffData.id)
-        .eq('tag', 'advance');
-
-      let outstanding = 0;
-      (ledgerData || []).forEach(entry => {
-        outstanding += Number(entry.debit || 0) - Number(entry.credit || 0);
-      });
-      setAdvanceOutstanding(outstanding);
-
       // Fetch recent payment requests
       const { data: requests } = await supabase
         .from('payment_requests')
@@ -106,10 +97,15 @@ export function StaffDashboard() {
 
       setRecentItems(combined);
     } catch (error) {
-      console.error('Error fetching dashboard data:', error);
+      console.error('Error fetching recent items:', error);
     } finally {
-      setIsLoading(false);
+      setIsLoadingRecent(false);
     }
+  };
+
+  const handleFormSuccess = () => {
+    // Refetch recent items - balance will auto-update via useStaffBalance
+    fetchRecentItems();
   };
 
   const getStatusIcon = (status: string) => {
@@ -171,6 +167,13 @@ export function StaffDashboard() {
     );
   }
 
+  // Use balance loading state
+  const isLoading = balanceData.isLoading || isLoadingRecent;
+  
+  // CRITICAL: advanceOutstanding comes from journal_lines (single source of truth)
+  // This ensures Staff sees EXACTLY what Admin sees
+  const advanceOutstanding = balanceData.advanceOutstanding;
+
   if (isLoading) {
     return (
       <div className="p-4 space-y-4">
@@ -231,7 +234,7 @@ export function StaffDashboard() {
             </CardContent>
           </Card>
 
-          {/* Advance Outstanding Card */}
+          {/* Advance Outstanding Card - Data from journal_lines (single source of truth) */}
           <Card className="relative overflow-hidden">
             <CardContent className="p-4">
               <div className="h-10 w-10 rounded-full bg-warning/10 flex items-center justify-center mb-2">
@@ -244,6 +247,10 @@ export function StaffDashboard() {
                 </p>
               ) : (
                 <p className="text-sm text-muted-foreground">{t('no_pending')}</p>
+              )}
+              {/* Debug: Show if there's a balance mismatch */}
+              {balanceData.error && (
+                <p className="text-xs text-destructive mt-1">{balanceData.error}</p>
               )}
             </CardContent>
           </Card>
@@ -324,12 +331,12 @@ export function StaffDashboard() {
       <QuickAdvanceForm
         open={showAdvanceForm}
         onOpenChange={setShowAdvanceForm}
-        onSuccess={fetchDashboardData}
+        onSuccess={handleFormSuccess}
       />
       <QuickExpenseForm
         open={showExpenseForm}
         onOpenChange={setShowExpenseForm}
-        onSuccess={fetchDashboardData}
+        onSuccess={handleFormSuccess}
       />
     </div>
   );
