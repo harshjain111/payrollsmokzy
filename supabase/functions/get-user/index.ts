@@ -21,9 +21,9 @@ serve(async (req) => {
       throw new Error("user_id parameter is required");
     }
 
-    // Get auth header to verify caller is owner
+    // Get auth header to verify caller
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith('Bearer ')) {
       throw new Error("Missing authorization header");
     }
 
@@ -39,7 +39,7 @@ serve(async (req) => {
       }
     );
 
-    // Create regular client to check caller permissions
+    // Create regular client to verify JWT
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -50,16 +50,21 @@ serve(async (req) => {
       }
     );
 
-    // Verify the caller is an owner
-    const { data: { user: caller } } = await supabaseClient.auth.getUser();
-    if (!caller) {
+    // Verify the caller using getClaims
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    
+    if (claimsError || !claimsData?.claims) {
       throw new Error("Unauthorized");
     }
 
+    const callerId = claimsData.claims.sub;
+
+    // Check caller's role using admin client
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", caller.id)
+      .eq("user_id", callerId)
       .single();
 
     if (!roleData || roleData.role !== "owner") {
