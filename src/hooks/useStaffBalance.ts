@@ -58,12 +58,14 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
     try {
       // Query journal_lines with account information
       // CRITICAL: This is the SINGLE SOURCE OF TRUTH for all balance calculations
+      // Use explicit join to get account codes reliably
       const { data: lines, error } = await supabase
         .from('journal_lines')
         .select(`
           debit,
           credit,
-          account:account_id(code)
+          account_id,
+          accounts!journal_lines_account_id_fkey(code)
         `)
         .eq('staff_id', staffId);
 
@@ -78,7 +80,8 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
       let advanceCredit = 0;
 
       (lines || []).forEach((line: any) => {
-        const code = line.account?.code;
+        // Handle both possible response structures from Supabase
+        const code = line.accounts?.code || line.account?.code;
         const debit = Number(line.debit) || 0;
         const credit = Number(line.credit) || 0;
 
@@ -90,6 +93,10 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
           advanceCredit += credit;
         }
       });
+      
+      console.log('[useStaffBalance] Staff:', staffId, 'Lines:', lines?.length, 
+        'Advance Dr:', advanceDebit, 'Advance Cr:', advanceCredit,
+        'Payable Cr:', payableCredit, 'Payable Dr:', payableDebit);
 
       // Calculate balances using the correct formula
       // Payable: Credit = we owe staff, Debit = we've paid
@@ -157,7 +164,8 @@ export function useAllStaffBalances() {
           staff_id,
           debit,
           credit,
-          account:account_id(code)
+          account_id,
+          accounts!journal_lines_account_id_fkey(code)
         `)
         .not('staff_id', 'is', null);
 
@@ -181,7 +189,7 @@ export function useAllStaffBalances() {
           advanceCredit: 0,
         };
 
-        const code = line.account?.code;
+        const code = line.accounts?.code || line.account?.code;
         const debit = Number(line.debit) || 0;
         const credit = Number(line.credit) || 0;
 
