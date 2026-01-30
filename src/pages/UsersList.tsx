@@ -287,59 +287,62 @@ export default function UsersList() {
                         {format(new Date(user.created_at), 'dd MMM yyyy')}
                       </TableCell>
                       <TableCell>
-                        {user.role !== 'owner' && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem asChild>
-                                <Link to={`/users/${user.user_id}/edit`}>
-                                  <Edit className="mr-2 h-4 w-4" />
-                                  Edit Role
-                                </Link>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
-                                <Key className="mr-2 h-4 w-4" />
-                                Reset Password
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <DropdownMenuItem
-                                    onSelect={(e) => e.preventDefault()}
-                                    className="text-destructive focus:text-destructive"
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Remove Access
-                                  </DropdownMenuItem>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remove User Access</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Are you sure you want to remove access for{' '}
-                                      <strong>{user.full_name || 'this user'}</strong>?
-                                      They will no longer be able to login.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDelete(user)}
-                                      disabled={deletingId === user.id}
-                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem asChild>
+                              <Link to={`/users/${user.user_id}/edit`}>
+                                <Edit className="mr-2 h-4 w-4" />
+                                Edit User
+                              </Link>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
+                              <Key className="mr-2 h-4 w-4" />
+                              Reset Password
+                            </DropdownMenuItem>
+                            {/* Only show delete option for non-owner accounts */}
+                            {user.role !== 'owner' && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <DropdownMenuItem
+                                      onSelect={(e) => e.preventDefault()}
+                                      className="text-destructive focus:text-destructive"
                                     >
-                                      {deletingId === user.id ? 'Removing...' : 'Remove'}
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        )}
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Remove Access
+                                    </DropdownMenuItem>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Remove User Access</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to remove access for{' '}
+                                        <strong>{user.full_name || 'this user'}</strong>?
+                                        They will no longer be able to login.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => handleDelete(user)}
+                                        disabled={deletingId === user.id}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        {deletingId === user.id ? 'Removing...' : 'Remove'}
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))}
