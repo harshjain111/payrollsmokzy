@@ -240,6 +240,8 @@ export default function Payouts() {
       }
 
       // Update the source record based on type
+      // NOTE: ledger_entry_id references legacy ledger_entries table
+      // Journal entries are tracked separately via journal_entry_id where applicable
       if (selectedItem.type === 'expense') {
         const { error: updateError } = await supabase
           .from('expenses')
@@ -247,7 +249,8 @@ export default function Payouts() {
             status: 'reimbursed',
             reimbursed_at: new Date().toISOString(),
             reimbursed_by: user.id,
-            ledger_entry_id: journalEntryId, // Now points to journal entry
+            // Don't set ledger_entry_id - it references legacy ledger_entries table
+            // The payout is tracked via journal_entries
           })
           .eq('id', selectedItem.id);
 
@@ -259,7 +262,8 @@ export default function Payouts() {
           .update({
             paid_at: new Date().toISOString(),
             paid_by: user.id,
-            ledger_entry_id: journalEntryId,
+            // Don't set ledger_entry_id - it references legacy ledger_entries table
+            // The payout is tracked via journal_entries
           })
           .eq('id', selectedItem.id);
 
