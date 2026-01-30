@@ -68,6 +68,20 @@ export function AccountantDashboard() {
       badgeVariant: 'destructive',
     },
     {
+      label: 'Request Advance',
+      description: 'Create advance request for any staff',
+      icon: Banknote,
+      href: '/requests/new',
+      variant: 'accent',
+    },
+    {
+      label: 'Request Expense',
+      description: 'Submit expense for any staff member',
+      icon: Receipt,
+      href: '/expenses/new',
+      variant: 'accent',
+    },
+    {
       label: 'View Ledger',
       description: 'All financial transactions',
       icon: FileText,
@@ -80,13 +94,6 @@ export function AccountantDashboard() {
       icon: UserPlus,
       href: '/staff/new',
       variant: 'secondary',
-    },
-    {
-      label: 'New Request',
-      description: 'Create advance or expense request',
-      icon: Plus,
-      href: '/requests/new',
-      variant: 'accent',
     },
   ];
 

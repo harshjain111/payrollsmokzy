@@ -562,13 +562,13 @@ export default function StaffForm() {
                 <Select 
                   value={role} 
                   onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}
-                  disabled={!isOwner && !isEditing}
                 >
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">
                     <SelectItem value="staff">Staff</SelectItem>
+                    {/* Only Owner can assign Admin/Accountant roles */}
                     {isOwner && (
                       <>
                         <SelectItem value="accountant">Accountant</SelectItem>
@@ -581,10 +581,13 @@ export default function StaffForm() {
                   {role === 'staff' && 'Can view own data, submit expenses and payment requests'}
                   {role === 'accountant' && 'Can record payments, reimburse expenses, export reports (no salary visibility)'}
                   {role === 'admin' && 'Can approve expenses and requests, record payments (no salary visibility)'}
-                  {!isOwner && !isEditing && (
-                    <span className="block mt-1 text-warning">Only Owner can assign Admin or Accountant roles</span>
-                  )}
                 </p>
+                {/* Show warning for non-owners */}
+                {!isOwner && (
+                  <p className="text-xs text-warning">
+                    Only Owner can assign Admin or Accountant roles. Staff can be upgraded later by Owner.
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
