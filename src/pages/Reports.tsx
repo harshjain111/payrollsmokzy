@@ -40,6 +40,7 @@ import {
   FileDown,
   CheckCircle,
   XCircle,
+  Scale,
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -52,9 +53,10 @@ import {
   exportAdvanceReportPDF,
   exportSummaryPDF,
 } from '@/lib/pdf-export';
+import { TrialBalance } from '@/components/reports/TrialBalance';
 import type { Staff } from '@/types/database';
 
-type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary';
+type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary' | 'trial_balance';
 
 interface DateRange {
   from: Date;
@@ -444,11 +446,15 @@ export default function Reports() {
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className={cn(
             "inline-flex w-max min-w-full sm:w-full sm:grid gap-1",
-            canSeeSalaryReports ? "sm:grid-cols-6" : "sm:grid-cols-4"
+            canSeeSalaryReports ? "sm:grid-cols-7" : "sm:grid-cols-5"
           )}>
             <TabsTrigger value="summary" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
               <BarChart3 className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Summary</span>
+            </TabsTrigger>
+            <TabsTrigger value="trial_balance" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <Scale className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Trial Balance</span>
             </TabsTrigger>
             <TabsTrigger value="ledger" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
               <FileText className="h-4 w-4" />
@@ -599,6 +605,11 @@ export default function Reports() {
               </CardHeader>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Trial Balance - CA-ready double-entry verification */}
+        <TabsContent value="trial_balance" className="mt-4">
+          <TrialBalance />
         </TabsContent>
 
         <TabsContent value="ledger" className="mt-4">
