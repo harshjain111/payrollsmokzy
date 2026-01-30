@@ -139,35 +139,35 @@ export default function NewRequest() {
   };
 
   return (
-    <div>
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Payment Request"
         description="Submit a request for payment or advance"
       >
-        <Button variant="outline" onClick={() => navigate(-1)}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
       </PageHeader>
 
       <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Request Details</CardTitle>
-          <CardDescription>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Request Details</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">
             {isPersonalRequest 
               ? 'Fill in the details for your payment request'
               : 'Create a payment request on behalf of a staff member'
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
             {/* Staff Selection - for Admin/Owner/Accountant in accounting mode */}
             {canRequestForOthers && (
               <div className="space-y-2">
-                <Label htmlFor="staff">Staff Member *</Label>
+                <Label htmlFor="staff" className="text-sm">Staff Member *</Label>
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
@@ -183,55 +183,58 @@ export default function NewRequest() {
 
             {/* Personal request indicator */}
             {isPersonalRequest && staffData && (
-              <div className="p-4 bg-secondary rounded-lg">
-                <p className="text-sm text-muted-foreground">Requesting for</p>
-                <p className="font-medium">{staffData.full_name}</p>
+              <div className="p-3 sm:p-4 bg-secondary rounded-lg">
+                <p className="text-xs sm:text-sm text-muted-foreground">Requesting for</p>
+                <p className="font-medium text-sm sm:text-base">{staffData.full_name}</p>
               </div>
             )}
 
             {/* Amount */}
             <div className="space-y-2">
-              <Label htmlFor="amount">Amount *</Label>
+              <Label htmlFor="amount" className="text-sm">Amount *</Label>
               <AmountInput
                 value={amount}
                 onChange={setAmount}
                 placeholder="Enter amount"
+                className="h-12 text-lg"
               />
             </div>
 
             {/* Reason */}
             <div className="space-y-2">
-              <Label htmlFor="reason">Reason *</Label>
+              <Label htmlFor="reason" className="text-sm">Reason *</Label>
               <Textarea
                 id="reason"
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="Provide a reason for this request..."
                 rows={4}
+                className="text-base"
               />
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 {reason.length}/500 characters
               </p>
             </div>
 
             {/* Submit */}
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => navigate(-1)}
                 disabled={isLoading}
+                className="h-11 order-2 sm:order-1"
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isLoading}>
+              <Button type="submit" disabled={isLoading} className="h-11 flex-1 order-1 sm:order-2">
                 {isLoading ? (
                   <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Submitting...
+                    <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                    <span className="text-sm">Submitting...</span>
                   </>
                 ) : (
-                  'Submit Request'
+                  <span className="text-sm">Submit Request</span>
                 )}
               </Button>
             </div>

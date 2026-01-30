@@ -61,7 +61,7 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
       <div
         ref={ref}
         className={cn(
-          'relative rounded-2xl p-6 transition-all duration-300 hover-scale overflow-hidden',
+          'relative rounded-2xl p-4 sm:p-6 transition-all duration-300 hover-scale overflow-hidden',
           'shadow-card hover:shadow-card-hover',
           variantStyles[variant],
           className
@@ -77,26 +77,26 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
 
         {/* Background decoration for gradient cards */}
         {isGradient && (
-          <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+          <div className="absolute top-0 right-0 w-24 h-24 sm:w-32 sm:h-32 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
         )}
 
-        <div className="relative flex items-start justify-between gap-4">
+        <div className="relative flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex-1 min-w-0">
             <p className={cn(
-              'text-sm font-medium truncate',
+              'text-xs sm:text-sm font-medium line-clamp-1',
               isGradient ? 'text-white/80' : 'text-muted-foreground'
             )}>
               {title}
             </p>
             <p className={cn(
-              'mt-2 text-3xl font-bold tabular-nums tracking-tight',
+              'mt-1 sm:mt-2 text-xl sm:text-3xl font-bold tabular-nums tracking-tight truncate',
               isGradient ? 'text-white' : 'text-foreground'
             )}>
               {value}
             </p>
             {subtitle && (
               <p className={cn(
-                'mt-1.5 text-sm truncate',
+                'mt-1 text-[10px] sm:text-sm line-clamp-1',
                 isGradient ? 'text-white/70' : 'text-muted-foreground'
               )}>
                 {subtitle}
@@ -123,10 +123,10 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           </div>
           {Icon && (
             <div className={cn(
-              'rounded-xl p-3 flex-shrink-0',
+              'rounded-lg sm:rounded-xl p-2 sm:p-3 flex-shrink-0',
               isGradient ? 'bg-white/20' : colorStyles[color].icon
             )}>
-              <Icon className="h-5 w-5" />
+              <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
             </div>
           )}
         </div>

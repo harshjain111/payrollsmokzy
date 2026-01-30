@@ -422,62 +422,68 @@ export default function Reports() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Reports"
         description="Generate and export accounting reports"
       >
         <div className="flex gap-2">
-          <Button variant="outline" onClick={exportToCSV} disabled={reportData.length === 0}>
-            <Download className="mr-2 h-4 w-4" />
-            CSV
+          <Button variant="outline" size="sm" onClick={exportToCSV} disabled={reportData.length === 0}>
+            <Download className="mr-1.5 h-4 w-4" />
+            <span className="hidden sm:inline">CSV</span>
           </Button>
-          <Button onClick={handlePDFExport} disabled={activeReport === 'summary' ? false : reportData.length === 0}>
-            <FileDown className="mr-2 h-4 w-4" />
-            PDF
+          <Button size="sm" onClick={handlePDFExport} disabled={activeReport === 'summary' ? false : reportData.length === 0}>
+            <FileDown className="mr-1.5 h-4 w-4" />
+            <span className="hidden sm:inline">PDF</span>
           </Button>
         </div>
       </PageHeader>
 
       <Tabs value={activeReport} onValueChange={(v) => setActiveReport(v as ReportType)}>
-        <TabsList className={cn("grid gap-1", canSeeSalaryReports ? "grid-cols-3 lg:grid-cols-6" : "grid-cols-2 lg:grid-cols-4")}>
-          <TabsTrigger value="summary" className="flex items-center gap-1">
-            <BarChart3 className="h-4 w-4" />
-            <span className="hidden sm:inline">Summary</span>
-          </TabsTrigger>
-          <TabsTrigger value="ledger" className="flex items-center gap-1">
-            <FileText className="h-4 w-4" />
-            <span className="hidden sm:inline">Ledger</span>
-          </TabsTrigger>
-          {canSeeSalaryReports && (
-            <TabsTrigger value="salary" className="flex items-center gap-1">
-              <Wallet className="h-4 w-4" />
-              <span className="hidden sm:inline">Salary</span>
+        {/* Mobile: Horizontal scroll tabs */}
+        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className={cn(
+            "inline-flex w-max min-w-full sm:w-full sm:grid gap-1",
+            canSeeSalaryReports ? "sm:grid-cols-6" : "sm:grid-cols-4"
+          )}>
+            <TabsTrigger value="summary" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <BarChart3 className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Summary</span>
             </TabsTrigger>
-          )}
-          <TabsTrigger value="advance" className="flex items-center gap-1">
-            <ArrowUpRight className="h-4 w-4" />
-            <span className="hidden sm:inline">Advances</span>
-          </TabsTrigger>
-          <TabsTrigger value="expense" className="flex items-center gap-1">
-            <Receipt className="h-4 w-4" />
-            <span className="hidden sm:inline">Expenses</span>
-          </TabsTrigger>
-          <TabsTrigger value="payment" className="flex items-center gap-1">
-            <FileSpreadsheet className="h-4 w-4" />
-            <span className="hidden sm:inline">Payments</span>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="ledger" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <FileText className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Ledger</span>
+            </TabsTrigger>
+            {canSeeSalaryReports && (
+              <TabsTrigger value="salary" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+                <Wallet className="h-4 w-4" />
+                <span className="text-xs sm:text-sm">Salary</span>
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="advance" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <ArrowUpRight className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Advances</span>
+            </TabsTrigger>
+            <TabsTrigger value="expense" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <Receipt className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Expenses</span>
+            </TabsTrigger>
+            <TabsTrigger value="payment" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <FileSpreadsheet className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">Payments</span>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {/* Filters */}
         <Card className="mt-4">
-          <CardContent className="pt-4">
-            <div className="flex flex-wrap gap-4">
+          <CardContent className="pt-4 px-3 sm:px-6">
+            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
               {activeReport !== 'advance' && (
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2 sm:col-span-1">
                   <Label className="text-xs">Staff</Label>
                   <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="All Staff" />
                     </SelectTrigger>
                     <SelectContent>
@@ -493,10 +499,10 @@ export default function Reports() {
               )}
 
               {(activeReport === 'summary' || activeReport === 'salary') && (
-                <div className="space-y-1">
+                <div className="space-y-1 col-span-2 sm:col-span-1">
                   <Label className="text-xs">Month</Label>
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -516,8 +522,8 @@ export default function Reports() {
                     <Label className="text-xs">From</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                        <Button variant="outline" className="w-full sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm">
+                          <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                           {format(dateRange.from, 'dd MMM yy')}
                         </Button>
                       </PopoverTrigger>
@@ -535,8 +541,8 @@ export default function Reports() {
                     <Label className="text-xs">To</Label>
                     <Popover>
                       <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
-                          <CalendarIcon className="mr-2 h-4 w-4" />
+                        <Button variant="outline" className="w-full sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm">
+                          <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                           {format(dateRange.to, 'dd MMM yy')}
                         </Button>
                       </PopoverTrigger>
@@ -559,35 +565,35 @@ export default function Reports() {
         {/* Report Content */}
         {/* Summary - hide salary-related stats for non-owners */}
         <TabsContent value="summary" className="mt-4">
-          <div className={cn("grid gap-4", canSeeSalaryReports ? "md:grid-cols-2 lg:grid-cols-4" : "md:grid-cols-3")}>
+          <div className={cn("grid gap-3 sm:gap-4 grid-cols-2", canSeeSalaryReports ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
             <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Active Staff</CardDescription>
-                <CardTitle className="text-2xl">{summaryStats.staffCount}</CardTitle>
+              <CardHeader className="pb-2 p-3 sm:p-6">
+                <CardDescription className="text-xs sm:text-sm">Active Staff</CardDescription>
+                <CardTitle className="text-xl sm:text-2xl">{summaryStats.staffCount}</CardTitle>
               </CardHeader>
             </Card>
             {canSeeSalaryReports && (
               <Card>
-                <CardHeader className="pb-2">
-                  <CardDescription>Monthly Payroll</CardDescription>
-                  <CardTitle className="text-2xl">
+                <CardHeader className="pb-2 p-3 sm:p-6">
+                  <CardDescription className="text-xs sm:text-sm">Monthly Payroll</CardDescription>
+                  <CardTitle className="text-xl sm:text-2xl">
                     <Amount value={summaryStats.totalPayroll} className="text-foreground" />
                   </CardTitle>
                 </CardHeader>
               </Card>
             )}
             <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Advances Outstanding</CardDescription>
-                <CardTitle className="text-2xl">
+              <CardHeader className="pb-2 p-3 sm:p-6">
+                <CardDescription className="text-xs sm:text-sm">Advances Outstanding</CardDescription>
+                <CardTitle className="text-xl sm:text-2xl">
                   <Amount value={summaryStats.totalAdvances} className="text-warning" />
                 </CardTitle>
               </CardHeader>
             </Card>
             <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Expenses Reimbursed</CardDescription>
-                <CardTitle className="text-2xl">
+              <CardHeader className="pb-2 p-3 sm:p-6">
+                <CardDescription className="text-xs sm:text-sm">Expenses Reimbursed</CardDescription>
+                <CardTitle className="text-xl sm:text-2xl">
                   <Amount value={summaryStats.totalExpenses} className="text-foreground" />
                 </CardTitle>
               </CardHeader>

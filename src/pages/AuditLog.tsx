@@ -176,25 +176,25 @@ export default function AuditLogPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="Audit Log"
         description="Track all changes to financial records"
       >
-        <Button variant="outline" onClick={fetchLogs} disabled={isLoading}>
-          <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
-          Refresh
+        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={isLoading}>
+          <RefreshCw className={cn("mr-1.5 h-4 w-4", isLoading && "animate-spin")} />
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </PageHeader>
 
       {/* Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
+        <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+          <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
             <div className="space-y-1">
               <Label className="text-xs">Module</Label>
               <Select value={selectedModule} onValueChange={setSelectedModule}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full sm:w-[180px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -210,7 +210,7 @@ export default function AuditLogPage() {
             <div className="space-y-1">
               <Label className="text-xs">Action</Label>
               <Select value={selectedAction} onValueChange={setSelectedAction}>
-                <SelectTrigger className="w-[150px]">
+                <SelectTrigger className="w-full sm:w-[150px]">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -227,8 +227,8 @@ export default function AuditLogPage() {
               <Label className="text-xs">From</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                  <Button variant="outline" className="w-full sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm">
+                    <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                     {format(dateRange.from, 'dd MMM yy')}
                   </Button>
                 </PopoverTrigger>
@@ -247,8 +247,8 @@ export default function AuditLogPage() {
               <Label className="text-xs">To</Label>
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-[140px] justify-start text-left font-normal">
-                    <CalendarIcon className="mr-2 h-4 w-4" />
+                  <Button variant="outline" className="w-full sm:w-[140px] justify-start text-left font-normal text-xs sm:text-sm">
+                    <CalendarIcon className="mr-1.5 h-3.5 w-3.5" />
                     {format(dateRange.to, 'dd MMM yy')}
                   </Button>
                 </PopoverTrigger>
@@ -266,18 +266,18 @@ export default function AuditLogPage() {
         </CardContent>
       </Card>
 
-      {/* Audit Log Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
+      {/* Audit Log Table - Desktop */}
+      <Card className="hidden lg:block">
+        <CardHeader className="px-4 sm:px-6">
+          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+            <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
             Activity Log
-            <Badge variant="secondary" className="ml-2">
-              {logs.length} entries
+            <Badge variant="secondary" className="ml-2 text-xs">
+              {logs.length}
             </Badge>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {isLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
@@ -330,47 +330,101 @@ export default function AuditLogPage() {
         </CardContent>
       </Card>
 
+      {/* Audit Log Cards - Mobile */}
+      <div className="lg:hidden space-y-3">
+        <div className="flex items-center gap-2 px-1">
+          <FileText className="h-4 w-4" />
+          <span className="font-semibold text-sm">Activity Log</span>
+          <Badge variant="secondary" className="text-xs">
+            {logs.length}
+          </Badge>
+        </div>
+        
+        {isLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+        ) : logs.length === 0 ? (
+          <Card>
+            <CardContent className="py-8 text-center text-muted-foreground text-sm">
+              No audit logs found
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-2">
+            {logs.map((log) => (
+              <Card key={log.id} className="overflow-hidden">
+                <CardContent className="p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">{getModuleLabel(log.table_name)}</Badge>
+                        {getActionBadge(log.action)}
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2">
+                        {formatChanges(log)}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {format(new Date(log.performed_at), 'dd MMM yyyy, HH:mm')}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 h-8 w-8 p-0"
+                      onClick={() => setSelectedLog(log)}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+
       {/* Detail Dialog */}
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] sm:max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Audit Log Details</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">Audit Log Details</DialogTitle>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Timestamp</p>
-                  <p className="font-medium">{format(new Date(selectedLog.performed_at), 'dd MMM yyyy HH:mm:ss')}</p>
+                  <p className="text-xs text-muted-foreground">Timestamp</p>
+                  <p className="font-medium text-xs sm:text-sm">{format(new Date(selectedLog.performed_at), 'dd MMM yyyy HH:mm:ss')}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Module</p>
-                  <p className="font-medium">{getModuleLabel(selectedLog.table_name)}</p>
+                  <p className="text-xs text-muted-foreground">Module</p>
+                  <p className="font-medium text-xs sm:text-sm">{getModuleLabel(selectedLog.table_name)}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Action</p>
+                  <p className="text-xs text-muted-foreground">Action</p>
                   {getActionBadge(selectedLog.action)}
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Record ID</p>
-                  <p className="font-mono text-xs">{selectedLog.record_id}</p>
+                  <p className="text-xs text-muted-foreground">Record ID</p>
+                  <p className="font-mono text-[10px] sm:text-xs truncate">{selectedLog.record_id}</p>
                 </div>
               </div>
 
               {selectedLog.old_data && (
                 <div>
-                  <p className="text-muted-foreground mb-2">Previous Data</p>
-                  <ScrollArea className="h-[150px] rounded-md border p-3">
-                    <pre className="text-xs">{JSON.stringify(selectedLog.old_data, null, 2)}</pre>
+                  <p className="text-xs text-muted-foreground mb-2">Previous Data</p>
+                  <ScrollArea className="h-[120px] sm:h-[150px] rounded-md border p-2 sm:p-3">
+                    <pre className="text-[10px] sm:text-xs">{JSON.stringify(selectedLog.old_data, null, 2)}</pre>
                   </ScrollArea>
                 </div>
               )}
 
               {selectedLog.new_data && (
                 <div>
-                  <p className="text-muted-foreground mb-2">New Data</p>
-                  <ScrollArea className="h-[150px] rounded-md border p-3">
-                    <pre className="text-xs">{JSON.stringify(selectedLog.new_data, null, 2)}</pre>
+                  <p className="text-xs text-muted-foreground mb-2">New Data</p>
+                  <ScrollArea className="h-[120px] sm:h-[150px] rounded-md border p-2 sm:p-3">
+                    <pre className="text-[10px] sm:text-xs">{JSON.stringify(selectedLog.new_data, null, 2)}</pre>
                   </ScrollArea>
                 </div>
               )}
