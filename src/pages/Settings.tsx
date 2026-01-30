@@ -144,70 +144,70 @@ export default function Settings() {
     : 'N/A';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title={t('settings')}
         description="Manage your account preferences and security settings"
       />
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 md:grid-cols-2">
         {/* Account Overview */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               Account Overview
             </CardTitle>
-            <CardDescription>Your account information and status</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Your account information and status</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Name</span>
-              <span className="font-medium">{staffData?.full_name || user?.email?.split('@')[0] || 'User'}</span>
+          <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Name</span>
+              <span className="font-medium text-sm sm:text-base truncate max-w-[180px]">{staffData?.full_name || user?.email?.split('@')[0] || 'User'}</span>
             </div>
             <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Phone</span>
-              <span className="font-medium">{staffData?.phone || 'Not set'}</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Phone</span>
+              <span className="font-medium text-sm sm:text-base">{staffData?.phone || 'Not set'}</span>
             </div>
             <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Role</span>
-              <Badge variant="secondary">{getRoleLabel(userRole)}</Badge>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground">Role</span>
+              <Badge variant="secondary" className="text-xs">{getRoleLabel(userRole)}</Badge>
             </div>
             <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                <Clock className="h-3.5 w-3.5" />
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 Last Login
               </span>
-              <span className="text-sm">{lastSignIn}</span>
+              <span className="text-xs sm:text-sm">{lastSignIn}</span>
             </div>
             <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground flex items-center gap-1">
-                {isMobile ? <Smartphone className="h-3.5 w-3.5" /> : <Monitor className="h-3.5 w-3.5" />}
-                Current Device
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1">
+                {isMobile ? <Smartphone className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <Monitor className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
+                Device
               </span>
-              <span className="text-sm">{deviceType} • {browserInfo}</span>
+              <span className="text-xs sm:text-sm">{deviceType} • {browserInfo}</span>
             </div>
           </CardContent>
         </Card>
 
         {/* Language Settings */}
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Globe className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               {t('language')}
             </CardTitle>
-            <CardDescription>Choose your preferred language</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Choose your preferred language</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
             <div className="space-y-2">
-              <Label>Display Language</Label>
+              <Label className="text-xs sm:text-sm">Display Language</Label>
               <Select value={language} onValueChange={(value: 'en' | 'hi' | 'as') => setLanguage(value)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 sm:h-11">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -216,7 +216,7 @@ export default function Settings() {
                   <SelectItem value="as">🇮🇳 অসমীয়া (Assamese)</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[10px] sm:text-xs text-muted-foreground">
                 Language preference is saved automatically
               </p>
             </div>
@@ -225,25 +225,25 @@ export default function Settings() {
 
         {/* Change Password */}
         <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Key className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Key className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               Change Password
             </CardTitle>
-            <CardDescription>Update your account password for security</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Update your account password for security</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             {passwordChangeSuccess ? (
-              <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
-                <CheckCircle className="h-5 w-5 text-green-500" />
-                <span className="text-green-600 dark:text-green-400 font-medium">
+              <div className="flex items-center gap-3 p-3 sm:p-4 bg-green-500/10 border border-green-500/20 rounded-lg">
+                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-500 shrink-0" />
+                <span className="text-green-600 dark:text-green-400 font-medium text-sm sm:text-base">
                   Password changed successfully!
                 </span>
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-3">
                 <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
+                  <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
                   <div className="relative">
                     <Input
                       id="current-password"
@@ -251,6 +251,7 @@ export default function Settings() {
                       value={currentPassword}
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••"
+                      className="h-10 sm:h-11 pr-10 text-sm"
                     />
                     <Button
                       type="button"
@@ -269,7 +270,7 @@ export default function Settings() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
+                  <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
                   <div className="relative">
                     <Input
                       id="new-password"
@@ -277,6 +278,7 @@ export default function Settings() {
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••"
+                      className="h-10 sm:h-11 pr-10 text-sm"
                     />
                     <Button
                       type="button"
@@ -292,11 +294,11 @@ export default function Settings() {
                       )}
                     </Button>
                   </div>
-                  <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">Minimum 6 characters</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
+                  <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
                   <div className="relative">
                     <Input
                       id="confirm-password"
@@ -304,6 +306,7 @@ export default function Settings() {
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
+                      className="h-10 sm:h-11 pr-10 text-sm"
                     />
                     <Button
                       type="button"
@@ -325,28 +328,29 @@ export default function Settings() {
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 
+                        size="sm"
                         disabled={!currentPassword || !newPassword || !confirmPassword || isChangingPassword}
                       >
                         {isChangingPassword ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Changing...
+                            <Loader2 className="mr-1.5 h-4 w-4 animate-spin" />
+                            <span className="text-sm">Changing...</span>
                           </>
                         ) : (
-                          'Change Password'
+                          <span className="text-sm">Change Password</span>
                         )}
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent>
+                    <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
                       <AlertDialogHeader>
-                        <AlertDialogTitle>Confirm Password Change</AlertDialogTitle>
-                        <AlertDialogDescription>
+                        <AlertDialogTitle className="text-base sm:text-lg">Confirm Password Change</AlertDialogTitle>
+                        <AlertDialogDescription className="text-xs sm:text-sm">
                           Are you sure you want to change your password? You will need to use the new password for future logins.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handlePasswordChange}>
+                        <AlertDialogCancel className="text-sm">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handlePasswordChange} className="text-sm">
                           Confirm Change
                         </AlertDialogAction>
                       </AlertDialogFooter>
@@ -360,41 +364,41 @@ export default function Settings() {
 
         {/* Security Actions */}
         <Card className="md:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <SettingsIcon className="h-5 w-5 text-primary" />
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <SettingsIcon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
               Security Actions
             </CardTitle>
-            <CardDescription>Manage your account security</CardDescription>
+            <CardDescription className="text-xs sm:text-sm">Manage your account security</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
             <div className="flex flex-col sm:flex-row gap-3">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
-                  <Button variant="outline" className="gap-2">
+                  <Button variant="outline" size="sm" className="gap-2 justify-center">
                     <LogOut className="h-4 w-4" />
-                    Sign Out from All Devices
+                    <span className="text-sm">Sign Out All Devices</span>
                   </Button>
                 </AlertDialogTrigger>
-                <AlertDialogContent>
+                <AlertDialogContent className="max-w-[90vw] sm:max-w-md">
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Sign Out Everywhere</AlertDialogTitle>
-                    <AlertDialogDescription>
+                    <AlertDialogTitle className="text-base sm:text-lg">Sign Out Everywhere</AlertDialogTitle>
+                    <AlertDialogDescription className="text-xs sm:text-sm">
                       This will sign you out from all devices and browsers. You will need to log in again on each device.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleSignOutAllDevices}>
+                    <AlertDialogCancel className="text-sm">Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleSignOutAllDevices} className="text-sm">
                       Sign Out All
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
 
-              <Button variant="destructive" className="gap-2" onClick={signOut}>
+              <Button variant="destructive" size="sm" className="gap-2 justify-center" onClick={signOut}>
                 <LogOut className="h-4 w-4" />
-                Sign Out
+                <span className="text-sm">Sign Out</span>
               </Button>
             </div>
           </CardContent>

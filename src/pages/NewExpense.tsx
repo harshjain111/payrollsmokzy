@@ -168,37 +168,38 @@ export default function NewExpense() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <PageHeader
         title="New Expense"
         description="Record an expense for reimbursement"
       >
-        <Button variant="ghost" onClick={() => navigate('/expenses')}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+        <Button variant="ghost" size="sm" onClick={() => navigate('/expenses')}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          <span className="hidden sm:inline">Back</span>
         </Button>
       </PageHeader>
 
       <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle>Expense Details</CardTitle>
+        <CardHeader className="p-4 sm:p-6">
+          <CardTitle className="text-base sm:text-lg">Expense Details</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6 p-4 sm:p-6 pt-0 sm:pt-0">
           {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Amount *</Label>
+            <Label htmlFor="amount" className="text-sm">Amount *</Label>
             <AmountInput
               value={amount}
               onChange={setAmount}
               placeholder="0.00"
+              className="h-12 text-lg"
             />
           </div>
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="category">Category *</Label>
+            <Label htmlFor="category" className="text-sm">Category *</Label>
             <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
-              <SelectTrigger>
+              <SelectTrigger className="h-11">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -213,13 +214,13 @@ export default function NewExpense() {
 
           {/* Expense Date */}
           <div className="space-y-2">
-            <Label>Expense Date *</Label>
+            <Label className="text-sm">Expense Date *</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    'w-full justify-start text-left font-normal',
+                    'w-full justify-start text-left font-normal h-11',
                     !expenseDate && 'text-muted-foreground'
                   )}
                 >
@@ -242,56 +243,57 @@ export default function NewExpense() {
 
           {/* Description */}
           <div className="space-y-2">
-            <Label htmlFor="description">Description *</Label>
+            <Label htmlFor="description" className="text-sm">Description *</Label>
             <Textarea
               id="description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Describe the expense (e.g., Cab fare for client meeting)"
               rows={3}
+              className="text-base"
             />
           </div>
 
           {/* Proof Upload */}
           <div className="space-y-2">
-            <Label htmlFor="proof">Proof / Receipt (optional)</Label>
-            <div className="flex items-center gap-4">
+            <Label htmlFor="proof" className="text-sm">Proof / Receipt (optional)</Label>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <Input
                 id="proof"
                 type="file"
                 accept="image/*,.pdf"
                 onChange={handleFileChange}
-                className="cursor-pointer"
+                className="cursor-pointer h-11"
               />
               {proofFile && (
-                <span className="text-sm text-muted-foreground">
+                <span className="text-xs sm:text-sm text-muted-foreground truncate max-w-[200px]">
                   {proofFile.name}
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               Upload a receipt or proof (max 5MB, images or PDF)
             </p>
           </div>
 
           {/* Actions */}
-          <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-3 pt-2 sm:pt-4">
             <Button
               variant="outline"
               onClick={() => handleSubmit(true)}
               disabled={isSubmitting}
-              className="flex-1"
+              className="flex-1 h-11"
             >
-              <Save className="mr-2 h-4 w-4" />
-              Save as Draft
+              <Save className="mr-1.5 h-4 w-4" />
+              <span className="text-sm">Save as Draft</span>
             </Button>
             <Button
               onClick={() => handleSubmit(false)}
               disabled={isSubmitting}
-              className="flex-1"
+              className="flex-1 h-11"
             >
-              <Send className="mr-2 h-4 w-4" />
-              Submit for Approval
+              <Send className="mr-1.5 h-4 w-4" />
+              <span className="text-sm">Submit for Approval</span>
             </Button>
           </div>
         </CardContent>
