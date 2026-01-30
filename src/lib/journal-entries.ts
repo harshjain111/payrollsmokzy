@@ -1,0 +1,611 @@
+/**
+ * Double-Entry Journal Entry Service
+ * 
+ * This service implements proper double-entry accounting (Golden Rules):
+ * - Every transaction has two sides (debit and credit)
+ * - Total debits must equal total credits
+ * - Staff ledger balance represents net payable/receivable
+ */
+
+import { supabase } from '@/integrations/supabase/client';
+
+export type TransactionType = 
+  | 'salary_settlement'    // Debit: Salary Expense, Credit: Staff Payable
+  | 'salary_payout'        // Debit: Staff Payable, Credit: Bank/Cash
+  | 'expense_approval'     // Debit: Expense Head, Credit: Staff Payable
+  | 'expense_payout'       // Debit: Staff Payable, Credit: Bank/Cash
+  | 'advance_paid'         // Debit: Staff Advances (Receivable), Credit: Bank/Cash
+  | 'advance_adjustment';  // Debit: Salary Expense (adjusted), Credit: Staff Advances
+
+export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque';
+
+export type ExpenseCategory = 
+  | 'travel' 
+  | 'food' 
+  | 'logistics' 
+  | 'equipment' 
+  | 'office_supplies' 
+  | 'communication' 
+  | 'other';
+
+interface JournalLine {
+  accountCode: string;
+  debit: number;
+  credit: number;
+  staffId?: string;
+  description?: string;
+}
+
+interface CreateJournalEntryParams {
+  transactionType: TransactionType;
+  staffId: string;
+  description: string;
+  entryDate?: string;
+  referenceId?: string;
+  referenceType?: string;
+  createdBy: string;
+  lines: JournalLine[];
+  isImmutable?: boolean;
+}
+
+interface SalarySettlementParams {
+  staffId: string;
+  staffName: string;
+  settlementMonth: string;
+  grossSalary: number;
+  leaveDeduction: number;
+  advanceAdjustment: number;
+  settlementId: string;
+  createdBy: string;
+}
+
+interface SalaryPayoutParams {
+  staffId: string;
+  staffName: string;
+  settlementMonth: string;
+  netPayable: number;
+  paymentMode: PaymentMode;
+  settlementId: string;
+  paymentRequestId: string;
+  createdBy: string;
+}
+
+interface ExpenseApprovalParams {
+  staffId: string;
+  staffName: string;
+  expenseId: string;
+  amount: number;
+  category: ExpenseCategory;
+  description: string;
+  createdBy: string;
+}
+
+interface ExpensePayoutParams {
+  staffId: string;
+  staffName: string;
+  expenseId: string;
+  amount: number;
+  paymentMode: PaymentMode;
+  createdBy: string;
+}
+
+interface AdvancePaidParams {
+  staffId: string;
+  staffName: string;
+  amount: number;
+  paymentMode: PaymentMode;
+  paymentRequestId: string;
+  createdBy: string;
+}
+
+// Account code mapping
+const ACCOUNT_CODES = {
+  CASH: '1000',
+  BANK: '1100',
+  STAFF_ADVANCES: '1200',
+  STAFF_PAYABLE: '2000',
+  SALARY_EXPENSE: '5000',
+  TRAVEL_EXPENSE: '5100',
+  FOOD_EXPENSE: '5200',
+  LOGISTICS_EXPENSE: '5300',
+  EQUIPMENT_EXPENSE: '5400',
+  OFFICE_SUPPLIES_EXPENSE: '5500',
+  COMMUNICATION_EXPENSE: '5600',
+  OTHER_EXPENSE: '5700',
+};
+
+const EXPENSE_CATEGORY_TO_ACCOUNT: Record<ExpenseCategory, string> = {
+  travel: ACCOUNT_CODES.TRAVEL_EXPENSE,
+  food: ACCOUNT_CODES.FOOD_EXPENSE,
+  logistics: ACCOUNT_CODES.LOGISTICS_EXPENSE,
+  equipment: ACCOUNT_CODES.EQUIPMENT_EXPENSE,
+  office_supplies: ACCOUNT_CODES.OFFICE_SUPPLIES_EXPENSE,
+  communication: ACCOUNT_CODES.COMMUNICATION_EXPENSE,
+  other: ACCOUNT_CODES.OTHER_EXPENSE,
+};
+
+const PAYMENT_MODE_TO_ACCOUNT: Record<PaymentMode, string> = {
+  cash: ACCOUNT_CODES.CASH,
+  upi: ACCOUNT_CODES.BANK,
+  bank_transfer: ACCOUNT_CODES.BANK,
+  cheque: ACCOUNT_CODES.BANK,
+};
+
+/**
+ * Get account ID from account code
+ */
+async function getAccountId(code: string): Promise<string> {
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('id')
+    .eq('code', code)
+    .single();
+  
+  if (error || !data) {
+    throw new Error(`Account not found for code: ${code}`);
+  }
+  
+  return data.id;
+}
+
+/**
+ * Generate a unique reference number for a transaction type
+ */
+async function generateReferenceNo(transactionType: TransactionType): Promise<string> {
+  const { data, error } = await supabase
+    .rpc('generate_journal_ref', { _transaction_type: transactionType });
+  
+  if (error) {
+    throw new Error(`Failed to generate reference number: ${error.message}`);
+  }
+  
+  return data;
+}
+
+/**
+ * Validate that debits equal credits
+ */
+function validateBalance(lines: JournalLine[]): void {
+  const totalDebits = lines.reduce((sum, line) => sum + line.debit, 0);
+  const totalCredits = lines.reduce((sum, line) => sum + line.credit, 0);
+  
+  if (Math.abs(totalDebits - totalCredits) > 0.01) {
+    throw new Error(`Journal entry is unbalanced. Debits: ${totalDebits}, Credits: ${totalCredits}`);
+  }
+}
+
+/**
+ * Create a complete journal entry with all lines
+ */
+async function createJournalEntry(params: CreateJournalEntryParams): Promise<string> {
+  const { 
+    transactionType, 
+    staffId, 
+    description, 
+    entryDate = new Date().toISOString().split('T')[0],
+    referenceId,
+    referenceType,
+    createdBy,
+    lines,
+    isImmutable = false
+  } = params;
+
+  // Validate balance
+  validateBalance(lines);
+
+  // Generate reference number
+  const referenceNo = await generateReferenceNo(transactionType);
+
+  // Create journal entry header
+  const { data: journalEntry, error: journalError } = await supabase
+    .from('journal_entries')
+    .insert({
+      entry_date: entryDate,
+      reference_no: referenceNo,
+      description,
+      transaction_type: transactionType,
+      reference_id: referenceId,
+      reference_type: referenceType,
+      staff_id: staffId,
+      is_immutable: isImmutable,
+      created_by: createdBy,
+    })
+    .select()
+    .single();
+
+  if (journalError || !journalEntry) {
+    throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+  }
+
+  // Create journal lines
+  const lineInserts = await Promise.all(
+    lines.map(async (line) => ({
+      journal_entry_id: journalEntry.id,
+      account_id: await getAccountId(line.accountCode),
+      staff_id: line.staffId || null,
+      debit: line.debit,
+      credit: line.credit,
+      description: line.description || null,
+    }))
+  );
+
+  const { error: linesError } = await supabase
+    .from('journal_lines')
+    .insert(lineInserts);
+
+  if (linesError) {
+    // Rollback: delete the journal entry if lines fail
+    await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
+    throw new Error(`Failed to create journal lines: ${linesError.message}`);
+  }
+
+  return journalEntry.id;
+}
+
+/**
+ * SALARY SETTLEMENT
+ * 
+ * When salary is settled (accrual - no cash movement):
+ * 1. Debit: Salary Expense (P&L impact)
+ * 2. Credit: Staff Payable (creates liability to pay staff)
+ * 
+ * If there's an advance adjustment:
+ * 3. Debit: Staff Payable (reduce what we owe)
+ * 4. Credit: Staff Advances (reduce what staff owes)
+ */
+export async function createSalarySettlementEntry(params: SalarySettlementParams): Promise<string> {
+  const { 
+    staffId, 
+    staffName, 
+    settlementMonth, 
+    grossSalary, 
+    leaveDeduction,
+    advanceAdjustment, 
+    settlementId, 
+    createdBy 
+  } = params;
+
+  const netSalary = grossSalary - leaveDeduction;
+  const lines: JournalLine[] = [];
+
+  // Entry 1: Salary Expense Dr, Staff Payable Cr
+  if (netSalary > 0) {
+    lines.push({
+      accountCode: ACCOUNT_CODES.SALARY_EXPENSE,
+      debit: netSalary,
+      credit: 0,
+      description: `Salary expense for ${staffName} - ${settlementMonth}`,
+    });
+    
+    lines.push({
+      accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
+      debit: 0,
+      credit: netSalary,
+      staffId,
+      description: `Salary payable to ${staffName} - ${settlementMonth}`,
+    });
+  }
+
+  // Entry 2: Advance Adjustment (if any)
+  // Debit: Staff Payable (reduce liability)
+  // Credit: Staff Advances (reduce receivable)
+  if (advanceAdjustment > 0) {
+    lines.push({
+      accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
+      debit: advanceAdjustment,
+      credit: 0,
+      staffId,
+      description: `Advance adjustment against ${settlementMonth} salary`,
+    });
+    
+    lines.push({
+      accountCode: ACCOUNT_CODES.STAFF_ADVANCES,
+      debit: 0,
+      credit: advanceAdjustment,
+      staffId,
+      description: `Advance cleared for ${staffName}`,
+    });
+  }
+
+  if (lines.length === 0) {
+    throw new Error('No journal lines to create - salary is zero');
+  }
+
+  return createJournalEntry({
+    transactionType: 'salary_settlement',
+    staffId,
+    description: `Salary settlement for ${staffName} - ${settlementMonth}`,
+    referenceId: settlementId,
+    referenceType: 'settlement',
+    createdBy,
+    lines,
+    isImmutable: true,
+  });
+}
+
+/**
+ * SALARY PAYOUT
+ * 
+ * When salary is actually paid (cash movement):
+ * 1. Debit: Staff Payable (clear liability)
+ * 2. Credit: Bank/Cash (money goes out)
+ * 
+ * After this entry, staff balance should be ZERO
+ */
+export async function createSalaryPayoutEntry(params: SalaryPayoutParams): Promise<string> {
+  const { 
+    staffId, 
+    staffName, 
+    settlementMonth, 
+    netPayable, 
+    paymentMode, 
+    settlementId,
+    paymentRequestId,
+    createdBy 
+  } = params;
+
+  if (netPayable <= 0) {
+    throw new Error('Net payable must be greater than zero for payout');
+  }
+
+  const paymentAccountCode = PAYMENT_MODE_TO_ACCOUNT[paymentMode];
+
+  const lines: JournalLine[] = [
+    {
+      accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
+      debit: netPayable,
+      credit: 0,
+      staffId,
+      description: `Salary payment to ${staffName} - ${settlementMonth}`,
+    },
+    {
+      accountCode: paymentAccountCode,
+      debit: 0,
+      credit: netPayable,
+      description: `Paid via ${paymentMode.replace('_', ' ')}`,
+    },
+  ];
+
+  return createJournalEntry({
+    transactionType: 'salary_payout',
+    staffId,
+    description: `Salary paid to ${staffName} - ${settlementMonth}`,
+    referenceId: paymentRequestId,
+    referenceType: 'payment_request',
+    createdBy,
+    lines,
+    isImmutable: true,
+  });
+}
+
+/**
+ * EXPENSE APPROVAL
+ * 
+ * When an expense is approved (creates payable to staff):
+ * 1. Debit: Expense Account (based on category)
+ * 2. Credit: Staff Payable (we owe staff this amount)
+ */
+export async function createExpenseApprovalEntry(params: ExpenseApprovalParams): Promise<string> {
+  const { 
+    staffId, 
+    staffName, 
+    expenseId, 
+    amount, 
+    category, 
+    description, 
+    createdBy 
+  } = params;
+
+  const expenseAccountCode = EXPENSE_CATEGORY_TO_ACCOUNT[category];
+
+  const lines: JournalLine[] = [
+    {
+      accountCode: expenseAccountCode,
+      debit: amount,
+      credit: 0,
+      description: `${category.replace('_', ' ')} expense - ${description}`,
+    },
+    {
+      accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
+      debit: 0,
+      credit: amount,
+      staffId,
+      description: `Expense reimbursement payable to ${staffName}`,
+    },
+  ];
+
+  return createJournalEntry({
+    transactionType: 'expense_approval',
+    staffId,
+    description: `Expense approved: ${description}`,
+    referenceId: expenseId,
+    referenceType: 'expense',
+    createdBy,
+    lines,
+    isImmutable: false, // Can be modified until paid
+  });
+}
+
+/**
+ * EXPENSE PAYOUT
+ * 
+ * When expense is reimbursed (cash movement):
+ * 1. Debit: Staff Payable (clear liability)
+ * 2. Credit: Bank/Cash (money goes out)
+ */
+export async function createExpensePayoutEntry(params: ExpensePayoutParams): Promise<string> {
+  const { 
+    staffId, 
+    staffName, 
+    expenseId, 
+    amount, 
+    paymentMode, 
+    createdBy 
+  } = params;
+
+  const paymentAccountCode = PAYMENT_MODE_TO_ACCOUNT[paymentMode];
+
+  const lines: JournalLine[] = [
+    {
+      accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
+      debit: amount,
+      credit: 0,
+      staffId,
+      description: `Expense reimbursed to ${staffName}`,
+    },
+    {
+      accountCode: paymentAccountCode,
+      debit: 0,
+      credit: amount,
+      description: `Paid via ${paymentMode.replace('_', ' ')}`,
+    },
+  ];
+
+  return createJournalEntry({
+    transactionType: 'expense_payout',
+    staffId,
+    description: `Expense reimbursed to ${staffName}`,
+    referenceId: expenseId,
+    referenceType: 'expense',
+    createdBy,
+    lines,
+    isImmutable: true,
+  });
+}
+
+/**
+ * ADVANCE PAID
+ * 
+ * When an advance is given to staff:
+ * 1. Debit: Staff Advances (staff owes us)
+ * 2. Credit: Bank/Cash (money goes out)
+ */
+export async function createAdvancePaidEntry(params: AdvancePaidParams): Promise<string> {
+  const { 
+    staffId, 
+    staffName, 
+    amount, 
+    paymentMode, 
+    paymentRequestId,
+    createdBy 
+  } = params;
+
+  const paymentAccountCode = PAYMENT_MODE_TO_ACCOUNT[paymentMode];
+
+  const lines: JournalLine[] = [
+    {
+      accountCode: ACCOUNT_CODES.STAFF_ADVANCES,
+      debit: amount,
+      credit: 0,
+      staffId,
+      description: `Advance paid to ${staffName}`,
+    },
+    {
+      accountCode: paymentAccountCode,
+      debit: 0,
+      credit: amount,
+      description: `Paid via ${paymentMode.replace('_', ' ')}`,
+    },
+  ];
+
+  return createJournalEntry({
+    transactionType: 'advance_paid',
+    staffId,
+    description: `Advance paid to ${staffName}`,
+    referenceId: paymentRequestId,
+    referenceType: 'payment_request',
+    createdBy,
+    lines,
+    isImmutable: true,
+  });
+}
+
+/**
+ * Get staff balance from journal entries
+ * 
+ * Returns the net payable/receivable for a staff member:
+ * - Positive = Company owes staff (payable)
+ * - Negative = Staff owes company (receivable)
+ */
+export async function getStaffJournalBalance(staffId: string): Promise<number> {
+  const { data, error } = await supabase
+    .rpc('get_staff_journal_balance', { _staff_id: staffId });
+  
+  if (error) {
+    throw new Error(`Failed to get staff balance: ${error.message}`);
+  }
+  
+  return Number(data) || 0;
+}
+
+/**
+ * Get all journal entries for a staff member
+ */
+export async function getStaffJournalEntries(staffId: string) {
+  const { data, error } = await supabase
+    .from('journal_entries')
+    .select(`
+      *,
+      lines:journal_lines(
+        *,
+        account:account_id(code, name, account_type)
+      )
+    `)
+    .eq('staff_id', staffId)
+    .order('entry_date', { ascending: true })
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to get journal entries: ${error.message}`);
+  }
+
+  return data;
+}
+
+/**
+ * Get staff-specific lines with running balance
+ * This is what should be displayed in the staff ledger view
+ */
+export async function getStaffLedgerFromJournals(staffId: string) {
+  const { data, error } = await supabase
+    .from('journal_lines')
+    .select(`
+      id,
+      debit,
+      credit,
+      description,
+      created_at,
+      staff_id,
+      journal_entry:journal_entry_id(
+        id,
+        entry_date,
+        reference_no,
+        description,
+        transaction_type,
+        is_legacy,
+        is_immutable
+      ),
+      account:account_id(
+        code,
+        name,
+        account_type
+      )
+    `)
+    .eq('staff_id', staffId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    throw new Error(`Failed to get staff ledger: ${error.message}`);
+  }
+
+  // Calculate running balance
+  let runningBalance = 0;
+  return (data || []).map(line => {
+    // For staff ledger: Credit increases balance (we owe them), Debit decreases (they owe us)
+    runningBalance += Number(line.credit) - Number(line.debit);
+    return {
+      ...line,
+      running_balance: runningBalance,
+    };
+  });
+}

@@ -37,6 +37,11 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
+import { 
+  createSalaryPayoutEntry, 
+  createAdvancePaidEntry,
+  createExpensePayoutEntry 
+} from '@/lib/journal-entries';
 import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 
@@ -161,54 +166,78 @@ export default function Payouts() {
 
     setIsProcessing(true);
     try {
-      let voucherType: VoucherType;
-      let tag: string;
-      let debit = 0;
-      let credit = 0;
+      let journalEntryId: string;
 
-      if (selectedItem.type === 'expense') {
-        voucherType = 'expense';
-        tag = 'expense';
-        credit = selectedItem.amount; // Reimbursement is credit
+      // ========================================
+      // DOUBLE-ENTRY ACCOUNTING: PAYOUT ENTRIES
+      // ========================================
+      // All payouts follow the same pattern:
+      // - Debit: Staff Payable / Staff Advances (clear liability/reduce receivable)
+      // - Credit: Bank/Cash (money goes out)
+      // 
+      // This ensures staff balance goes to ZERO after payout
+
+      if (selectedItem.type === 'salary') {
+        // SALARY PAYOUT
+        // Debit: Staff Payable (clear the liability created during settlement)
+        // Credit: Bank/Cash (money out)
+        
+        // Extract month from description (format: "Salary for MMMM yyyy")
+        const monthMatch = selectedItem.description.match(/Salary for (.+)/);
+        const settlementMonth = monthMatch ? monthMatch[1] : format(new Date(), 'MMMM yyyy');
+
+        journalEntryId = await createSalaryPayoutEntry({
+          staffId: selectedItem.staffId,
+          staffName: selectedItem.staffName,
+          settlementMonth,
+          netPayable: selectedItem.amount,
+          paymentMode,
+          settlementId: selectedItem.settlementId || '',
+          paymentRequestId: selectedItem.id,
+          createdBy: user.id,
+        });
+
+        // Update salary settlement with payout journal entry
+        if (selectedItem.settlementId) {
+          await supabase
+            .from('salary_settlements')
+            .update({
+              paid_at: new Date().toISOString(),
+              paid_by: user.id,
+              payment_mode: paymentMode,
+              payout_journal_entry_id: journalEntryId,
+            })
+            .eq('id', selectedItem.settlementId);
+        }
+
       } else if (selectedItem.type === 'advance') {
-        voucherType = 'advance';
-        tag = 'advance';
-        debit = selectedItem.amount; // Advance is debit (staff owes)
+        // ADVANCE PAYOUT
+        // Debit: Staff Advances (staff now owes us this amount)
+        // Credit: Bank/Cash (money out)
+        
+        journalEntryId = await createAdvancePaidEntry({
+          staffId: selectedItem.staffId,
+          staffName: selectedItem.staffName,
+          amount: selectedItem.amount,
+          paymentMode,
+          paymentRequestId: selectedItem.id,
+          createdBy: user.id,
+        });
+
       } else {
-        // salary payout
-        voucherType = 'settlement';
-        tag = 'salary';
-        credit = selectedItem.amount; // Salary payment is credit
+        // EXPENSE PAYOUT
+        // Debit: Staff Payable (clear the liability created during approval)
+        // Credit: Bank/Cash (money out)
+        
+        journalEntryId = await createExpensePayoutEntry({
+          staffId: selectedItem.staffId,
+          staffName: selectedItem.staffName,
+          expenseId: selectedItem.id,
+          amount: selectedItem.amount,
+          paymentMode,
+          createdBy: user.id,
+        });
       }
-
-      // Generate voucher number
-      const { data: voucherNo, error: voucherError } = await supabase
-        .rpc('generate_voucher_no', { _voucher_type: voucherType });
-
-      if (voucherError) throw voucherError;
-
-      // Create ledger entry (THIS is where ledger entry is created for salary!)
-      const { data: ledgerEntry, error: ledgerError } = await supabase
-        .from('ledger_entries')
-        .insert({
-          staff_id: selectedItem.staffId,
-          voucher_type: voucherType,
-          voucher_no: voucherNo,
-          entry_date: new Date().toISOString().split('T')[0],
-          description: selectedItem.description,
-          debit,
-          credit,
-          tag,
-          reference_month: selectedItem.referenceMonth || null,
-          payment_mode: paymentMode,
-          paid_by: user.id,
-          is_immutable: true,
-          created_by: user.id,
-        })
-        .select()
-        .single();
-
-      if (ledgerError) throw ledgerError;
 
       // Update the source record based on type
       if (selectedItem.type === 'expense') {
@@ -218,40 +247,23 @@ export default function Payouts() {
             status: 'reimbursed',
             reimbursed_at: new Date().toISOString(),
             reimbursed_by: user.id,
-            ledger_entry_id: ledgerEntry.id,
+            ledger_entry_id: journalEntryId, // Now points to journal entry
           })
           .eq('id', selectedItem.id);
 
         if (updateError) throw updateError;
       } else if (selectedItem.type === 'advance' || selectedItem.type === 'salary') {
-        // Mark request as paid
+        // Mark payment request as paid
         const { error: updateError } = await supabase
           .from('payment_requests')
           .update({
             paid_at: new Date().toISOString(),
             paid_by: user.id,
-            ledger_entry_id: ledgerEntry.id,
+            ledger_entry_id: journalEntryId,
           })
           .eq('id', selectedItem.id);
 
         if (updateError) throw updateError;
-
-        // For salary payouts, also update the settlement record
-        if (selectedItem.type === 'salary' && selectedItem.settlementId) {
-          const { error: settlementError } = await supabase
-            .from('salary_settlements')
-            .update({
-              paid_at: new Date().toISOString(),
-              paid_by: user.id,
-              payment_mode: paymentMode,
-              ledger_entry_id: ledgerEntry.id,
-            })
-            .eq('id', selectedItem.settlementId);
-
-          if (settlementError) {
-            console.error('Error updating settlement:', settlementError);
-          }
-        }
       }
 
       // Notify the staff member
@@ -273,14 +285,14 @@ export default function Payouts() {
           _title: typeLabel,
           _message: message,
           _type: 'success',
-          _reference_type: 'ledger_entry',
-          _reference_id: ledgerEntry.id,
+          _reference_type: 'journal_entry',
+          _reference_id: journalEntryId,
         });
       }
 
       toast({
         title: 'Payout Successful',
-        description: `₹${selectedItem.amount.toLocaleString('en-IN')} paid to ${selectedItem.staffName}.`,
+        description: `₹${selectedItem.amount.toLocaleString('en-IN')} paid to ${selectedItem.staffName}. Balance cleared.`,
       });
 
       setSelectedItem(null);
