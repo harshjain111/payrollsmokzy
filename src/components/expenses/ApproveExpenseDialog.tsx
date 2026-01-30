@@ -35,11 +35,13 @@ export function ApproveExpenseDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleApprove = async () => {
-    // Prevent self-approval - cannot approve own expense submissions
-    if (expense.created_by === user?.id) {
+    // Prevent self-approval - cannot approve expense where YOU are the beneficiary (staff)
+    // This checks if the approver's user_id matches the staff's user_id, not who created it
+    // Owners/Admins CAN approve expenses they created on behalf of other staff
+    if (expense.staff?.user_id === user?.id) {
       toast({
         title: 'Cannot approve',
-        description: 'You cannot approve your own expense submissions.',
+        description: 'You cannot approve expenses where you are the beneficiary.',
         variant: 'destructive',
       });
       onOpenChange(false);
