@@ -197,6 +197,7 @@ async function createJournalEntry(params: CreateJournalEntryParams): Promise<str
   const referenceNo = await generateReferenceNo(transactionType);
 
   // Create journal entry header
+  // Note: Empty string for UUID must be converted to null
   const { data: journalEntry, error: journalError } = await supabase
     .from('journal_entries')
     .insert({
@@ -204,8 +205,8 @@ async function createJournalEntry(params: CreateJournalEntryParams): Promise<str
       reference_no: referenceNo,
       description,
       transaction_type: transactionType,
-      reference_id: referenceId,
-      reference_type: referenceType,
+      reference_id: referenceId || null, // Convert empty string to null
+      reference_type: referenceType || null,
       staff_id: staffId,
       is_immutable: isImmutable,
       created_by: createdBy,
