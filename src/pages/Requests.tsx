@@ -31,6 +31,7 @@ import { Plus, ClipboardList, Check, X, Loader2, ArrowRight } from 'lucide-react
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
+import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
 
 interface RequestWithStaff extends PaymentRequest {
   staff: StaffPublic;
@@ -159,6 +160,10 @@ export default function Requests() {
       }
 
       toast.success('Request approved - now available in Payouts');
+      
+      // Immediately update notification counts
+      refetchNotificationCounts();
+      
       fetchRequests();
     } catch (error) {
       console.error('Error approving request:', error);
@@ -199,6 +204,10 @@ export default function Requests() {
       }
 
       toast.success('Request rejected');
+      
+      // Immediately update notification counts
+      refetchNotificationCounts();
+      
       setRejectionReason('');
       fetchRequests();
     } catch (error) {
