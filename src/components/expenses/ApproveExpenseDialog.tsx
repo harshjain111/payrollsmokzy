@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Amount } from '@/components/ui/amount';
+import { createExpenseApprovalEntry } from '@/lib/journal-entries';
 import type { Expense } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
@@ -45,14 +46,38 @@ export function ApproveExpenseDialog({
       return;
     }
 
+    if (!user?.id) return;
+
     try {
       setIsSubmitting(true);
 
+      // ========================================
+      // DOUBLE-ENTRY ACCOUNTING: EXPENSE APPROVAL
+      // ========================================
+      // When an expense is approved (creates payable to staff):
+      // 1. Debit: Expense Account (based on category)
+      // 2. Credit: Staff Payable (we owe staff this amount)
+      //
+      // The actual payout will create another entry:
+      // 1. Debit: Staff Payable (clear liability)
+      // 2. Credit: Bank/Cash (money out)
+
+      const journalEntryId = await createExpenseApprovalEntry({
+        staffId: expense.staff_id,
+        staffName: expense.staff?.full_name || 'Staff',
+        expenseId: expense.id,
+        amount: expense.amount,
+        category: expense.category,
+        description: expense.description,
+        createdBy: user.id,
+      });
+
+      // Update expense status and link to journal entry
       const { error } = await supabase
         .from('expenses')
         .update({
           status: 'approved',
-          approved_by: user?.id,
+          approved_by: user.id,
           approved_at: new Date().toISOString(),
         })
         .eq('id', expense.id);
@@ -92,7 +117,7 @@ export function ApproveExpenseDialog({
 
       toast({
         title: 'Expense approved',
-        description: 'The expense has been approved for reimbursement.',
+        description: 'The expense has been approved for reimbursement. Journal entry created.',
       });
 
       // Immediately update notification counts
@@ -100,11 +125,11 @@ export function ApproveExpenseDialog({
 
       onOpenChange(false);
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error approving expense:', error);
       toast({
         title: 'Error',
-        description: 'Failed to approve expense. Please try again.',
+        description: error.message || 'Failed to approve expense. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -130,7 +155,7 @@ export function ApproveExpenseDialog({
                 </p>
               </div>
               <p className="text-sm text-muted-foreground">
-                Once approved, the accountant can proceed with reimbursement.
+                This will create a journal entry recording the expense and staff payable.
               </p>
             </div>
           </AlertDialogDescription>

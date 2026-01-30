@@ -74,6 +74,62 @@ export interface LedgerEntry {
   created_by?: string;
 }
 
+// ========================================
+// DOUBLE-ENTRY ACCOUNTING TYPES
+// ========================================
+
+export type TransactionType = 
+  | 'salary_settlement'
+  | 'salary_payout'
+  | 'expense_approval'
+  | 'expense_payout'
+  | 'advance_paid'
+  | 'advance_adjustment';
+
+export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+
+export interface Account {
+  id: string;
+  code: string;
+  name: string;
+  account_type: AccountType;
+  parent_id?: string;
+  is_system: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface JournalEntry {
+  id: string;
+  entry_date: string;
+  reference_no: string;
+  description: string;
+  transaction_type: TransactionType;
+  reference_id?: string;
+  reference_type?: string;
+  staff_id?: string;
+  is_immutable: boolean;
+  is_legacy: boolean;
+  created_by?: string;
+  created_at: string;
+  lines?: JournalLine[];
+}
+
+export interface JournalLine {
+  id: string;
+  journal_entry_id: string;
+  account_id: string;
+  staff_id?: string;
+  debit: number;
+  credit: number;
+  description?: string;
+  created_at: string;
+  running_balance?: number;
+  journal_entry?: JournalEntry;
+  account?: Account;
+}
+
 export interface PaymentRequest {
   id: string;
   staff_id: string;

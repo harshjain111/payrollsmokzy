@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          account_type: string
+          code: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name: string
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_type: string
+          code: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_type?: string
+          code?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_system?: boolean
+          name?: string
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_parent_id_fkey"
+            columns: ["parent_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -135,6 +179,128 @@ export type Database = {
           },
         ]
       }
+      journal_entries: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string
+          entry_date: string
+          id: string
+          is_immutable: boolean
+          is_legacy: boolean
+          reference_id: string | null
+          reference_no: string
+          reference_type: string | null
+          staff_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description: string
+          entry_date?: string
+          id?: string
+          is_immutable?: boolean
+          is_legacy?: boolean
+          reference_id?: string | null
+          reference_no: string
+          reference_type?: string | null
+          staff_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          entry_date?: string
+          id?: string
+          is_immutable?: boolean
+          is_legacy?: boolean
+          reference_id?: string | null
+          reference_no?: string
+          reference_type?: string | null
+          staff_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      journal_lines: {
+        Row: {
+          account_id: string
+          created_at: string
+          credit: number
+          debit: number
+          description: string | null
+          id: string
+          journal_entry_id: string
+          staff_id: string | null
+        }
+        Insert: {
+          account_id: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id: string
+          staff_id?: string | null
+        }
+        Update: {
+          account_id?: string
+          created_at?: string
+          credit?: number
+          debit?: number
+          description?: string | null
+          id?: string
+          journal_entry_id?: string
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "journal_lines_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_entries: {
         Row: {
           approved_by: string | null
@@ -146,6 +312,7 @@ export type Database = {
           entry_date: string
           id: string
           is_immutable: boolean | null
+          is_legacy: boolean | null
           paid_by: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode"] | null
           reference_month: string | null
@@ -166,6 +333,7 @@ export type Database = {
           entry_date?: string
           id?: string
           is_immutable?: boolean | null
+          is_legacy?: boolean | null
           paid_by?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
           reference_month?: string | null
@@ -186,6 +354,7 @@ export type Database = {
           entry_date?: string
           id?: string
           is_immutable?: boolean | null
+          is_legacy?: boolean | null
           paid_by?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode"] | null
           reference_month?: string | null
@@ -392,6 +561,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          journal_entry_id: string | null
           leave_days: number | null
           leave_deduction: number | null
           ledger_entry_id: string | null
@@ -400,6 +570,7 @@ export type Database = {
           paid_at: string | null
           paid_by: string | null
           payment_mode: string | null
+          payout_journal_entry_id: string | null
           settled_at: string | null
           settled_by: string | null
           settlement_month: string
@@ -415,6 +586,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           leave_days?: number | null
           leave_deduction?: number | null
           ledger_entry_id?: string | null
@@ -423,6 +595,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           payment_mode?: string | null
+          payout_journal_entry_id?: string | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month: string
@@ -438,6 +611,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          journal_entry_id?: string | null
           leave_days?: number | null
           leave_deduction?: number | null
           ledger_entry_id?: string | null
@@ -446,6 +620,7 @@ export type Database = {
           paid_at?: string | null
           paid_by?: string | null
           payment_mode?: string | null
+          payout_journal_entry_id?: string | null
           settled_at?: string | null
           settled_by?: string | null
           settlement_month?: string
@@ -455,10 +630,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "salary_settlements_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "salary_settlements_ledger_entry_id_fkey"
             columns: ["ledger_entry_id"]
             isOneToOne: false
             referencedRelation: "ledger_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_settlements_payout_journal_entry_id_fkey"
+            columns: ["payout_journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
             referencedColumns: ["id"]
           },
           {
@@ -620,14 +809,31 @@ export type Database = {
         }
         Returns: string
       }
+      generate_journal_ref: {
+        Args: { _transaction_type: string }
+        Returns: string
+      }
       generate_voucher_no: {
         Args: { _voucher_type: Database["public"]["Enums"]["voucher_type"] }
         Returns: string
       }
+      get_account_id: { Args: { _code: string }; Returns: string }
       get_advances_outstanding: { Args: { _staff_id: string }; Returns: number }
+      get_expense_account_code: {
+        Args: { _category: Database["public"]["Enums"]["expense_category"] }
+        Returns: string
+      }
+      get_payment_account_code: {
+        Args: { _payment_mode: Database["public"]["Enums"]["payment_mode"] }
+        Returns: string
+      }
       get_reconciliation_status: {
         Args: { _month: string; _staff_id: string }
         Returns: Json
+      }
+      get_staff_journal_balance: {
+        Args: { _staff_id: string }
+        Returns: number
       }
       get_staff_salary_for_month: {
         Args: { _month: string; _staff_id: string }

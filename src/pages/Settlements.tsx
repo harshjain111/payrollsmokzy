@@ -24,6 +24,7 @@ import { toast } from '@/hooks/use-toast';
 import { EnhancedSettlementConfirmDialog } from '@/components/settlements/EnhancedSettlementConfirmDialog';
 import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentConfirmDialog';
 import { AdvanceAdjustmentInput } from '@/components/settlements/AdvanceAdjustmentInput';
+import { createSalarySettlementEntry } from '@/lib/journal-entries';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
@@ -284,7 +285,7 @@ export default function Settlements() {
   };
 
   const handleSettle = async () => {
-    if (!calculation || !selectedStaffId || !selectedMonth) return;
+    if (!calculation || !selectedStaffId || !selectedMonth || !user?.id) return;
 
     if (isAlreadySettled) {
       toast({
@@ -295,11 +296,35 @@ export default function Settlements() {
       return;
     }
 
+    const staffName = selectedStaff?.full_name || 'Unknown';
+    const monthLabel = format(new Date(selectedMonth + '-01'), 'MMMM yyyy');
+
     try {
       setIsSettling(true);
 
-      // Step 1: Create IMMUTABLE settlement record (calculation & locking ONLY)
-      // NO ledger entry at this stage - ledger entry created only when salary is PAID
+      // ========================================
+      // DOUBLE-ENTRY ACCOUNTING: SALARY SETTLEMENT
+      // ========================================
+      // This creates the ACCRUAL entries (no cash movement):
+      // 1. Debit: Salary Expense (P&L)
+      // 2. Credit: Staff Payable (creates liability)
+      // 3. If advance adjustment:
+      //    - Debit: Staff Payable (reduce liability)
+      //    - Credit: Staff Advances (reduce receivable)
+      
+      // Step 1: Create journal entry for salary settlement
+      const journalEntryId = await createSalarySettlementEntry({
+        staffId: selectedStaffId,
+        staffName,
+        settlementMonth: monthLabel,
+        grossSalary: calculation.grossSalary,
+        leaveDeduction: calculation.leaveDeduction,
+        advanceAdjustment: calculation.advanceToAdjust,
+        settlementId: '', // Will be updated after settlement record is created
+        createdBy: user.id,
+      });
+
+      // Step 2: Create settlement record linking to journal entry
       const { data: settlementRecord, error: settlementError } = await supabase
         .from('salary_settlements')
         .insert({
@@ -313,52 +338,44 @@ export default function Settlements() {
           opening_advance_balance: calculation.advancesOutstanding,
           closing_advance_balance: calculation.carryForwardAdvance,
           balance_payable: calculation.netPayable,
-          status: 'settled', // Calculation is locked
+          status: 'settled',
           settled_at: new Date().toISOString(),
-          settled_by: user?.id,
-          ledger_entry_id: null, // NO ledger entry yet - created on payout
-          created_by: user?.id,
+          settled_by: user.id,
+          journal_entry_id: journalEntryId, // Link to double-entry journal
+          created_by: user.id,
         })
         .select()
         .single();
 
       if (settlementError) throw settlementError;
 
-      // Step 2: Create advance adjustment ledger entry ONLY if advance was adjusted
-      // This is separate from salary payout and happens immediately
-      if (calculation.advanceToAdjust > 0) {
-        const { data: adjustVoucher } = await supabase
-          .rpc('generate_voucher_no', { _voucher_type: 'journal' });
+      // Step 3: Update journal entry with settlement reference
+      await supabase
+        .from('journal_entries')
+        .update({ reference_id: settlementRecord.id })
+        .eq('id', journalEntryId);
 
-        await supabase
-          .from('ledger_entries')
-          .insert({
-            staff_id: selectedStaffId,
-            voucher_type: 'journal',
-            voucher_no: adjustVoucher,
-            entry_date: new Date().toISOString().split('T')[0],
-            description: `Advance adjustment against ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} salary`,
-            debit: 0,
-            credit: calculation.advanceToAdjust,
-            tag: 'advance',
-            reference_month: selectedMonth,
-            is_immutable: true,
-            created_by: user?.id,
-          });
-      }
+      // Step 4: Mark journal entry as immutable
+      await supabase
+        .from('journal_entries')
+        .update({ is_immutable: true })
+        .eq('id', journalEntryId);
 
-      // Step 3: Auto-create salary payout request (if net payable > 0)
-      // This request will appear in Payouts page for Owner to execute
+      // Step 5: Create salary payout request (if net payable > 0)
+      // This will appear in Payouts page for Owner to execute
+      // The PAYOUT will create the second journal entry:
+      // - Debit: Staff Payable (clear liability)
+      // - Credit: Bank/Cash (money out)
       if (calculation.netPayable > 0) {
         const { error: payoutRequestError } = await supabase
           .from('payment_requests')
           .insert({
             staff_id: selectedStaffId,
-            requested_by: user?.id,
+            requested_by: user.id,
             amount: calculation.netPayable,
-            reason: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`,
-            status: 'approved', // Pre-approved since owner created it
-            approved_by: user?.id,
+            reason: `Salary for ${monthLabel}`,
+            status: 'approved',
+            approved_by: user.id,
             approved_at: new Date().toISOString(),
             payout_type: 'salary',
             settlement_id: settlementRecord.id,
@@ -369,7 +386,7 @@ export default function Settlements() {
 
       toast({
         title: 'Salary Settled',
-        description: `Salary for ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')} has been locked. Go to Payouts to execute payment.`,
+        description: `Salary for ${monthLabel} has been recorded. ${calculation.netPayable > 0 ? 'Go to Payouts to execute payment.' : ''}`,
       });
 
       // Reset form
@@ -381,8 +398,10 @@ export default function Settlements() {
       setShowConfirmDialog(false);
       setShowZeroPaymentDialog(false);
       
-      // Navigate to payouts
-      navigate('/payouts');
+      // Navigate to payouts if there's something to pay
+      if (calculation.netPayable > 0) {
+        navigate('/payouts');
+      }
     } catch (error: any) {
       console.error('Error settling salary:', error);
       toast({
