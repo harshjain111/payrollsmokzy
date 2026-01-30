@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { Amount } from '@/components/ui/amount';
 import type { Expense } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
+import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
 
 interface ApproveExpenseDialogProps {
   expense: Expense;
@@ -93,6 +94,9 @@ export function ApproveExpenseDialog({
         title: 'Expense approved',
         description: 'The expense has been approved for reimbursement.',
       });
+
+      // Immediately update notification counts
+      refetchNotificationCounts();
 
       onOpenChange(false);
       onSuccess();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -7,6 +7,15 @@ interface NotificationCounts {
   pendingExpenses: number;
   approvedExpenses: number;
   unreadNotifications: number;
+}
+
+// Global refetch trigger for notification counts
+let globalRefetch: (() => void) | null = null;
+
+export function refetchNotificationCounts() {
+  if (globalRefetch) {
+    globalRefetch();
+  }
 }
 
 export function useNotificationCounts() {
@@ -18,56 +27,7 @@ export function useNotificationCounts() {
     unreadNotifications: 0,
   });
 
-  useEffect(() => {
-    if (!user) return;
-    
-    fetchCounts();
-    
-    // Set up real-time subscription for notifications
-    const channel = supabase
-      .channel('notification-counts')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'notifications',
-          filter: `user_id=eq.${user.id}`,
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'payment_requests',
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'expenses',
-        },
-        () => {
-          fetchCounts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, userRole]);
-
-  const fetchCounts = async () => {
+  const fetchCounts = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -117,7 +77,64 @@ export function useNotificationCounts() {
     } catch (error) {
       console.error('Error fetching notification counts:', error);
     }
-  };
+  }, [user, isOwner, isAdmin, isAccountant]);
 
-  return counts;
+  // Register global refetch function
+  useEffect(() => {
+    globalRefetch = fetchCounts;
+    return () => {
+      globalRefetch = null;
+    };
+  }, [fetchCounts]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    fetchCounts();
+    
+    // Set up real-time subscription for notifications
+    const channel = supabase
+      .channel('notification-counts')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
+        },
+        () => {
+          fetchCounts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payment_requests',
+        },
+        () => {
+          fetchCounts();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'expenses',
+        },
+        () => {
+          fetchCounts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, userRole, fetchCounts]);
+
+  return { counts, refetch: fetchCounts };
 }

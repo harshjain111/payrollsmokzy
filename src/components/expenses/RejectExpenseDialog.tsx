@@ -16,6 +16,7 @@ import { toast } from '@/hooks/use-toast';
 import { Amount } from '@/components/ui/amount';
 import type { Expense } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
+import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
 
 interface RejectExpenseDialogProps {
   expense: Expense;
@@ -86,6 +87,9 @@ export function RejectExpenseDialog({
         title: 'Expense rejected',
         description: 'The expense has been rejected.',
       });
+
+      // Immediately update notification counts
+      refetchNotificationCounts();
 
       setReason('');
       onOpenChange(false);

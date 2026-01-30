@@ -295,7 +295,7 @@ function AppSidebar() {
     }
   }, [location.pathname, isMobile, setOpenMobile]);
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts.counts);
 
   const handleSignOut = async () => {
     await signOut();
@@ -518,7 +518,7 @@ function AppHeader() {
   const isCollapsed = state === 'collapsed';
   const counts = useNotificationCounts();
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts.counts);
   const allItems = navSections.flatMap(s => s.items);
 
   const getInitials = (name: string) => {
