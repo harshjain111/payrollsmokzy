@@ -78,32 +78,32 @@ export default function UserForm() {
 
   const fetchUserData = async () => {
     try {
-      // Fetch user role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', id)
-        .single();
+      // Fetch user details via edge function (gets auth metadata + staff data)
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-user?user_id=${id}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.session?.access_token}`,
+          },
+        }
+      );
 
-      if (roleError) throw roleError;
+      const result = await response.json();
 
-      if (roleData) {
-        setRole(roleData.role as AppRole);
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to fetch user');
       }
 
-      // Fetch staff if linked
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('user_id', id)
-        .single();
-
-      if (staffData) {
-        setFullName(staffData.full_name);
-        setPhone(staffData.phone || '');
-        setEmail(staffData.email || '');
-        setLinkedStaffId(staffData.id);
-      }
+      const userData = result.user;
+      
+      setRole(userData.role as AppRole);
+      setFullName(userData.full_name || '');
+      setPhone(userData.phone || '');
+      setEmail(userData.email || '');
+      setLinkedStaffId(userData.staff_id);
     } catch (error) {
       console.error('Error fetching user:', error);
       toast({
