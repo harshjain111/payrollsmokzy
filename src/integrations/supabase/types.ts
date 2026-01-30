@@ -831,13 +831,32 @@ export type Database = {
         Args: { _month: string; _staff_id: string }
         Returns: Json
       }
+      get_staff_advances_from_journals: {
+        Args: { _staff_id: string }
+        Returns: number
+      }
       get_staff_journal_balance: {
+        Args: { _staff_id: string }
+        Returns: number
+      }
+      get_staff_payable_from_journals: {
         Args: { _staff_id: string }
         Returns: number
       }
       get_staff_salary_for_month: {
         Args: { _month: string; _staff_id: string }
         Returns: number
+      }
+      get_trial_balance: {
+        Args: never
+        Returns: {
+          account_code: string
+          account_name: string
+          account_type: string
+          balance: number
+          total_credit: number
+          total_debit: number
+        }[]
       }
       get_user_staff_id: { Args: { _user_id: string }; Returns: string }
       get_working_days_in_month: { Args: { _month: string }; Returns: number }

@@ -181,8 +181,9 @@ export default function Settlements() {
 
       if (salaryError) throw salaryError;
 
+      // SAFEGUARD 4: Use journal_lines as single source of truth for advances
       const { data: advanceData, error: advanceError } = await supabase
-        .rpc('get_advances_outstanding', {
+        .rpc('get_staff_advances_from_journals', {
           _staff_id: selectedStaffId,
         });
 
