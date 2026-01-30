@@ -107,9 +107,10 @@ export default function Requests() {
   };
 
   const handleApprove = async (request: RequestWithStaff) => {
-    // Prevent self-approval - Admin/Owner cannot approve their own requests
-    if (request.requested_by === user?.id) {
-      toast.error('You cannot approve your own requests');
+    // Prevent self-benefit approval - cannot approve requests where YOU are the beneficiary
+    // But you CAN approve requests you created on behalf of others
+    if (request.staff?.user_id === user?.id) {
+      toast.error('You cannot approve requests for yourself');
       return;
     }
 
