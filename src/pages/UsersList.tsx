@@ -46,13 +46,12 @@ interface UserWithRole {
   user_id: string;
   role: AppRole;
   created_at: string;
-  user_metadata?: {
-    full_name?: string;
-    phone?: string;
-  };
-  email?: string;
-  staff_id?: string;
-  staff_name?: string;
+  full_name: string | null;
+  phone: string | null;
+  email: string | null;
+  staff_id: string | null;
+  staff_name: string | null;
+  last_sign_in: string | null;
 }
 
 export default function UsersList() {
@@ -69,44 +68,39 @@ export default function UsersList() {
 
   const fetchUsers = async () => {
     try {
-      // Fetch user roles with staff info
-      const { data: rolesData, error: rolesError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .order('created_at', { ascending: false });
+      setIsLoading(true);
+      
+      // Get current session for auth header
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("Not authenticated");
+      }
 
-      if (rolesError) throw rolesError;
-
-      // Get staff info for users that are linked to staff
-      const { data: staffData } = await supabase
-        .from('staff')
-        .select('id, user_id, full_name, phone, email');
-
-      const staffMap = new Map(staffData?.map(s => [s.user_id, s]) || []);
-
-      const usersWithData: UserWithRole[] = (rolesData || []).map(role => {
-        const staff = staffMap.get(role.user_id);
-        return {
-          id: role.id,
-          user_id: role.user_id,
-          role: role.role as AppRole,
-          created_at: role.created_at,
-          user_metadata: {
-            full_name: staff?.full_name,
-            phone: staff?.phone,
+      // Call edge function to get users with auth metadata
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/list-users`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
           },
-          email: staff?.email,
-          staff_id: staff?.id,
-          staff_name: staff?.full_name,
-        };
-      });
+        }
+      );
 
-      setUsers(usersWithData);
-    } catch (error) {
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch users');
+      }
+
+      setUsers(data.users || []);
+    } catch (error: any) {
       console.error('Error fetching users:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load users.',
+        description: error.message || 'Failed to load users.',
         variant: 'destructive',
       });
     } finally {
@@ -115,8 +109,8 @@ export default function UsersList() {
   };
 
   const filteredUsers = users.filter(u =>
-    (u.user_metadata?.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (u.user_metadata?.phone || '').includes(searchQuery) ||
+    (u.full_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (u.phone || '').includes(searchQuery) ||
     (u.email || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -255,12 +249,12 @@ export default function UsersList() {
                         <div className="flex items-center gap-3">
                           <Avatar className="h-9 w-9">
                             <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                              {getInitials(user.user_metadata?.full_name)}
+                              {getInitials(user.full_name || undefined)}
                             </AvatarFallback>
                           </Avatar>
                           <div>
                             <p className="font-medium">
-                              {user.user_metadata?.full_name || 'Unknown'}
+                              {user.full_name || 'Unknown'}
                             </p>
                             <p className="text-sm text-muted-foreground">
                               {user.email || '-'}
@@ -269,7 +263,7 @@ export default function UsersList() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
-                        {user.user_metadata?.phone || '-'}
+                        {user.phone || '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={getRoleBadgeVariant(user.role)}>
@@ -327,7 +321,7 @@ export default function UsersList() {
                                     <AlertDialogTitle>Remove User Access</AlertDialogTitle>
                                     <AlertDialogDescription>
                                       Are you sure you want to remove access for{' '}
-                                      <strong>{user.user_metadata?.full_name || 'this user'}</strong>?
+                                      <strong>{user.full_name || 'this user'}</strong>?
                                       They will no longer be able to login.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
@@ -361,7 +355,7 @@ export default function UsersList() {
         open={!!resetPasswordUser}
         onOpenChange={(open) => !open && setResetPasswordUser(null)}
         userId={resetPasswordUser?.user_id || ''}
-        userName={resetPasswordUser?.user_metadata?.full_name || 'User'}
+        userName={resetPasswordUser?.full_name || 'User'}
         onSuccess={fetchUsers}
       />
     </div>
