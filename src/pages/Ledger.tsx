@@ -50,29 +50,70 @@ interface JournalLineWithDetails {
   } | null;
 }
 
+interface StaffBalance {
+  staffId: string;
+  staffName: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
 export default function Ledger() {
   const [searchParams] = useSearchParams();
   const { isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
   
   const [journalLines, setJournalLines] = useState<JournalLineWithDetails[]>([]);
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
+  const [staffBalances, setStaffBalances] = useState<StaffBalance[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string>(
     searchParams.get('staff') || 'all'
   );
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Calculate totals from journal lines (double-entry system)
+  // Calculate totals from journal lines - ONLY staff-side entries (staff_id IS NOT NULL)
   const totals = journalLines.reduce(
-    (acc, line) => ({
-      debit: acc.debit + Number(line.debit),
-      credit: acc.credit + Number(line.credit),
-    }),
+    (acc, line) => {
+      // Only include lines with staff_id for staff ledger view
+      if (line.staff_id) {
+        return {
+          debit: acc.debit + Number(line.debit),
+          credit: acc.credit + Number(line.credit),
+        };
+      }
+      return acc;
+    },
     { debit: 0, credit: 0 }
   );
 
-  // Staff balance = Credit - Debit (positive = we owe them)
-  const closingBalance = totals.credit - totals.debit;
+  // For "All Staff" view: calculate as SUM of individual staff balances
+  // For individual staff: use direct calculation
+  const closingBalance = selectedStaff === 'all' 
+    ? staffBalances.reduce((sum, sb) => sum + sb.balance, 0)
+    : totals.credit - totals.debit;
+
+  // Validation: ensure individual balances sum to aggregate
+  useEffect(() => {
+    if (selectedStaff === 'all' && staffBalances.length > 0) {
+      const sumOfIndividual = staffBalances.reduce((sum, sb) => sum + sb.balance, 0);
+      const directCalculation = totals.credit - totals.debit;
+      
+      // Allow small rounding difference
+      if (Math.abs(sumOfIndividual - directCalculation) > 0.01) {
+        console.error('Balance validation failed:', {
+          sumOfIndividual,
+          directCalculation,
+          difference: sumOfIndividual - directCalculation
+        });
+        setValidationError(`Balance mismatch: Individual sum (₹${sumOfIndividual.toLocaleString('en-IN')}) ≠ Aggregate (₹${directCalculation.toLocaleString('en-IN')})`);
+      } else {
+        setValidationError(null);
+      }
+    } else {
+      setValidationError(null);
+    }
+  }, [staffBalances, totals, selectedStaff]);
 
   useEffect(() => {
     fetchData();
@@ -80,6 +121,7 @@ export default function Ledger() {
 
   const fetchData = async () => {
     setIsLoading(true);
+    setValidationError(null);
     try {
       // Fetch staff list (for filter dropdown)
       if (isOwner || isAdmin || (isAccountant && accountingMode) || isCA) {
@@ -99,6 +141,7 @@ export default function Ledger() {
           staffIdFilter = staffData.id;
         } else {
           setJournalLines([]);
+          setStaffBalances([]);
           setIsLoading(false);
           return;
         }
@@ -106,7 +149,8 @@ export default function Ledger() {
         staffIdFilter = selectedStaff;
       }
 
-      // Fetch from journal_lines table (double-entry system)
+      // CRITICAL: Only fetch journal_lines WHERE staff_id IS NOT NULL
+      // This ensures we only see staff-side entries, not Bank/Cash/Expense accounts
       let query = supabase
         .from('journal_lines')
         .select(`
@@ -131,6 +175,7 @@ export default function Ledger() {
             account_type
           )
         `)
+        .not('staff_id', 'is', null) // CRITICAL: Exclude non-staff journal lines
         .order('created_at', { ascending: true });
 
       if (staffIdFilter) {
@@ -141,10 +186,40 @@ export default function Ledger() {
 
       if (linesError) throw linesError;
 
-      // Calculate running balance for staff-specific lines
+      // Calculate per-staff balances for validation and "All Staff" view
+      const staffBalanceMap = new Map<string, { debit: number; credit: number; name: string }>();
+      
+      (linesData || []).forEach(line => {
+        if (line.staff_id) {
+          const existing = staffBalanceMap.get(line.staff_id) || { debit: 0, credit: 0, name: '' };
+          staffBalanceMap.set(line.staff_id, {
+            debit: existing.debit + Number(line.debit),
+            credit: existing.credit + Number(line.credit),
+            name: existing.name // Will be filled from staff list
+          });
+        }
+      });
+
+      // Build staff balances array
+      const balances: StaffBalance[] = [];
+      staffBalanceMap.forEach((value, staffId) => {
+        const staffInfo = staffList.find(s => s.id === staffId);
+        balances.push({
+          staffId,
+          staffName: staffInfo?.full_name || 'Unknown',
+          debit: value.debit,
+          credit: value.credit,
+          balance: value.credit - value.debit
+        });
+      });
+      setStaffBalances(balances);
+
+      // Calculate running balance for display
       let runningBalance = 0;
       const linesWithBalance = (linesData || []).map(line => {
-        runningBalance += Number(line.credit) - Number(line.debit);
+        if (line.staff_id) {
+          runningBalance += Number(line.credit) - Number(line.debit);
+        }
         return { ...line, running_balance: runningBalance };
       }) as JournalLineWithDetails[];
 
@@ -250,6 +325,16 @@ export default function Ledger() {
         </CardContent>
       </Card>
 
+      {/* Validation Error Alert */}
+      {validationError && (
+        <Card className="rounded-xl border-destructive bg-destructive/10">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-destructive text-sm font-medium">⚠️ {validationError}</p>
+            <p className="text-destructive/80 text-xs mt-1">Please contact support - balance reconciliation failed.</p>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Summary Cards - Mobile Optimized */}
       <div className="grid gap-2 sm:gap-5 grid-cols-3">
         <Card className="rounded-xl sm:rounded-2xl shadow-card border-0 overflow-hidden">
@@ -260,7 +345,9 @@ export default function Ledger() {
                   <ArrowDownRight className="h-3 w-3 sm:h-5 sm:w-5 text-warning" />
                 </div>
               </div>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">Debits</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
+                {selectedStaff === 'all' ? 'Staff Debits' : 'Debits'}
+              </span>
               <span className="text-sm sm:text-xl font-bold font-mono truncate">
                 ₹{totals.debit.toLocaleString('en-IN')}
               </span>
@@ -276,7 +363,9 @@ export default function Ledger() {
                   <ArrowUpRight className="h-3 w-3 sm:h-5 sm:w-5 text-success" />
                 </div>
               </div>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">Credits</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
+                {selectedStaff === 'all' ? 'Staff Credits' : 'Credits'}
+              </span>
               <span className="text-sm sm:text-xl font-bold font-mono truncate">
                 ₹{totals.credit.toLocaleString('en-IN')}
               </span>
@@ -292,7 +381,9 @@ export default function Ledger() {
                   <Scale className={`h-3 w-3 sm:h-5 sm:w-5 ${closingBalance >= 0 ? 'text-primary' : 'text-destructive'}`} />
                 </div>
               </div>
-              <span className="text-[10px] sm:text-xs text-muted-foreground">Balance</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">
+                {selectedStaff === 'all' ? 'Net Outstanding' : 'Balance'}
+              </span>
               <span className={`text-sm sm:text-xl font-bold font-mono truncate ${closingBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                 ₹{Math.abs(closingBalance).toLocaleString('en-IN')}
               </span>
@@ -301,14 +392,21 @@ export default function Ledger() {
         </Card>
       </div>
 
-      {/* Balance Explanation */}
-      <div className="px-1 text-xs text-muted-foreground">
-        {closingBalance > 0 ? (
-          <span className="text-success">↑ Company owes staff ₹{closingBalance.toLocaleString('en-IN')}</span>
-        ) : closingBalance < 0 ? (
-          <span className="text-warning">↓ Staff owes company ₹{Math.abs(closingBalance).toLocaleString('en-IN')}</span>
-        ) : (
-          <span className="text-success">✓ Ledger balanced - no outstanding</span>
+      {/* Balance Explanation with Helper Text */}
+      <div className="px-1 space-y-1">
+        <div className="text-xs text-muted-foreground">
+          {closingBalance > 0 ? (
+            <span className="text-success">↑ Company owes staff ₹{closingBalance.toLocaleString('en-IN')}</span>
+          ) : closingBalance < 0 ? (
+            <span className="text-warning">↓ Staff owes company ₹{Math.abs(closingBalance).toLocaleString('en-IN')}</span>
+          ) : (
+            <span className="text-success">✓ Ledger balanced - no outstanding</span>
+          )}
+        </div>
+        {selectedStaff === 'all' && (
+          <p className="text-[10px] text-muted-foreground/70">
+            Staff Sub-Ledger: Shows only staff receivables/payables. Bank & expense accounts excluded.
+          </p>
         )}
       </div>
 
