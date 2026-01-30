@@ -56,6 +56,11 @@ interface StaffBalance {
   debit: number;
   credit: number;
   balance: number;
+  // Per-account breakdown for accurate balance calculation
+  payableDebit: number;
+  payableCredit: number;
+  advanceDebit: number;
+  advanceCredit: number;
 }
 
 export default function Ledger() {
@@ -73,38 +78,49 @@ export default function Ledger() {
   const [validationError, setValidationError] = useState<string | null>(null);
 
   // Calculate totals from journal lines - ONLY staff-side entries (staff_id IS NOT NULL)
+  // Also calculate per-account totals for proper balance formula
   const totals = journalLines.reduce(
     (acc, line) => {
-      // Only include lines with staff_id for staff ledger view
-      if (line.staff_id) {
+      if (line.staff_id && line.account) {
+        const accountCode = line.account.code;
         return {
           debit: acc.debit + Number(line.debit),
           credit: acc.credit + Number(line.credit),
+          payableDebit: acc.payableDebit + (accountCode === '2000' ? Number(line.debit) : 0),
+          payableCredit: acc.payableCredit + (accountCode === '2000' ? Number(line.credit) : 0),
+          advanceDebit: acc.advanceDebit + (accountCode === '1200' ? Number(line.debit) : 0),
+          advanceCredit: acc.advanceCredit + (accountCode === '1200' ? Number(line.credit) : 0),
         };
       }
       return acc;
     },
-    { debit: 0, credit: 0 }
+    { debit: 0, credit: 0, payableDebit: 0, payableCredit: 0, advanceDebit: 0, advanceCredit: 0 }
   );
 
   // For "All Staff" view: calculate as SUM of individual staff balances
-  // For individual staff: use direct calculation
+  // For individual staff: use account-based formula
+  // Staff Balance = (Payable Cr - Payable Dr) - (Advance Dr - Advance Cr)
   const closingBalance = selectedStaff === 'all' 
     ? staffBalances.reduce((sum, sb) => sum + sb.balance, 0)
-    : totals.credit - totals.debit;
+    : (totals.payableCredit - totals.payableDebit) - (totals.advanceDebit - totals.advanceCredit);
 
-  // Validation: ensure individual balances sum to aggregate
+  // Validation: ensure individual balances sum to the aggregate "All Staff" balance
   useEffect(() => {
     if (selectedStaff === 'all' && staffBalances.length > 0) {
       const sumOfIndividual = staffBalances.reduce((sum, sb) => sum + sb.balance, 0);
-      const directCalculation = totals.credit - totals.debit;
+      // For aggregate, recalculate using account-based formula
+      const aggregatePayableBalance = totals.payableCredit - totals.payableDebit;
+      const aggregateAdvanceBalance = totals.advanceDebit - totals.advanceCredit;
+      const directCalculation = aggregatePayableBalance - aggregateAdvanceBalance;
       
       // Allow small rounding difference
       if (Math.abs(sumOfIndividual - directCalculation) > 0.01) {
         console.error('Balance validation failed:', {
           sumOfIndividual,
           directCalculation,
-          difference: sumOfIndividual - directCalculation
+          difference: sumOfIndividual - directCalculation,
+          aggregatePayableBalance,
+          aggregateAdvanceBalance,
         });
         setValidationError(`Balance mismatch: Individual sum (₹${sumOfIndividual.toLocaleString('en-IN')}) ≠ Aggregate (₹${directCalculation.toLocaleString('en-IN')})`);
       } else {
@@ -187,39 +203,94 @@ export default function Ledger() {
       if (linesError) throw linesError;
 
       // Calculate per-staff balances for validation and "All Staff" view
-      const staffBalanceMap = new Map<string, { debit: number; credit: number; name: string }>();
+      // CRITICAL: Use account-based calculation for accurate balance
+      // Staff Balance = (Payable Cr - Payable Dr) - (Advance Dr - Advance Cr)
+      // Positive = Company owes staff, Negative = Staff owes company
+      const staffBalanceMap = new Map<string, {
+        debit: number;
+        credit: number;
+        payableDebit: number;
+        payableCredit: number;
+        advanceDebit: number;
+        advanceCredit: number;
+      }>();
       
       (linesData || []).forEach(line => {
-        if (line.staff_id) {
-          const existing = staffBalanceMap.get(line.staff_id) || { debit: 0, credit: 0, name: '' };
-          staffBalanceMap.set(line.staff_id, {
-            debit: existing.debit + Number(line.debit),
-            credit: existing.credit + Number(line.credit),
-            name: existing.name // Will be filled from staff list
-          });
+        if (line.staff_id && line.account) {
+          const existing = staffBalanceMap.get(line.staff_id) || {
+            debit: 0,
+            credit: 0,
+            payableDebit: 0,
+            payableCredit: 0,
+            advanceDebit: 0,
+            advanceCredit: 0
+          };
+          
+          const accountCode = line.account.code;
+          const debit = Number(line.debit);
+          const credit = Number(line.credit);
+          
+          const updated = {
+            debit: existing.debit + debit,
+            credit: existing.credit + credit,
+            payableDebit: existing.payableDebit + (accountCode === '2000' ? debit : 0),
+            payableCredit: existing.payableCredit + (accountCode === '2000' ? credit : 0),
+            advanceDebit: existing.advanceDebit + (accountCode === '1200' ? debit : 0),
+            advanceCredit: existing.advanceCredit + (accountCode === '1200' ? credit : 0),
+          };
+          
+          staffBalanceMap.set(line.staff_id, updated);
         }
       });
 
-      // Build staff balances array
+      // Build staff balances array with correct formula
       const balances: StaffBalance[] = [];
       staffBalanceMap.forEach((value, staffId) => {
         const staffInfo = staffList.find(s => s.id === staffId);
+        // Net Staff Balance = (Payable Credits - Payable Debits) - (Advance Debits - Advance Credits)
+        // Payable: Cr means we owe staff, Dr means we've paid
+        // Advance: Dr means staff owes us, Cr means advance was cleared
+        const payableBalance = value.payableCredit - value.payableDebit; // Positive = we owe staff
+        const advanceBalance = value.advanceDebit - value.advanceCredit; // Positive = staff owes us
+        const netBalance = payableBalance - advanceBalance; // Net outstanding
+        
         balances.push({
           staffId,
           staffName: staffInfo?.full_name || 'Unknown',
           debit: value.debit,
           credit: value.credit,
-          balance: value.credit - value.debit
+          balance: netBalance,
+          payableDebit: value.payableDebit,
+          payableCredit: value.payableCredit,
+          advanceDebit: value.advanceDebit,
+          advanceCredit: value.advanceCredit,
         });
       });
       setStaffBalances(balances);
 
-      // Calculate running balance for display
-      let runningBalance = 0;
+      // Calculate running balance for display using correct formula per account type
+      // Running balance tracks: (Payable Cr - Payable Dr) - (Advance Dr - Advance Cr)
+      let runningPayableCr = 0;
+      let runningPayableDr = 0;
+      let runningAdvanceDr = 0;
+      let runningAdvanceCr = 0;
+      
       const linesWithBalance = (linesData || []).map(line => {
-        if (line.staff_id) {
-          runningBalance += Number(line.credit) - Number(line.debit);
+        if (line.staff_id && line.account) {
+          const accountCode = line.account.code;
+          const debit = Number(line.debit);
+          const credit = Number(line.credit);
+          
+          if (accountCode === '2000') { // Staff Payable
+            runningPayableDr += debit;
+            runningPayableCr += credit;
+          } else if (accountCode === '1200') { // Staff Advances
+            runningAdvanceDr += debit;
+            runningAdvanceCr += credit;
+          }
         }
+        // Running balance = (Payable Cr - Payable Dr) - (Advance Dr - Advance Cr)
+        const runningBalance = (runningPayableCr - runningPayableDr) - (runningAdvanceDr - runningAdvanceCr);
         return { ...line, running_balance: runningBalance };
       }) as JournalLineWithDetails[];
 

@@ -260,6 +260,7 @@ export default function Settlements() {
 
     const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
     
+    // VALIDATION 1: Leave days must be valid
     if (leaveDays > 30) {
       toast({
         title: 'Invalid Leave Days',
@@ -273,6 +274,54 @@ export default function Settlements() {
       toast({
         title: 'Invalid Leave Days',
         description: `Leave days cannot exceed ${daysInMonth} for this month.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // VALIDATION 2: Advance adjustment cannot exceed outstanding advance
+    if (calculation.advanceToAdjust > calculation.advancesOutstanding) {
+      toast({
+        title: 'Invalid Advance Adjustment',
+        description: 'Advance adjustment cannot exceed outstanding advance balance.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // VALIDATION 3: Advance adjustment cannot exceed gross salary
+    if (calculation.advanceToAdjust > calculation.grossSalary) {
+      toast({
+        title: 'Invalid Advance Adjustment',
+        description: 'Advance adjustment cannot exceed gross salary.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // VALIDATION 4: Net payable must reconcile correctly
+    const expectedNetPayable = calculation.grossSalary - calculation.advanceToAdjust;
+    if (Math.abs(calculation.netPayable - expectedNetPayable) > 0.01) {
+      toast({
+        title: 'Calculation Error',
+        description: `Net payable (₹${calculation.netPayable}) does not match expected (₹${expectedNetPayable}). Please refresh and try again.`,
+        variant: 'destructive',
+      });
+      console.error('Settlement validation failed:', {
+        grossSalary: calculation.grossSalary,
+        advanceToAdjust: calculation.advanceToAdjust,
+        netPayable: calculation.netPayable,
+        expectedNetPayable,
+      });
+      return;
+    }
+
+    // VALIDATION 5: Carry-forward must reconcile
+    const expectedCarryForward = calculation.advancesOutstanding - calculation.advanceToAdjust;
+    if (Math.abs(calculation.carryForwardAdvance - expectedCarryForward) > 0.01) {
+      toast({
+        title: 'Calculation Error',
+        description: 'Carry-forward advance does not reconcile. Please refresh and try again.',
         variant: 'destructive',
       });
       return;

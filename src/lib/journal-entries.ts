@@ -246,30 +246,42 @@ async function createJournalEntry(params: CreateJournalEntryParams): Promise<str
 /**
  * SALARY SETTLEMENT
  * 
+ * IMPORTANT: grossSalary parameter is the NET salary AFTER leave deduction.
+ * The caller (Settlements.tsx) calculates: grossSalary = monthlySalary - leaveDeduction
+ * 
  * When salary is settled (accrual - no cash movement):
- * 1. Debit: Salary Expense (P&L impact)
+ * 1. Debit: Salary Expense (the actual payable amount, which is grossSalary)
  * 2. Credit: Staff Payable (creates liability to pay staff)
  * 
  * If there's an advance adjustment:
- * 3. Debit: Staff Payable (reduce what we owe)
- * 4. Credit: Staff Advances (reduce what staff owes)
+ * 3. Debit: Staff Payable (reduce liability)
+ * 4. Credit: Staff Advances (reduce what staff owes us)
+ * 
+ * ACCOUNTING RULES:
+ * - Leave deduction is NOT a separate entry - it simply reduces salary expense
+ * - Only the NET salary (after leave) creates a payable
+ * - Advance adjustment is an internal settlement, NOT income/expense
+ * - Advance adjustment has ZERO net effect on staff balance
  */
 export async function createSalarySettlementEntry(params: SalarySettlementParams): Promise<string> {
   const { 
     staffId, 
     staffName, 
     settlementMonth, 
-    grossSalary, 
-    leaveDeduction,
+    grossSalary,  // This is already NET of leave deduction (monthlySalary - leaveDeduction)
+    leaveDeduction: _leaveDeduction, // Kept for reference but NOT used in calculation
     advanceAdjustment, 
     settlementId, 
     createdBy 
   } = params;
 
-  const netSalary = grossSalary - leaveDeduction;
+  // CRITICAL FIX: grossSalary is already net of leave, DO NOT subtract again!
+  // Previous bug: netSalary = grossSalary - leaveDeduction was double-subtracting
+  const netSalary = grossSalary;
   const lines: JournalLine[] = [];
 
   // Entry 1: Salary Expense Dr, Staff Payable Cr
+  // This records the actual salary payable to staff (after leave deduction)
   if (netSalary > 0) {
     lines.push({
       accountCode: ACCOUNT_CODES.SALARY_EXPENSE,
@@ -288,8 +300,10 @@ export async function createSalarySettlementEntry(params: SalarySettlementParams
   }
 
   // Entry 2: Advance Adjustment (if any)
-  // Debit: Staff Payable (reduce liability)
-  // Credit: Staff Advances (reduce receivable)
+  // This is an INTERNAL settlement - reduces both payable AND advances
+  // Debit: Staff Payable (reduce what we owe staff)
+  // Credit: Staff Advances (reduce what staff owes us)
+  // Net effect on staff balance: ZERO (shifts between accounts only)
   if (advanceAdjustment > 0) {
     lines.push({
       accountCode: ACCOUNT_CODES.STAFF_PAYABLE,
