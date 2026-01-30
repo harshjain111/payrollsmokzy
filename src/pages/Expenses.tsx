@@ -34,6 +34,8 @@ export default function Expenses() {
     isAdmin, 
     isAccountant, 
     isStaff,
+    staffData,
+    accountingMode,
     canApproveExpenses 
   } = useAuth();
   
@@ -48,7 +50,7 @@ export default function Expenses() {
 
   useEffect(() => {
     fetchExpenses();
-  }, [activeTab]);
+  }, [activeTab, staffData?.id, accountingMode]);
 
   const fetchExpenses = async () => {
     try {
@@ -60,6 +62,21 @@ export default function Expenses() {
           staff:staff_public(*)
         `)
         .order('created_at', { ascending: false });
+
+      // CRITICAL: Personal context filtering
+      // Staff always sees only their own expenses
+      // Accountant in personal mode (My Account) sees only their own expenses
+      // This ensures complete isolation between personal and role contexts
+      if (isStaff || (isAccountant && !accountingMode)) {
+        if (staffData?.id) {
+          query = query.eq('staff_id', staffData.id);
+        } else {
+          // No staff record - return empty
+          setExpenses([]);
+          setIsLoading(false);
+          return;
+        }
+      }
 
       // Filter by status
       if (activeTab !== 'all') {

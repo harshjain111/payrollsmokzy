@@ -57,7 +57,7 @@ export default function Requests() {
 
   useEffect(() => {
     fetchRequests();
-  }, [staffData?.id, activeTab]);
+  }, [staffData?.id, activeTab, accountingMode]);
 
   const fetchRequests = async () => {
     setIsLoading(true);
@@ -74,11 +74,18 @@ export default function Requests() {
         `)
         .order('created_at', { ascending: false });
 
-      // Staff can only see their own requests
-      // Accountant in personal mode sees own requests only
+      // CRITICAL: Personal context filtering
+      // Staff always sees only their own requests
+      // Accountant in personal mode (My Account) sees only their own requests
+      // This ensures complete isolation between personal and role contexts
       if (isStaff || (isAccountant && !accountingMode)) {
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
+        } else {
+          // No staff record - return empty
+          setRequests([]);
+          setIsLoading(false);
+          return;
         }
       }
 

@@ -64,7 +64,7 @@ export default function Ledger() {
 
   useEffect(() => {
     fetchData();
-  }, [selectedStaff, selectedMonth, staffData?.id]);
+  }, [selectedStaff, selectedMonth, staffData?.id, accountingMode]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -87,11 +87,18 @@ export default function Ledger() {
         .order('entry_date', { ascending: true })
         .order('created_at', { ascending: true });
 
-      // Filter by staff
+      // CRITICAL: Personal context filtering
+      // Staff always sees only their own ledger
+      // Accountant in personal mode (My Account) sees only their own ledger
+      // This ensures complete isolation between personal and role contexts
       if (isStaff || (isAccountant && !accountingMode)) {
-        // Staff can only see their own
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
+        } else {
+          // No staff record - return empty
+          setEntries([]);
+          setIsLoading(false);
+          return;
         }
       } else if (selectedStaff !== 'all') {
         query = query.eq('staff_id', selectedStaff);
