@@ -56,64 +56,27 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
     }
 
     try {
-      // Step 1: Get all account codes in a simple lookup map
-      const { data: accounts, error: accountsError } = await supabase
-        .from('accounts')
-        .select('id, code')
-        .in('code', ['1200', '2000']); // Staff Advances and Staff Payable
+      // CRITICAL: Use SECURITY DEFINER RPC functions for Staff users
+      // Staff cannot read accounts table due to RLS, so we use the server-side functions
+      const [advancesResult, payableResult] = await Promise.all([
+        supabase.rpc('get_staff_advances_from_journals', { _staff_id: staffId }),
+        supabase.rpc('get_staff_payable_from_journals', { _staff_id: staffId }),
+      ]);
+
+      if (advancesResult.error) throw advancesResult.error;
+      if (payableResult.error) throw payableResult.error;
+
+      // advanceBalance = outstanding advances (positive = staff owes company)
+      const advanceBalance = Number(advancesResult.data) || 0;
       
-      if (accountsError) throw accountsError;
-      
-      const accountCodeMap = new Map<string, string>();
-      (accounts || []).forEach(acc => {
-        accountCodeMap.set(acc.id, acc.code);
-      });
-
-      // Step 2: Query journal_lines for this staff
-      // CRITICAL: This is the SINGLE SOURCE OF TRUTH for all balance calculations
-      const { data: lines, error } = await supabase
-        .from('journal_lines')
-        .select('debit, credit, account_id')
-        .eq('staff_id', staffId);
-
-      if (error) throw error;
-
-      // Calculate per-account totals
-      // Account 2000 = Staff Payable (Liability)
-      // Account 1200 = Staff Advances (Asset/Receivable)
-      let payableCredit = 0;
-      let payableDebit = 0;
-      let advanceDebit = 0;
-      let advanceCredit = 0;
-
-      (lines || []).forEach((line: any) => {
-        // Look up account code from our map
-        const code = accountCodeMap.get(line.account_id);
-        const debit = Number(line.debit) || 0;
-        const credit = Number(line.credit) || 0;
-
-        if (code === '2000') { // Staff Payable
-          payableCredit += credit;
-          payableDebit += debit;
-        } else if (code === '1200') { // Staff Advances
-          advanceDebit += debit;
-          advanceCredit += credit;
-        }
-      });
-      
-      console.log('[useStaffBalance] Staff:', staffId, 'Lines:', lines?.length, 
-        'Advance Dr:', advanceDebit, 'Advance Cr:', advanceCredit,
-        'Payable Cr:', payableCredit, 'Payable Dr:', payableDebit);
-
-      // Calculate balances using the correct formula
-      // Payable: Credit = we owe staff, Debit = we've paid
-      const payableBalance = payableCredit - payableDebit;
-      
-      // Advances: Debit = staff owes us, Credit = advance was cleared/adjusted
-      const advanceBalance = advanceDebit - advanceCredit;
+      // payableBalance = salary/expense payable (positive = company owes staff)
+      const payableBalance = Number(payableResult.data) || 0;
       
       // Net Staff Balance = What we owe them - What they owe us
       const netBalance = payableBalance - advanceBalance;
+      
+      console.log('[useStaffBalance] Staff:', staffId, 
+        'Advances:', advanceBalance, 'Payable:', payableBalance, 'Net:', netBalance);
       
       // Derived values for UI
       const advanceOutstanding = Math.max(0, advanceBalance); // Only show positive (they owe us)
@@ -123,10 +86,10 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
         netBalance,
         payableBalance,
         advanceBalance,
-        payableCredit,
-        payableDebit,
-        advanceDebit,
-        advanceCredit,
+        payableCredit: payableBalance > 0 ? payableBalance : 0,
+        payableDebit: payableBalance < 0 ? Math.abs(payableBalance) : 0,
+        advanceDebit: advanceBalance > 0 ? advanceBalance : 0,
+        advanceCredit: advanceBalance < 0 ? Math.abs(advanceBalance) : 0,
         advanceOutstanding,
         salaryPayable,
         isLoading: false,
