@@ -64,8 +64,9 @@ export function useDashboardStats() {
         approvedExpensesResult,
         approvedRequestsResult,
         pendingSalariesResult,
-        // CRITICAL: Use journal_lines as SINGLE SOURCE OF TRUTH for advances
-        journalAdvancesResult,
+        // CRITICAL: Separate queries for reliable account lookup
+        accountsResult,
+        journalLinesResult,
         completedTodayResult,
       ] = await Promise.all([
         // Active staff and missing salary
@@ -95,16 +96,16 @@ export function useDashboardStats() {
               .eq('status', 'pending')
           : Promise.resolve({ data: [] }),
         
-        // CRITICAL FIX: Advances outstanding from journal_lines (SINGLE SOURCE OF TRUTH)
-        // Account code 1200 = Staff Advances
-        // Balance = Sum(Debit) - Sum(Credit) = Outstanding advances
+        // CRITICAL FIX: Get accounts for lookup
+        supabase
+          .from('accounts')
+          .select('id, code')
+          .eq('code', '1200'), // Staff Advances account
+        
+        // Get all journal lines with staff_id
         supabase
           .from('journal_lines')
-          .select(`
-            debit,
-            credit,
-            account:account_id(code)
-          `)
+          .select('debit, credit, account_id')
           .not('staff_id', 'is', null),
         
         // Completed payments today (from journal_entries, not legacy ledger)
@@ -126,13 +127,19 @@ export function useDashboardStats() {
       const pendingSalaries = pendingSalariesResult.data || [];
       const completedToday = completedTodayResult.data || [];
 
+      // Build account code lookup map
+      const accountCodeMap = new Map<string, string>();
+      (accountsResult.data || []).forEach((acc: any) => {
+        accountCodeMap.set(acc.id, acc.code);
+      });
+
       // Calculate advances outstanding from journal_lines (SINGLE SOURCE OF TRUTH)
       // Staff Advances account (1200): Debit = given, Credit = adjusted/cleared
       let totalAdvanceDebit = 0;
       let totalAdvanceCredit = 0;
       
-      (journalAdvancesResult.data || []).forEach((line: any) => {
-        const accountCode = line.account?.code;
+      (journalLinesResult.data || []).forEach((line: any) => {
+        const accountCode = accountCodeMap.get(line.account_id);
         if (accountCode === '1200') { // Staff Advances account
           totalAdvanceDebit += Number(line.debit) || 0;
           totalAdvanceCredit += Number(line.credit) || 0;

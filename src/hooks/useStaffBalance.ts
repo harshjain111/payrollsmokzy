@@ -56,17 +56,24 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
     }
 
     try {
-      // Query journal_lines with account information
+      // Step 1: Get all account codes in a simple lookup map
+      const { data: accounts, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, code')
+        .in('code', ['1200', '2000']); // Staff Advances and Staff Payable
+      
+      if (accountsError) throw accountsError;
+      
+      const accountCodeMap = new Map<string, string>();
+      (accounts || []).forEach(acc => {
+        accountCodeMap.set(acc.id, acc.code);
+      });
+
+      // Step 2: Query journal_lines for this staff
       // CRITICAL: This is the SINGLE SOURCE OF TRUTH for all balance calculations
-      // Use explicit join to get account codes reliably
       const { data: lines, error } = await supabase
         .from('journal_lines')
-        .select(`
-          debit,
-          credit,
-          account_id,
-          accounts!journal_lines_account_id_fkey(code)
-        `)
+        .select('debit, credit, account_id')
         .eq('staff_id', staffId);
 
       if (error) throw error;
@@ -80,8 +87,8 @@ export function useStaffBalance(staffId: string | null | undefined): StaffBalanc
       let advanceCredit = 0;
 
       (lines || []).forEach((line: any) => {
-        // Handle both possible response structures from Supabase
-        const code = line.accounts?.code || line.account?.code;
+        // Look up account code from our map
+        const code = accountCodeMap.get(line.account_id);
         const debit = Number(line.debit) || 0;
         const credit = Number(line.credit) || 0;
 
@@ -157,16 +164,23 @@ export function useAllStaffBalances() {
 
   const fetchAllBalances = useCallback(async () => {
     try {
-      // Query ALL staff journal lines with account information
+      // Step 1: Get all account codes in a simple lookup map
+      const { data: accounts, error: accountsError } = await supabase
+        .from('accounts')
+        .select('id, code')
+        .in('code', ['1200', '2000']); // Staff Advances and Staff Payable
+      
+      if (accountsError) throw accountsError;
+      
+      const accountCodeMap = new Map<string, string>();
+      (accounts || []).forEach(acc => {
+        accountCodeMap.set(acc.id, acc.code);
+      });
+
+      // Step 2: Query ALL staff journal lines
       const { data: lines, error } = await supabase
         .from('journal_lines')
-        .select(`
-          staff_id,
-          debit,
-          credit,
-          account_id,
-          accounts!journal_lines_account_id_fkey(code)
-        `)
+        .select('staff_id, debit, credit, account_id')
         .not('staff_id', 'is', null);
 
       if (error) throw error;
@@ -189,7 +203,8 @@ export function useAllStaffBalances() {
           advanceCredit: 0,
         };
 
-        const code = line.accounts?.code || line.account?.code;
+        // Look up account code from our map
+        const code = accountCodeMap.get(line.account_id);
         const debit = Number(line.debit) || 0;
         const credit = Number(line.credit) || 0;
 
