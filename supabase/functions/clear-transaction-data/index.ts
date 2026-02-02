@@ -99,8 +99,7 @@ Deno.serve(async (req) => {
       total: 0,
     };
 
-    // 1. Delete journal_lines (must be first due to FK to journal_entries)
-    // Get journal entry IDs in date range first
+    // 1. Get journal entry IDs in date range first
     const { data: journalEntryIds } = await adminClient
       .from('journal_entries')
       .select('id')
@@ -109,6 +108,19 @@ Deno.serve(async (req) => {
 
     if (journalEntryIds && journalEntryIds.length > 0) {
       const ids = journalEntryIds.map(e => e.id);
+      
+      // 1a. First, remove immutability flag on journal entries to allow deletion
+      const { error: immutableJeError } = await adminClient
+        .from('journal_entries')
+        .update({ is_immutable: false })
+        .in('id', ids);
+
+      if (immutableJeError) {
+        console.error('Error removing immutability from journal_entries:', immutableJeError);
+        // Continue - this might fail if trigger prevents even UPDATE, but we'll try delete anyway
+      }
+
+      // 1b. Delete journal_lines (must be first due to FK to journal_entries)
       const { error: linesError, count: linesCount } = await adminClient
         .from('journal_lines')
         .delete({ count: 'exact' })
@@ -121,34 +133,50 @@ Deno.serve(async (req) => {
       deletedCounts.journal_lines = linesCount || 0;
     }
 
-    // 2. Delete journal_entries
-    const { error: jeError, count: jeCount } = await adminClient
-      .from('journal_entries')
-      .delete({ count: 'exact' })
-      .gte('entry_date', dateFrom)
-      .lte('entry_date', dateTo);
+    // 2. Delete journal_entries (now with is_immutable = false)
+    if (journalEntryIds && journalEntryIds.length > 0) {
+      const ids = journalEntryIds.map(e => e.id);
+      const { error: jeError, count: jeCount } = await adminClient
+        .from('journal_entries')
+        .delete({ count: 'exact' })
+        .in('id', ids);
 
-    if (jeError) {
-      console.error('Error deleting journal_entries:', jeError);
-      throw new Error(`Failed to delete journal entries: ${jeError.message}`);
+      if (jeError) {
+        console.error('Error deleting journal_entries:', jeError);
+        throw new Error(`Failed to delete journal entries: ${jeError.message}`);
+      }
+      deletedCounts.journal_entries = jeCount || 0;
     }
-    deletedCounts.journal_entries = jeCount || 0;
 
-    // 3. Delete ledger_entries
-    const { error: leError, count: leCount } = await adminClient
+    // 3. Delete ledger_entries - first remove immutability
+    const { data: ledgerEntryIds } = await adminClient
       .from('ledger_entries')
-      .delete({ count: 'exact' })
+      .select('id')
       .gte('entry_date', dateFrom)
       .lte('entry_date', dateTo);
 
-    if (leError) {
-      console.error('Error deleting ledger_entries:', leError);
-      throw new Error(`Failed to delete ledger entries: ${leError.message}`);
+    if (ledgerEntryIds && ledgerEntryIds.length > 0) {
+      const ids = ledgerEntryIds.map(e => e.id);
+      
+      // Remove immutability first
+      await adminClient
+        .from('ledger_entries')
+        .update({ is_immutable: false })
+        .in('id', ids);
+
+      const { error: leError, count: leCount } = await adminClient
+        .from('ledger_entries')
+        .delete({ count: 'exact' })
+        .in('id', ids);
+
+      if (leError) {
+        console.error('Error deleting ledger_entries:', leError);
+        throw new Error(`Failed to delete ledger entries: ${leError.message}`);
+      }
+      deletedCounts.ledger_entries = leCount || 0;
     }
-    deletedCounts.ledger_entries = leCount || 0;
 
     // 4. Delete salary_settlements (by settlement_month)
-    // Convert date range to months
     const fromMonth = dateFrom.substring(0, 7); // YYYY-MM
     const toMonth = dateTo.substring(0, 7);
     
