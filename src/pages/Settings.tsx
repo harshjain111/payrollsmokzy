@@ -43,6 +43,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { ClearTransactionDataCard } from '@/components/settings/ClearTransactionDataCard';
 
 export default function Settings() {
   const { user, userRole, signOut, staffData } = useAuth();
@@ -403,6 +404,9 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Clear Transaction Data - Owner Only */}
+        <ClearTransactionDataCard />
       </div>
     </div>
   );
