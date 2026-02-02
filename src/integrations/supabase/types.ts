@@ -790,6 +790,10 @@ export type Database = {
       }
     }
     Functions: {
+      admin_clear_transaction_data: {
+        Args: { _date_from: string; _date_to: string; _owner_id: string }
+        Returns: Json
+      }
       calculate_running_balance: {
         Args: { _staff_id: string }
         Returns: {

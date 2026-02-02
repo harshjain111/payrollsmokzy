@@ -87,139 +87,22 @@ Deno.serve(async (req) => {
 
     console.log(`[clear-transaction-data] Owner ${user.email} initiating data clear: ${dateFrom} to ${dateTo}`);
 
-    // Execute deletion in a transaction-like manner
-    // Order matters due to foreign key constraints
-    const deletedCounts: Record<string, number> = {
-      journal_lines: 0,
-      journal_entries: 0,
-      ledger_entries: 0,
-      salary_settlements: 0,
-      payment_requests: 0,
-      expenses: 0,
-      total: 0,
-    };
-
-    // 1. Get journal entry IDs in date range first
-    const { data: journalEntryIds } = await adminClient
-      .from('journal_entries')
-      .select('id')
-      .gte('entry_date', dateFrom)
-      .lte('entry_date', dateTo);
-
-    if (journalEntryIds && journalEntryIds.length > 0) {
-      const ids = journalEntryIds.map(e => e.id);
-      
-      // 1a. First, remove immutability flag on journal entries to allow deletion
-      const { error: immutableJeError } = await adminClient
-        .from('journal_entries')
-        .update({ is_immutable: false })
-        .in('id', ids);
-
-      if (immutableJeError) {
-        console.error('Error removing immutability from journal_entries:', immutableJeError);
-        // Continue - this might fail if trigger prevents even UPDATE, but we'll try delete anyway
+    // Call the database function that bypasses immutability triggers
+    const { data: deletedCounts, error: clearError } = await adminClient.rpc(
+      'admin_clear_transaction_data',
+      {
+        _date_from: dateFrom,
+        _date_to: dateTo,
+        _owner_id: user.id,
       }
+    );
 
-      // 1b. Delete journal_lines (must be first due to FK to journal_entries)
-      const { error: linesError, count: linesCount } = await adminClient
-        .from('journal_lines')
-        .delete({ count: 'exact' })
-        .in('journal_entry_id', ids);
-
-      if (linesError) {
-        console.error('Error deleting journal_lines:', linesError);
-        throw new Error(`Failed to delete journal lines: ${linesError.message}`);
-      }
-      deletedCounts.journal_lines = linesCount || 0;
+    if (clearError) {
+      console.error('Error clearing transaction data:', clearError);
+      throw new Error(`Failed to clear transaction data: ${clearError.message}`);
     }
 
-    // 2. Delete journal_entries (now with is_immutable = false)
-    if (journalEntryIds && journalEntryIds.length > 0) {
-      const ids = journalEntryIds.map(e => e.id);
-      const { error: jeError, count: jeCount } = await adminClient
-        .from('journal_entries')
-        .delete({ count: 'exact' })
-        .in('id', ids);
-
-      if (jeError) {
-        console.error('Error deleting journal_entries:', jeError);
-        throw new Error(`Failed to delete journal entries: ${jeError.message}`);
-      }
-      deletedCounts.journal_entries = jeCount || 0;
-    }
-
-    // 3. Delete ledger_entries - first remove immutability
-    const { data: ledgerEntryIds } = await adminClient
-      .from('ledger_entries')
-      .select('id')
-      .gte('entry_date', dateFrom)
-      .lte('entry_date', dateTo);
-
-    if (ledgerEntryIds && ledgerEntryIds.length > 0) {
-      const ids = ledgerEntryIds.map(e => e.id);
-      
-      // Remove immutability first
-      await adminClient
-        .from('ledger_entries')
-        .update({ is_immutable: false })
-        .in('id', ids);
-
-      const { error: leError, count: leCount } = await adminClient
-        .from('ledger_entries')
-        .delete({ count: 'exact' })
-        .in('id', ids);
-
-      if (leError) {
-        console.error('Error deleting ledger_entries:', leError);
-        throw new Error(`Failed to delete ledger entries: ${leError.message}`);
-      }
-      deletedCounts.ledger_entries = leCount || 0;
-    }
-
-    // 4. Delete salary_settlements (by settlement_month)
-    const fromMonth = dateFrom.substring(0, 7); // YYYY-MM
-    const toMonth = dateTo.substring(0, 7);
-    
-    const { error: ssError, count: ssCount } = await adminClient
-      .from('salary_settlements')
-      .delete({ count: 'exact' })
-      .gte('settlement_month', fromMonth)
-      .lte('settlement_month', toMonth);
-
-    if (ssError) {
-      console.error('Error deleting salary_settlements:', ssError);
-      throw new Error(`Failed to delete salary settlements: ${ssError.message}`);
-    }
-    deletedCounts.salary_settlements = ssCount || 0;
-
-    // 5. Delete payment_requests (by created_at)
-    const { error: prError, count: prCount } = await adminClient
-      .from('payment_requests')
-      .delete({ count: 'exact' })
-      .gte('created_at', dateFrom)
-      .lte('created_at', dateTo + 'T23:59:59');
-
-    if (prError) {
-      console.error('Error deleting payment_requests:', prError);
-      throw new Error(`Failed to delete payment requests: ${prError.message}`);
-    }
-    deletedCounts.payment_requests = prCount || 0;
-
-    // 6. Delete expenses (by expense_date)
-    const { error: expError, count: expCount } = await adminClient
-      .from('expenses')
-      .delete({ count: 'exact' })
-      .gte('expense_date', dateFrom)
-      .lte('expense_date', dateTo);
-
-    if (expError) {
-      console.error('Error deleting expenses:', expError);
-      throw new Error(`Failed to delete expenses: ${expError.message}`);
-    }
-    deletedCounts.expenses = expCount || 0;
-
-    // Calculate total
-    deletedCounts.total = Object.values(deletedCounts).reduce((a, b) => a + b, 0) - deletedCounts.total;
+    console.log(`[clear-transaction-data] Successfully cleared data. Counts:`, deletedCounts);
 
     // Log audit entry
     const auditData = {
@@ -250,13 +133,11 @@ Deno.serve(async (req) => {
       // Don't fail the operation for audit log error
     }
 
-    console.log(`[clear-transaction-data] Successfully cleared data. Counts:`, deletedCounts);
-
     return new Response(
       JSON.stringify({
         success: true,
         deletedCounts,
-        message: `Successfully cleared ${deletedCounts.total} records`,
+        message: `Successfully cleared ${deletedCounts?.total || 0} records`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
