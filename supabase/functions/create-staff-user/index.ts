@@ -77,17 +77,30 @@ serve(async (req) => {
       .eq("user_id", caller.id)
       .single();
 
-    if (!roleData || roleData.role !== "owner") {
-      throw new Error("Only owners can create staff users");
+    const callerRole = roleData?.role;
+    
+    // Allow owner, admin, and accountant to create staff users
+    if (!callerRole || !['owner', 'admin', 'accountant'].includes(callerRole)) {
+      throw new Error("Only owners, admins, or accountants can create staff users");
     }
 
     // Parse request body
     const body: CreateStaffUserRequest = await req.json();
-    const { phone, password, full_name, role, staff_data } = body;
+    let { phone, password, full_name, role, staff_data } = body;
 
     // Validate required fields
     if (!phone || !password || !full_name || !role || !staff_data) {
       throw new Error("Missing required fields");
+    }
+
+    // Non-owners can only assign 'staff' role
+    if (callerRole !== 'owner' && role !== 'staff') {
+      throw new Error("Only owners can assign admin or accountant roles");
+    }
+
+    // Non-owners must set salary to 0
+    if (callerRole !== 'owner') {
+      staff_data.monthly_salary = 0;
     }
 
     // Clean and validate phone
