@@ -54,6 +54,41 @@ export function AdvanceAdjustmentInput({
     );
   }
 
+  // When gross salary is 0, show a warning that advances cannot be adjusted
+  if (grossSalary <= 0) {
+    return (
+      <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
+        <div className="flex items-center justify-between">
+          <Label className="text-sm font-medium">Advance Adjustment</Label>
+          <Badge variant="outline" className="font-mono">
+            Outstanding: ₹{totalAdvanceOutstanding.toLocaleString('en-IN')}
+          </Badge>
+        </div>
+        
+        <Alert className="border-warning/30 bg-warning/10">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <AlertDescription className="text-warning">
+            Cannot adjust advances when gross salary is ₹0. The full outstanding amount of ₹{totalAdvanceOutstanding.toLocaleString('en-IN')} will carry forward to the next month.
+          </AlertDescription>
+        </Alert>
+
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t">
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Salary After Adjustment</p>
+            <Amount value={0} className="font-semibold" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs text-muted-foreground">Advance Carry Forward</p>
+            <Amount 
+              value={totalAdvanceOutstanding} 
+              className="font-semibold text-warning"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 p-4 rounded-lg border bg-muted/30">
       <div className="flex items-center justify-between">
