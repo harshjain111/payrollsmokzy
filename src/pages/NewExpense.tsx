@@ -80,7 +80,20 @@ export default function NewExpense() {
         .order('event_date', { ascending: false });
 
       if (error) throw error;
-      setEvents(data || []);
+      
+      // Sort events by proximity to today - closest dates first
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const sortedEvents = (data || []).sort((a, b) => {
+        const dateA = new Date(a.event_date);
+        const dateB = new Date(b.event_date);
+        const diffA = Math.abs(dateA.getTime() - today.getTime());
+        const diffB = Math.abs(dateB.getTime() - today.getTime());
+        return diffA - diffB;
+      });
+      
+      setEvents(sortedEvents);
     } catch (error) {
       console.error('Error fetching events:', error);
     } finally {
