@@ -1,5 +1,4 @@
  import { useState, useEffect } from 'react';
- import { useNavigate } from 'react-router-dom';
  import { supabase } from '@/integrations/supabase/client';
  import { useAuth } from '@/contexts/AuthContext';
  import { PageHeader } from '@/components/layout/PageHeader';
@@ -25,10 +24,11 @@
  import { EmptyState } from '@/components/layout/EmptyState';
  import { CreateLeaveDialog } from '@/components/leave/CreateLeaveDialog';
  import { LeaveApprovalDialog } from '@/components/leave/LeaveApprovalDialog';
- import { Plus, Calendar, Search, Filter, Clock, CheckCircle, XCircle } from 'lucide-react';
+ import { Plus, Calendar, Search, Clock, CheckCircle, XCircle, CalendarX, CalendarMinus, Eye } from 'lucide-react';
  import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
- import type { LeaveRecord, LeaveStatus, LeaveType } from '@/types/leave';
+ import type { LeaveRecord, LeaveStatus } from '@/types/leave';
  import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
+ import { cn } from '@/lib/utils';
  
  interface StaffOption {
    id: string;
@@ -37,7 +37,6 @@
  }
  
  export default function LeaveRecords() {
-   const navigate = useNavigate();
    const { user, userRole, staffData } = useAuth();
    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
    const [staff, setStaff] = useState<StaffOption[]>([]);
@@ -54,7 +53,6 @@
  
    const isStaff = userRole === 'staff';
    const canApprove = userRole === 'owner' || userRole === 'admin' || userRole === 'accountant';
-   const canCreate = true; // All roles can create (staff creates requests, others create directly)
  
    useEffect(() => {
      fetchLeaveRecords();
@@ -130,8 +128,12 @@
      return true;
    });
  
+   // Stats
    const pendingCount = leaveRecords.filter(r => r.status === 'pending').length;
    const approvedCount = leaveRecords.filter(r => r.status === 'approved').length;
+   const unpaidPenaltyCount = leaveRecords.filter(r => 
+     r.status === 'approved' && (r.leave_type === 'unpaid' || r.leave_type === 'penalty')
+   ).length;
    const totalDeductionDays = leaveRecords
      .filter(r => r.status === 'approved')
      .reduce((sum, r) => sum + r.deduction_days, 0);
@@ -146,154 +148,180 @@
  
    const getStatusIcon = (status: LeaveStatus) => {
      switch (status) {
-       case 'pending':
-         return <Clock className="h-4 w-4" />;
-       case 'approved':
-         return <CheckCircle className="h-4 w-4" />;
-       case 'rejected':
-         return <XCircle className="h-4 w-4" />;
+       case 'pending': return <Clock className="h-4 w-4" />;
+       case 'approved': return <CheckCircle className="h-4 w-4" />;
+       case 'rejected': return <XCircle className="h-4 w-4" />;
      }
    };
  
-   const getStatusVariant = (status: LeaveStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
+   const getStatusVariant = (status: LeaveStatus): 'default' | 'secondary' | 'destructive' => {
      switch (status) {
-       case 'pending':
-         return 'secondary';
-       case 'approved':
-         return 'default';
-       case 'rejected':
-         return 'destructive';
-       default:
-         return 'outline';
+       case 'pending': return 'secondary';
+       case 'approved': return 'default';
+       case 'rejected': return 'destructive';
      }
    };
  
-   const handleRowClick = (record: LeaveRecord) => {
-     if (canApprove && record.status === 'pending') {
-       setSelectedLeave(record);
-       setShowApprovalDialog(true);
-     }
+   const handleReviewClick = (record: LeaveRecord) => {
+     setSelectedLeave(record);
+     setShowApprovalDialog(true);
    };
  
    return (
      <div className="space-y-4 md:space-y-6">
        <PageHeader
-         title="Leave Records"
-         description={isStaff ? 'View your leave history and submit requests' : 'Manage staff leave and salary deductions'}
+         title={isStaff ? 'My Leaves' : 'Leave Records'}
+         description={isStaff ? 'Track your leave requests and approvals' : 'Manage staff leave and salary deductions'}
        >
-         {canCreate && (
-           <Button onClick={() => setShowCreateDialog(true)}>
-             <Plus className="mr-2 h-4 w-4" />
-             {isStaff ? 'Request Leave' : 'Record Leave'}
-           </Button>
-         )}
+         <Button onClick={() => setShowCreateDialog(true)}>
+           <Plus className="mr-2 h-4 w-4" />
+           {isStaff ? 'Request Leave' : 'Record Leave'}
+         </Button>
        </PageHeader>
  
-       {/* Stats Cards */}
-       <div className="grid gap-4 md:grid-cols-3">
-         <Card>
+       {/* Clickable Summary Tiles */}
+       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+         {/* Total Leaves */}
+         <Card 
+           className={cn(
+             "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
+             selectedStatus === 'approved' && "ring-2 ring-primary"
+           )}
+           onClick={() => setSelectedStatus('approved')}
+         >
            <CardHeader className="pb-2">
-             <CardTitle className="text-sm font-medium text-muted-foreground">
-               Pending Requests
+             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+               <Calendar className="h-3.5 w-3.5" />
+               {isStaff ? 'My Leaves' : 'Total Leaves'}
              </CardTitle>
            </CardHeader>
            <CardContent>
-             <div className="text-2xl font-bold text-warning">{pendingCount}</div>
+             <div className="text-2xl font-bold">{approvedCount}</div>
+             <p className="text-xs text-muted-foreground mt-0.5">This month</p>
            </CardContent>
          </Card>
-         <Card>
+ 
+         {/* Unpaid/Penalty (Admin only) */}
+         {!isStaff && (
+           <Card 
+             className="cursor-pointer transition-all hover:shadow-md hover:border-destructive/50"
+             onClick={() => setSelectedStatus('approved')}
+           >
+             <CardHeader className="pb-2">
+               <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                 <CalendarX className="h-3.5 w-3.5" />
+                 Unpaid / Penalty
+               </CardTitle>
+             </CardHeader>
+             <CardContent>
+               <div className="text-2xl font-bold text-destructive">{unpaidPenaltyCount}</div>
+               <p className="text-xs text-muted-foreground mt-0.5">With salary impact</p>
+             </CardContent>
+           </Card>
+         )}
+ 
+         {/* Total Deduction Days */}
+         <Card 
+           className="cursor-pointer transition-all hover:shadow-md"
+           onClick={() => setSelectedStatus('approved')}
+         >
            <CardHeader className="pb-2">
-             <CardTitle className="text-sm font-medium text-muted-foreground">
-               Approved Leaves
-             </CardTitle>
-           </CardHeader>
-           <CardContent>
-             <div className="text-2xl font-bold text-success">{approvedCount}</div>
-           </CardContent>
-         </Card>
-         <Card>
-           <CardHeader className="pb-2">
-             <CardTitle className="text-sm font-medium text-muted-foreground">
-               Total Deduction Days
+             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+               <CalendarMinus className="h-3.5 w-3.5" />
+               {isStaff ? 'Salary Impact' : 'Deduction Days'}
              </CardTitle>
            </CardHeader>
            <CardContent>
              <div className="text-2xl font-bold">{totalDeductionDays}</div>
+             <p className="text-xs text-muted-foreground mt-0.5">
+               {isStaff ? `${totalDeductionDays} day${totalDeductionDays !== 1 ? 's' : ''} deducted` : 'Total days'}
+             </p>
+           </CardContent>
+         </Card>
+ 
+         {/* Pending */}
+         <Card 
+           className={cn(
+             "cursor-pointer transition-all hover:shadow-md",
+             selectedStatus === 'pending' && "ring-2 ring-warning",
+             pendingCount > 0 && "border-warning/50"
+           )}
+           onClick={() => setSelectedStatus('pending')}
+         >
+           <CardHeader className="pb-2">
+             <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+               <Clock className="h-3.5 w-3.5" />
+               {isStaff ? 'Awaiting Approval' : 'Pending Review'}
+             </CardTitle>
+           </CardHeader>
+           <CardContent>
+             <div className={cn("text-2xl font-bold", pendingCount > 0 && "text-warning")}>
+               {pendingCount}
+             </div>
+             <p className="text-xs text-muted-foreground mt-0.5">
+               {isStaff ? 'Waiting' : 'Need action'}
+             </p>
            </CardContent>
          </Card>
        </div>
  
        {/* Filters */}
        <Card>
-         <CardContent className="pt-6">
-           <div className="flex flex-col gap-4 md:flex-row md:items-end">
-             <div className="flex-1 space-y-2">
-               <label className="text-sm font-medium">Search</label>
+         <CardContent className="py-3">
+           <div className="flex flex-col gap-3 md:flex-row md:items-center">
+             <div className="flex-1">
                <div className="relative">
                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                  <Input
-                   placeholder="Search by name or ID..."
+                   placeholder={isStaff ? "Search..." : "Search by name..."}
                    value={searchQuery}
                    onChange={(e) => setSearchQuery(e.target.value)}
-                   className="pl-10"
+                   className="pl-10 h-9"
                  />
                </div>
              </div>
  
-             <div className="w-full md:w-48 space-y-2">
-               <label className="text-sm font-medium">Month</label>
-               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                 <SelectTrigger>
-                   <SelectValue />
+             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+               <SelectTrigger className="w-full md:w-40 h-9">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 {monthOptions.map((m) => (
+                   <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                 ))}
+               </SelectContent>
+             </Select>
+ 
+             {!isStaff && (
+               <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                 <SelectTrigger className="w-full md:w-40 h-9">
+                   <SelectValue placeholder="All Staff" />
                  </SelectTrigger>
                  <SelectContent>
-                   {monthOptions.map((month) => (
-                     <SelectItem key={month.value} value={month.value}>
-                       {month.label}
-                     </SelectItem>
+                   <SelectItem value="all">All Staff</SelectItem>
+                   {staff.map((s) => (
+                     <SelectItem key={s.id} value={s.id}>{s.full_name}</SelectItem>
                    ))}
                  </SelectContent>
                </Select>
-             </div>
- 
-             {!isStaff && (
-               <div className="w-full md:w-48 space-y-2">
-                 <label className="text-sm font-medium">Staff</label>
-                 <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
-                   <SelectTrigger>
-                     <SelectValue />
-                   </SelectTrigger>
-                   <SelectContent>
-                     <SelectItem value="all">All Staff</SelectItem>
-                     {staff.map((s) => (
-                       <SelectItem key={s.id} value={s.id}>
-                         {s.full_name}
-                       </SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
-               </div>
              )}
  
-             <div className="w-full md:w-40 space-y-2">
-               <label className="text-sm font-medium">Status</label>
-               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                 <SelectTrigger>
-                   <SelectValue />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="all">All Status</SelectItem>
-                   <SelectItem value="pending">Pending</SelectItem>
-                   <SelectItem value="approved">Approved</SelectItem>
-                   <SelectItem value="rejected">Rejected</SelectItem>
-                 </SelectContent>
-               </Select>
-             </div>
+             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+               <SelectTrigger className="w-full md:w-32 h-9">
+                 <SelectValue />
+               </SelectTrigger>
+               <SelectContent>
+                 <SelectItem value="all">All</SelectItem>
+                 <SelectItem value="pending">Pending</SelectItem>
+                 <SelectItem value="approved">Approved</SelectItem>
+                 <SelectItem value="rejected">{isStaff ? 'Declined' : 'Rejected'}</SelectItem>
+               </SelectContent>
+             </Select>
            </div>
          </CardContent>
        </Card>
  
-       {/* Leave Records Table */}
+       {/* Leave Table */}
        <Card>
          <CardContent className="p-0">
            {isLoading ? (
@@ -303,76 +331,122 @@
            ) : filteredRecords.length === 0 ? (
              <EmptyState
                icon={Calendar}
-               title="No leave records"
-               description={isStaff ? 'You haven\'t submitted any leave requests yet.' : 'No leave records found for the selected filters.'}
+               title={isStaff ? "No leaves yet" : "No leave records"}
+               description={isStaff ? 'Need time off? Submit a leave request.' : 'No records match the selected filters.'}
                action={
-                 canCreate && (
-                   <Button onClick={() => setShowCreateDialog(true)}>
-                     <Plus className="mr-2 h-4 w-4" />
-                     {isStaff ? 'Request Leave' : 'Record Leave'}
-                   </Button>
-                 )
+                 <Button onClick={() => setShowCreateDialog(true)}>
+                   <Plus className="mr-2 h-4 w-4" />
+                   {isStaff ? 'Request Leave' : 'Record Leave'}
+                 </Button>
                }
              />
            ) : (
-             <Table>
-               <TableHeader>
-                 <TableRow>
-                   <TableHead>Date</TableHead>
-                   {!isStaff && <TableHead>Staff</TableHead>}
-                   <TableHead>Type</TableHead>
-                   <TableHead className="text-right">Deduction</TableHead>
-                   <TableHead>Status</TableHead>
-                   <TableHead>Remarks</TableHead>
-                 </TableRow>
-               </TableHeader>
-               <TableBody>
-                 {filteredRecords.map((record) => (
-                   <TableRow
-                     key={record.id}
-                     className={canApprove && record.status === 'pending' ? 'cursor-pointer hover:bg-muted/50' : ''}
-                     onClick={() => handleRowClick(record)}
-                   >
-                     <TableCell className="font-medium">
-                       {format(new Date(record.leave_date), 'dd MMM yyyy')}
-                       <div className="text-xs text-muted-foreground">
-                         {format(new Date(record.leave_date), 'EEEE')}
-                       </div>
-                     </TableCell>
-                     {!isStaff && (
-                       <TableCell>
-                         <div>{record.staff?.full_name}</div>
-                         <div className="text-xs text-muted-foreground">
-                           {record.staff?.employee_id}
-                         </div>
-                       </TableCell>
-                     )}
-                     <TableCell>
-                       <Badge variant="outline">
-                         {LEAVE_TYPE_CONFIG[record.leave_type]?.label || record.leave_type}
-                       </Badge>
-                     </TableCell>
-                     <TableCell className="text-right font-medium">
-                       {record.deduction_days} day{record.deduction_days !== 1 ? 's' : ''}
-                     </TableCell>
-                     <TableCell>
-                       <Badge variant={getStatusVariant(record.status)} className="gap-1">
-                         {getStatusIcon(record.status)}
-                         {LEAVE_STATUS_LABELS[record.status]}
-                       </Badge>
-                     </TableCell>
-                     <TableCell className="max-w-[200px] truncate text-muted-foreground">
-                       {record.rejection_reason || record.remarks || '-'}
-                     </TableCell>
+             <div className="overflow-x-auto">
+               <Table>
+                 <TableHeader>
+                   <TableRow>
+                     {!isStaff && <TableHead>Staff</TableHead>}
+                     <TableHead>Date</TableHead>
+                     <TableHead>Type</TableHead>
+                     <TableHead className="text-center">Deduction</TableHead>
+                     <TableHead>Status</TableHead>
+                     {!isStaff && <TableHead>Approved By</TableHead>}
+                     <TableHead className="text-right">Actions</TableHead>
                    </TableRow>
-                 ))}
-               </TableBody>
-             </Table>
+                 </TableHeader>
+                 <TableBody>
+                   {filteredRecords.map((record) => (
+                     <TableRow key={record.id}>
+                       {/* Staff Name */}
+                       {!isStaff && (
+                         <TableCell>
+                           <div className="font-medium">{record.staff?.full_name}</div>
+                           <div className="text-xs text-muted-foreground">{record.staff?.employee_id}</div>
+                         </TableCell>
+                       )}
+                       
+                       {/* Date */}
+                       <TableCell>
+                         <div className="font-medium">{format(new Date(record.leave_date), 'dd MMM')}</div>
+                         <div className="text-xs text-muted-foreground">{format(new Date(record.leave_date), 'EEEE')}</div>
+                       </TableCell>
+                       
+                       {/* Type */}
+                       <TableCell>
+                         <Badge variant="outline">
+                           {isStaff 
+                             ? (record.leave_type === 'paid' ? 'Paid' : 'Leave')
+                             : LEAVE_TYPE_CONFIG[record.leave_type]?.label
+                           }
+                         </Badge>
+                       </TableCell>
+                       
+                       {/* Deduction */}
+                       <TableCell className="text-center">
+                         {isStaff ? (
+                           <span className={cn(
+                             "text-sm font-medium",
+                             record.deduction_days > 0 ? "text-destructive" : "text-success"
+                           )}>
+                             {record.deduction_days === 0 ? 'None' : `-${record.deduction_days}d`}
+                           </span>
+                         ) : (
+                           <span className="font-medium">{record.deduction_days}d</span>
+                         )}
+                       </TableCell>
+                       
+                       {/* Status */}
+                       <TableCell>
+                         {isStaff ? (
+                           <div className="flex items-center gap-1.5">
+                             {getStatusIcon(record.status)}
+                             <span className={cn(
+                               "text-sm",
+                               record.status === 'pending' && "text-warning",
+                               record.status === 'approved' && "text-success",
+                               record.status === 'rejected' && "text-destructive"
+                             )}>
+                               {record.status === 'pending' ? 'Waiting' : 
+                                record.status === 'approved' ? 'Approved' : 'Declined'}
+                             </span>
+                           </div>
+                         ) : (
+                           <Badge variant={getStatusVariant(record.status)} className="gap-1">
+                             {getStatusIcon(record.status)}
+                             {LEAVE_STATUS_LABELS[record.status]}
+                           </Badge>
+                         )}
+                       </TableCell>
+                       
+                       {/* Approved By */}
+                       {!isStaff && (
+                         <TableCell className="text-sm text-muted-foreground">
+                           {record.approved_by ? 'Manager' : '-'}
+                         </TableCell>
+                       )}
+                       
+                       {/* Actions */}
+                       <TableCell className="text-right">
+                         {canApprove && record.status === 'pending' ? (
+                           <Button size="sm" onClick={() => handleReviewClick(record)}>
+                             Review
+                           </Button>
+                         ) : (
+                           <Button size="sm" variant="ghost">
+                             <Eye className="h-4 w-4" />
+                           </Button>
+                         )}
+                       </TableCell>
+                     </TableRow>
+                   ))}
+                 </TableBody>
+               </Table>
+             </div>
            )}
          </CardContent>
        </Card>
  
-       {/* Create Leave Dialog */}
+       {/* Dialogs */}
        <CreateLeaveDialog
          open={showCreateDialog}
          onOpenChange={setShowCreateDialog}
@@ -380,7 +454,6 @@
          staffId={isStaff ? staffData?.id : undefined}
        />
  
-       {/* Approval Dialog */}
        <LeaveApprovalDialog
          open={showApprovalDialog}
          onOpenChange={setShowApprovalDialog}

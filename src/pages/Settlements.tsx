@@ -759,6 +759,7 @@ export default function Settlements() {
               advanceAdjusted: calculation.advanceToAdjust,
               closingAdvanceBalance: calculation.carryForwardAdvance,
               netPayable: calculation.netPayable,
+              systemDeductionDays: calculation.systemDeductionDays,
             }}
             paymentMode={paymentMode}
           />
