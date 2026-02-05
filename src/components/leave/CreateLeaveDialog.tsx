@@ -22,11 +22,10 @@
  } from '@/components/ui/select';
  import { Calendar } from '@/components/ui/calendar';
  import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
- import { CalendarIcon, Info } from 'lucide-react';
+import { CalendarIcon } from 'lucide-react';
  import { format } from 'date-fns';
  import { cn } from '@/lib/utils';
  import { toast } from '@/hooks/use-toast';
- import { Alert, AlertDescription } from '@/components/ui/alert';
  import type { LeaveType } from '@/types/leave';
  import { LEAVE_TYPE_CONFIG } from '@/types/leave';
  
@@ -75,10 +74,10 @@
  
    // Update deduction days when leave type changes (for non-custom types)
    useEffect(() => {
-     if (leaveType !== 'custom') {
+    if (leaveType !== 'custom' && !isStaff) {
        setDeductionDays(LEAVE_TYPE_CONFIG[leaveType].defaultDeduction);
      }
-   }, [leaveType]);
+  }, [leaveType, isStaff]);
  
    const fetchStaff = async () => {
      try {
@@ -116,6 +115,16 @@
        return;
      }
  
+    // Staff must provide a reason
+    if (isStaff && !remarks.trim()) {
+      toast({
+        title: 'Validation Error',
+        description: 'Please provide a reason for your leave request.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
      try {
        setIsSubmitting(true);
  
@@ -124,7 +133,7 @@
        const insertData = {
          staff_id: targetStaffId,
          leave_date: format(leaveDate, 'yyyy-MM-dd'),
-         leave_type: leaveType,
+        leave_type: isStaff ? 'unpaid' as LeaveType : leaveType, // Staff requests default to unpaid, decided during approval
          deduction_days: canSetDeduction ? deductionDays : LEAVE_TYPE_CONFIG[leaveType].defaultDeduction,
          status: isStaff ? 'pending' as const : 'approved' as const, // Admin/Accountant/Owner can directly approve
          remarks: remarks || undefined,
@@ -178,10 +187,10 @@
      <Dialog open={open} onOpenChange={onOpenChange}>
        <DialogContent className="sm:max-w-md">
          <DialogHeader>
-           <DialogTitle>{isStaff ? 'Request Leave' : 'Record Leave'}</DialogTitle>
+          <DialogTitle>{isStaff ? 'Request Time Off' : 'Record Leave'}</DialogTitle>
            <DialogDescription>
              {isStaff 
-               ? 'Submit a leave request for approval.' 
+              ? 'Submit your leave request for manager approval.' 
                : 'Record a leave entry for a staff member.'}
            </DialogDescription>
          </DialogHeader>
@@ -233,25 +242,27 @@
              </Popover>
            </div>
  
-           {/* Leave Type */}
-           <div className="space-y-2">
-             <Label>Leave Type *</Label>
-             <Select value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)}>
-               <SelectTrigger>
-                 <SelectValue />
-               </SelectTrigger>
-               <SelectContent>
-                 {Object.entries(LEAVE_TYPE_CONFIG).map(([value, config]) => (
-                   <SelectItem key={value} value={value}>
-                     <div className="flex flex-col">
-                       <span>{config.label}</span>
-                       <span className="text-xs text-muted-foreground">{config.description}</span>
-                     </div>
-                   </SelectItem>
-                 ))}
-               </SelectContent>
-             </Select>
-           </div>
+          {/* Leave Type - Only shown for Admin/Accountant/Owner */}
+          {!isStaff && (
+            <div className="space-y-2">
+              <Label>Leave Type *</Label>
+              <Select value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(LEAVE_TYPE_CONFIG).map(([value, config]) => (
+                    <SelectItem key={value} value={value}>
+                      <div className="flex flex-col">
+                        <span>{config.label}</span>
+                        <span className="text-xs text-muted-foreground">{config.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
  
            {/* Deduction Days (only for admins/accountants/owners) */}
            {canSetDeduction && (
@@ -274,23 +285,13 @@
              </div>
            )}
  
-           {/* Staff info about deduction */}
-           {isStaff && (
-             <Alert>
-               <Info className="h-4 w-4" />
-               <AlertDescription>
-                 The final salary deduction will be determined by your manager during approval.
-               </AlertDescription>
-             </Alert>
-           )}
- 
            {/* Remarks */}
            <div className="space-y-2">
-             <Label>Remarks (Optional)</Label>
+            <Label>{isStaff ? 'Reason *' : 'Remarks (Optional)'}</Label>
              <Textarea
                value={remarks}
                onChange={(e) => setRemarks(e.target.value)}
-               placeholder="Reason for leave..."
+              placeholder={isStaff ? 'Please explain your reason for leave...' : 'Reason for leave...'}
                rows={3}
              />
            </div>
@@ -301,7 +302,7 @@
              Cancel
            </Button>
            <Button onClick={handleSubmit} disabled={isSubmitting}>
-             {isSubmitting ? 'Submitting...' : isStaff ? 'Submit Request' : 'Record Leave'}
+            {isSubmitting ? 'Submitting...' : isStaff ? 'Request Leave' : 'Record Leave'}
            </Button>
          </DialogFooter>
        </DialogContent>
