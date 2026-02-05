@@ -94,6 +94,33 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          event_date: string
+          id: string
+          location: string
+        }
+        Insert: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date: string
+          id?: string
+          location: string
+        }
+        Update: {
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          event_date?: string
+          id?: string
+          location?: string
+        }
+        Relationships: []
+      }
       expenses: {
         Row: {
           amount: number
@@ -103,6 +130,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           description: string
+          event_id: string | null
           expense_date: string
           id: string
           ledger_entry_id: string | null
@@ -124,6 +152,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description: string
+          event_id?: string | null
           expense_date?: string
           id?: string
           ledger_entry_id?: string | null
@@ -145,6 +174,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           description?: string
+          event_id?: string | null
           expense_date?: string
           id?: string
           ledger_entry_id?: string | null
@@ -159,6 +189,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "expenses_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "expenses_ledger_entry_id_fkey"
             columns: ["ledger_entry_id"]
