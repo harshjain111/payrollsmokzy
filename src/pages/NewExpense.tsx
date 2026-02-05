@@ -356,12 +356,12 @@ export default function NewExpense() {
           {/* Related Event (Optional) */}
           <div className="space-y-2">
             <Label htmlFor="event" className="text-sm">Related Event (Optional)</Label>
-            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+            <Select value={selectedEventId || 'none'} onValueChange={(v) => setSelectedEventId(v === 'none' ? '' : v)}>
               <SelectTrigger className="h-11">
                 <SelectValue placeholder="Select an event (optional)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">No event</SelectItem>
+                <SelectItem value="none">No event</SelectItem>
                 {events.map((event) => (
                   <SelectItem key={event.id} value={event.id}>
                     {format(new Date(event.event_date), 'dd MMM yyyy')} - {event.location}
