@@ -42,6 +42,7 @@ import {
   createAdvancePaidEntry,
   createExpensePayoutEntry 
 } from '@/lib/journal-entries';
+import { PaidBySelector } from '@/components/payouts/PaidBySelector';
 import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 
@@ -93,6 +94,7 @@ export default function Payouts() {
   const [selectedItem, setSelectedItem] = useState<PayoutItem | null>(null);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank_transfer');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
 
   useEffect(() => {
     if (canExecutePayout) {
@@ -167,6 +169,10 @@ export default function Payouts() {
     setIsProcessing(true);
     try {
       let journalEntryId: string;
+      
+      // Use selected paid_by or default to current user
+      const paidByUserId = paidBy?.userId || user.id;
+      const paidByUserName = paidBy?.userName || null;
 
       // ========================================
       // DOUBLE-ENTRY ACCOUNTING: PAYOUT ENTRIES
@@ -195,6 +201,8 @@ export default function Payouts() {
           settlementId: selectedItem.settlementId || '',
           paymentRequestId: selectedItem.id,
           createdBy: user.id,
+          paidByUserId,
+          paidByUserName,
         });
 
         // Update salary settlement with payout journal entry
@@ -203,7 +211,8 @@ export default function Payouts() {
             .from('salary_settlements')
             .update({
               paid_at: new Date().toISOString(),
-              paid_by: user.id,
+              paid_by: paidByUserId,
+              paid_by_user_name: paidByUserName,
               payment_mode: paymentMode,
               payout_journal_entry_id: journalEntryId,
             })
@@ -222,6 +231,8 @@ export default function Payouts() {
           paymentMode,
           paymentRequestId: selectedItem.id,
           createdBy: user.id,
+          paidByUserId,
+          paidByUserName,
         });
 
       } else {
@@ -236,6 +247,8 @@ export default function Payouts() {
           amount: selectedItem.amount,
           paymentMode,
           createdBy: user.id,
+          paidByUserId,
+          paidByUserName,
         });
       }
 
@@ -248,7 +261,8 @@ export default function Payouts() {
           .update({
             status: 'reimbursed',
             reimbursed_at: new Date().toISOString(),
-            reimbursed_by: user.id,
+            reimbursed_by: paidByUserId,
+            reimbursed_by_user_name: paidByUserName,
             // Don't set ledger_entry_id - it references legacy ledger_entries table
             // The payout is tracked via journal_entries
           })
@@ -261,7 +275,8 @@ export default function Payouts() {
           .from('payment_requests')
           .update({
             paid_at: new Date().toISOString(),
-            paid_by: user.id,
+            paid_by: paidByUserId,
+            paid_by_user_name: paidByUserName,
             // Don't set ledger_entry_id - it references legacy ledger_entries table
             // The payout is tracked via journal_entries
           })
@@ -301,6 +316,7 @@ export default function Payouts() {
 
       setSelectedItem(null);
       setPaymentMode('bank_transfer');
+      setPaidBy(null);
       fetchApprovedItems();
     } catch (error: any) {
       console.error('Error executing payout:', error);
@@ -317,6 +333,7 @@ export default function Payouts() {
   const openPayoutDialog = (item: PayoutItem) => {
     setSelectedItem(item);
     setPaymentMode('bank_transfer');
+    setPaidBy(null); // Will be set to current user by PaidBySelector
   };
 
   // Convert data to unified PayoutItem format
@@ -614,6 +631,12 @@ export default function Payouts() {
                   </SelectContent>
                 </Select>
               </div>
+
+              <PaidBySelector
+                value={paidBy}
+                onChange={setPaidBy}
+                disabled={isProcessing}
+              />
 
               <div className="p-2 sm:p-3 rounded-lg bg-muted/50 text-[10px] sm:text-sm text-muted-foreground">
                 <p>

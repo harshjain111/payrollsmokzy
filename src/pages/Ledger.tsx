@@ -42,6 +42,7 @@ interface JournalLineWithDetails {
     transaction_type: string;
     is_legacy: boolean;
     is_immutable: boolean;
+    paid_by_user_name: string | null;
   } | null;
   account: {
     code: string;
@@ -183,7 +184,8 @@ export default function Ledger() {
             description,
             transaction_type,
             is_legacy,
-            is_immutable
+            is_immutable,
+            paid_by_user_name
           ),
           account:account_id(
             code,
@@ -512,6 +514,11 @@ export default function Ledger() {
                         <p className="text-xs sm:text-sm line-clamp-2">
                           {line.description || line.journal_entry?.description}
                         </p>
+                        {line.journal_entry?.paid_by_user_name && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Paid by: {line.journal_entry.paid_by_user_name}
+                          </p>
+                        )}
                         <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                           {line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM') : '-'} • {line.journal_entry?.reference_no}
                         </p>
@@ -549,7 +556,8 @@ export default function Ledger() {
                       <TableHead className="font-semibold">Reference</TableHead>
                       <TableHead className="font-semibold">Type</TableHead>
                       <TableHead className="font-semibold">Account</TableHead>
-                      <TableHead className="font-semibold max-w-[250px]">Description</TableHead>
+                      <TableHead className="font-semibold max-w-[200px]">Description</TableHead>
+                      <TableHead className="font-semibold">Paid By</TableHead>
                       <TableHead className="font-semibold text-right">Debit</TableHead>
                       <TableHead className="font-semibold text-right">Credit</TableHead>
                       <TableHead className="font-semibold text-right">Balance</TableHead>
@@ -577,10 +585,19 @@ export default function Ledger() {
                         <TableCell>
                           <span className="text-sm">{line.account?.name}</span>
                         </TableCell>
-                        <TableCell className="max-w-[250px]">
-                          <span className="truncate block text-sm">
+                        <TableCell className="max-w-[200px]">
+                          <span className="truncate block text-sm" title={line.description || line.journal_entry?.description || ''}>
                             {line.description || line.journal_entry?.description}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          {line.journal_entry?.paid_by_user_name ? (
+                            <span className="text-sm text-muted-foreground">
+                              {line.journal_entry.paid_by_user_name}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/50">-</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">
                           {line.debit > 0 ? (

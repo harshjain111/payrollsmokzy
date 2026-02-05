@@ -109,6 +109,7 @@ export type Database = {
           proof_url: string | null
           reimbursed_at: string | null
           reimbursed_by: string | null
+          reimbursed_by_user_name: string | null
           rejection_reason: string | null
           staff_id: string
           status: Database["public"]["Enums"]["expense_status"]
@@ -129,6 +130,7 @@ export type Database = {
           proof_url?: string | null
           reimbursed_at?: string | null
           reimbursed_by?: string | null
+          reimbursed_by_user_name?: string | null
           rejection_reason?: string | null
           staff_id: string
           status?: Database["public"]["Enums"]["expense_status"]
@@ -149,6 +151,7 @@ export type Database = {
           proof_url?: string | null
           reimbursed_at?: string | null
           reimbursed_by?: string | null
+          reimbursed_by_user_name?: string | null
           rejection_reason?: string | null
           staff_id?: string
           status?: Database["public"]["Enums"]["expense_status"]
@@ -188,6 +191,8 @@ export type Database = {
           id: string
           is_immutable: boolean
           is_legacy: boolean
+          paid_by: string | null
+          paid_by_user_name: string | null
           reference_id: string | null
           reference_no: string
           reference_type: string | null
@@ -202,6 +207,8 @@ export type Database = {
           id?: string
           is_immutable?: boolean
           is_legacy?: boolean
+          paid_by?: string | null
+          paid_by_user_name?: string | null
           reference_id?: string | null
           reference_no: string
           reference_type?: string | null
@@ -216,6 +223,8 @@ export type Database = {
           id?: string
           is_immutable?: boolean
           is_legacy?: boolean
+          paid_by?: string | null
+          paid_by_user_name?: string | null
           reference_id?: string | null
           reference_no?: string
           reference_type?: string | null
@@ -428,6 +437,7 @@ export type Database = {
           ledger_entry_id: string | null
           paid_at: string | null
           paid_by: string | null
+          paid_by_user_name: string | null
           payout_type: string | null
           reason: string
           rejection_reason: string | null
@@ -446,6 +456,7 @@ export type Database = {
           ledger_entry_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
+          paid_by_user_name?: string | null
           payout_type?: string | null
           reason: string
           rejection_reason?: string | null
@@ -464,6 +475,7 @@ export type Database = {
           ledger_entry_id?: string | null
           paid_at?: string | null
           paid_by?: string | null
+          paid_by_user_name?: string | null
           payout_type?: string | null
           reason?: string
           rejection_reason?: string | null
@@ -569,6 +581,7 @@ export type Database = {
           opening_advance_balance: number | null
           paid_at: string | null
           paid_by: string | null
+          paid_by_user_name: string | null
           payment_mode: string | null
           payout_journal_entry_id: string | null
           settled_at: string | null
@@ -594,6 +607,7 @@ export type Database = {
           opening_advance_balance?: number | null
           paid_at?: string | null
           paid_by?: string | null
+          paid_by_user_name?: string | null
           payment_mode?: string | null
           payout_journal_entry_id?: string | null
           settled_at?: string | null
@@ -619,6 +633,7 @@ export type Database = {
           opening_advance_balance?: number | null
           paid_at?: string | null
           paid_by?: string | null
+          paid_by_user_name?: string | null
           payment_mode?: string | null
           payout_journal_entry_id?: string | null
           settled_at?: string | null

@@ -68,6 +68,8 @@ interface SalaryPayoutParams {
   settlementId: string;
   paymentRequestId: string;
   createdBy: string;
+   paidByUserId?: string;
+   paidByUserName?: string;
 }
 
 interface ExpenseApprovalParams {
@@ -87,6 +89,8 @@ interface ExpensePayoutParams {
   amount: number;
   paymentMode: PaymentMode;
   createdBy: string;
+   paidByUserId?: string;
+   paidByUserName?: string;
 }
 
 interface AdvancePaidParams {
@@ -96,6 +100,8 @@ interface AdvancePaidParams {
   paymentMode: PaymentMode;
   paymentRequestId: string;
   createdBy: string;
+   paidByUserId?: string;
+   paidByUserName?: string;
 }
 
 // Account code mapping
@@ -356,7 +362,9 @@ export async function createSalaryPayoutEntry(params: SalaryPayoutParams): Promi
     paymentMode, 
     settlementId,
     paymentRequestId,
-    createdBy 
+    createdBy,
+    paidByUserId,
+    paidByUserName,
   } = params;
 
   if (netPayable <= 0) {
@@ -381,16 +389,57 @@ export async function createSalaryPayoutEntry(params: SalaryPayoutParams): Promi
     },
   ];
 
-  return createJournalEntry({
-    transactionType: 'salary_payout',
-    staffId,
-    description: `Salary paid to ${staffName} - ${settlementMonth}`,
-    referenceId: paymentRequestId,
-    referenceType: 'payment_request',
-    createdBy,
-    lines,
-    isImmutable: true,
-  });
+  // Validate balance
+  validateBalance(lines);
+
+  // Generate reference number
+  const referenceNo = await generateReferenceNo('salary_payout');
+
+  // Create journal entry header with paid_by fields
+  const { data: journalEntry, error: journalError } = await supabase
+    .from('journal_entries')
+    .insert({
+      entry_date: new Date().toISOString().split('T')[0],
+      reference_no: referenceNo,
+      description: `Salary paid to ${staffName} - ${settlementMonth}`,
+      transaction_type: 'salary_payout',
+      reference_id: paymentRequestId || null,
+      reference_type: 'payment_request',
+      staff_id: staffId,
+      is_immutable: true,
+      created_by: createdBy,
+      paid_by: paidByUserId || createdBy,
+      paid_by_user_name: paidByUserName || null,
+    })
+    .select()
+    .single();
+
+  if (journalError || !journalEntry) {
+    throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+  }
+
+  // Create journal lines
+  const lineInserts = await Promise.all(
+    lines.map(async (line) => ({
+      journal_entry_id: journalEntry.id,
+      account_id: await getAccountId(line.accountCode),
+      staff_id: line.staffId || null,
+      debit: line.debit,
+      credit: line.credit,
+      description: line.description || null,
+    }))
+  );
+
+  const { error: linesError } = await supabase
+    .from('journal_lines')
+    .insert(lineInserts);
+
+  if (linesError) {
+    await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
+    throw new Error(`Failed to create journal lines: ${linesError.message}`);
+  }
+
+  return journalEntry.id;
 }
 
 /**
@@ -455,7 +504,9 @@ export async function createExpensePayoutEntry(params: ExpensePayoutParams): Pro
     expenseId, 
     amount, 
     paymentMode, 
-    createdBy 
+    createdBy,
+    paidByUserId,
+    paidByUserName,
   } = params;
 
   const paymentAccountCode = PAYMENT_MODE_TO_ACCOUNT[paymentMode];
@@ -476,16 +527,57 @@ export async function createExpensePayoutEntry(params: ExpensePayoutParams): Pro
     },
   ];
 
-  return createJournalEntry({
-    transactionType: 'expense_payout',
-    staffId,
-    description: `Expense reimbursed to ${staffName}`,
-    referenceId: expenseId,
-    referenceType: 'expense',
-    createdBy,
-    lines,
-    isImmutable: true,
-  });
+  // Validate balance
+  validateBalance(lines);
+
+  // Generate reference number
+  const referenceNo = await generateReferenceNo('expense_payout');
+
+  // Create journal entry header with paid_by fields
+  const { data: journalEntry, error: journalError } = await supabase
+    .from('journal_entries')
+    .insert({
+      entry_date: new Date().toISOString().split('T')[0],
+      reference_no: referenceNo,
+      description: `Expense reimbursed to ${staffName}`,
+      transaction_type: 'expense_payout',
+      reference_id: expenseId || null,
+      reference_type: 'expense',
+      staff_id: staffId,
+      is_immutable: true,
+      created_by: createdBy,
+      paid_by: paidByUserId || createdBy,
+      paid_by_user_name: paidByUserName || null,
+    })
+    .select()
+    .single();
+
+  if (journalError || !journalEntry) {
+    throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+  }
+
+  // Create journal lines
+  const lineInserts = await Promise.all(
+    lines.map(async (line) => ({
+      journal_entry_id: journalEntry.id,
+      account_id: await getAccountId(line.accountCode),
+      staff_id: line.staffId || null,
+      debit: line.debit,
+      credit: line.credit,
+      description: line.description || null,
+    }))
+  );
+
+  const { error: linesError } = await supabase
+    .from('journal_lines')
+    .insert(lineInserts);
+
+  if (linesError) {
+    await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
+    throw new Error(`Failed to create journal lines: ${linesError.message}`);
+  }
+
+  return journalEntry.id;
 }
 
 /**
@@ -502,7 +594,9 @@ export async function createAdvancePaidEntry(params: AdvancePaidParams): Promise
     amount, 
     paymentMode, 
     paymentRequestId,
-    createdBy 
+    createdBy,
+    paidByUserId,
+    paidByUserName,
   } = params;
 
   const paymentAccountCode = PAYMENT_MODE_TO_ACCOUNT[paymentMode];
@@ -523,16 +617,57 @@ export async function createAdvancePaidEntry(params: AdvancePaidParams): Promise
     },
   ];
 
-  return createJournalEntry({
-    transactionType: 'advance_paid',
-    staffId,
-    description: `Advance paid to ${staffName}`,
-    referenceId: paymentRequestId,
-    referenceType: 'payment_request',
-    createdBy,
-    lines,
-    isImmutable: true,
-  });
+  // Validate balance
+  validateBalance(lines);
+
+  // Generate reference number
+  const referenceNo = await generateReferenceNo('advance_paid');
+
+  // Create journal entry header with paid_by fields
+  const { data: journalEntry, error: journalError } = await supabase
+    .from('journal_entries')
+    .insert({
+      entry_date: new Date().toISOString().split('T')[0],
+      reference_no: referenceNo,
+      description: `Advance paid to ${staffName}`,
+      transaction_type: 'advance_paid',
+      reference_id: paymentRequestId || null,
+      reference_type: 'payment_request',
+      staff_id: staffId,
+      is_immutable: true,
+      created_by: createdBy,
+      paid_by: paidByUserId || createdBy,
+      paid_by_user_name: paidByUserName || null,
+    })
+    .select()
+    .single();
+
+  if (journalError || !journalEntry) {
+    throw new Error(`Failed to create journal entry: ${journalError?.message}`);
+  }
+
+  // Create journal lines
+  const lineInserts = await Promise.all(
+    lines.map(async (line) => ({
+      journal_entry_id: journalEntry.id,
+      account_id: await getAccountId(line.accountCode),
+      staff_id: line.staffId || null,
+      debit: line.debit,
+      credit: line.credit,
+      description: line.description || null,
+    }))
+  );
+
+  const { error: linesError } = await supabase
+    .from('journal_lines')
+    .insert(lineInserts);
+
+  if (linesError) {
+    await supabase.from('journal_entries').delete().eq('id', journalEntry.id);
+    throw new Error(`Failed to create journal lines: ${linesError.message}`);
+  }
+
+  return journalEntry.id;
 }
 
 /**
