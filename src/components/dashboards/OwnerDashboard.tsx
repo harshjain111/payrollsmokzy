@@ -85,7 +85,7 @@ export function OwnerDashboard() {
       </PageHeader>
 
       {/* Summary Stats */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 lg:gap-5 grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Active Staff"
           value={stats.activeStaff}
@@ -110,7 +110,7 @@ export function OwnerDashboard() {
         <StatCard
           title="Current Period"
           value={format(new Date(), 'MMM yyyy')}
-          subtitle="Settlement target"
+          subtitle="Settlement period"
           icon={Calculator}
           color="pink"
         />
@@ -118,8 +118,8 @@ export function OwnerDashboard() {
 
       {/* Action Tiles - Clickable */}
       <div className="space-y-2 sm:space-y-3">
-        <h2 className="text-base sm:text-lg font-semibold text-foreground">Action Required</h2>
-        <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+        <h2 className="text-base sm:text-lg lg:text-xl font-semibold text-foreground">Action Required</h2>
+        <div className="grid gap-3 sm:gap-4 lg:gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
           <ActionTile
             title="Pending Approvals"
             count={totalPendingApprovals}
@@ -142,7 +142,7 @@ export function OwnerDashboard() {
             title="Payouts Pending"
             count={totalPendingPayouts}
             amount={totalPendingPayoutsAmount}
-            subtitle="Approved & ready to pay"
+            subtitle="Approved and ready to pay"
             icon={CreditCard}
             href="/payouts?status=approved"
             variant="info"
@@ -151,12 +151,12 @@ export function OwnerDashboard() {
       </div>
 
       {/* Secondary Stats Tiles */}
-      <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-3 sm:gap-4 lg:gap-5 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
         <ActionTile
           title="Pending Expenses"
           count={stats.pendingExpenses}
           amount={stats.totalPendingExpensesAmount}
-          subtitle="Expense claims awaiting review"
+          subtitle="Expense claims awaiting approval"
           icon={Receipt}
           href="/expenses?status=pending"
           variant="warning"
@@ -165,7 +165,7 @@ export function OwnerDashboard() {
           title="Pending Advances"
           count={stats.pendingRequests}
           amount={stats.totalPendingRequestsAmount}
-          subtitle="Advance requests awaiting review"
+          subtitle="Advance requests awaiting approval"
           icon={Banknote}
           href="/requests?status=pending"
           variant="warning"
@@ -173,7 +173,7 @@ export function OwnerDashboard() {
         <ActionTile
           title="Staff Missing Salary"
           count={stats.staffMissingSalary}
-          subtitle="New staff without salary setup"
+          subtitle="Staff members without salary setup"
           icon={UserPlus}
           href="/staff?salary=missing"
           variant="warning"

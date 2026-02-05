@@ -81,22 +81,22 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
         )}
 
         <div className="relative flex items-start justify-between gap-2 sm:gap-4">
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             <p className={cn(
-              'text-xs sm:text-sm font-medium line-clamp-1',
+              'text-xs sm:text-sm font-medium',
               isGradient ? 'text-white/80' : 'text-muted-foreground'
             )}>
               {title}
             </p>
             <p className={cn(
-              'mt-1 sm:mt-2 text-xl sm:text-3xl font-bold tabular-nums tracking-tight truncate',
+              'mt-1 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-bold tabular-nums tracking-tight',
               isGradient ? 'text-white' : 'text-foreground'
             )}>
               {value}
             </p>
             {subtitle && (
               <p className={cn(
-                'mt-1 text-[10px] sm:text-sm line-clamp-1',
+                'mt-1 text-[10px] sm:text-xs lg:text-sm',
                 isGradient ? 'text-white/70' : 'text-muted-foreground'
               )}>
                 {subtitle}
