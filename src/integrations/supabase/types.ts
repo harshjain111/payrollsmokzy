@@ -347,6 +347,72 @@ export type Database = {
           },
         ]
       }
+      leave_records: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          created_at: string
+          created_by: string | null
+          deduction_days: number
+          id: string
+          is_immutable: boolean
+          leave_date: string
+          leave_type: Database["public"]["Enums"]["leave_type"]
+          rejection_reason: string | null
+          remarks: string | null
+          staff_id: string
+          status: Database["public"]["Enums"]["leave_status"]
+          updated_at: string
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deduction_days?: number
+          id?: string
+          is_immutable?: boolean
+          leave_date: string
+          leave_type?: Database["public"]["Enums"]["leave_type"]
+          rejection_reason?: string | null
+          remarks?: string | null
+          staff_id: string
+          status?: Database["public"]["Enums"]["leave_status"]
+          updated_at?: string
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deduction_days?: number
+          id?: string
+          is_immutable?: boolean
+          leave_date?: string
+          leave_type?: Database["public"]["Enums"]["leave_type"]
+          rejection_reason?: string | null
+          remarks?: string | null
+          staff_id?: string
+          status?: Database["public"]["Enums"]["leave_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ledger_entries: {
         Row: {
           approved_by: string | null
@@ -609,6 +675,10 @@ export type Database = {
           closing_advance_balance: number | null
           created_at: string
           created_by: string | null
+          deduction_adjusted_at: string | null
+          deduction_adjusted_by: string | null
+          deduction_adjustment_reason: string | null
+          final_deduction_days: number | null
           id: string
           journal_entry_id: string | null
           leave_days: number | null
@@ -626,6 +696,7 @@ export type Database = {
           settlement_month: string
           staff_id: string
           status: Database["public"]["Enums"]["settlement_status"] | null
+          system_deduction_days: number | null
           updated_at: string
         }
         Insert: {
@@ -635,6 +706,10 @@ export type Database = {
           closing_advance_balance?: number | null
           created_at?: string
           created_by?: string | null
+          deduction_adjusted_at?: string | null
+          deduction_adjusted_by?: string | null
+          deduction_adjustment_reason?: string | null
+          final_deduction_days?: number | null
           id?: string
           journal_entry_id?: string | null
           leave_days?: number | null
@@ -652,6 +727,7 @@ export type Database = {
           settlement_month: string
           staff_id: string
           status?: Database["public"]["Enums"]["settlement_status"] | null
+          system_deduction_days?: number | null
           updated_at?: string
         }
         Update: {
@@ -661,6 +737,10 @@ export type Database = {
           closing_advance_balance?: number | null
           created_at?: string
           created_by?: string | null
+          deduction_adjusted_at?: string | null
+          deduction_adjusted_by?: string | null
+          deduction_adjustment_reason?: string | null
+          final_deduction_days?: number | null
           id?: string
           journal_entry_id?: string | null
           leave_days?: number | null
@@ -678,6 +758,7 @@ export type Database = {
           settlement_month?: string
           staff_id?: string
           status?: Database["public"]["Enums"]["settlement_status"] | null
+          system_deduction_days?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -879,6 +960,16 @@ export type Database = {
         Args: { _category: Database["public"]["Enums"]["expense_category"] }
         Returns: string
       }
+      get_monthly_leave_records: {
+        Args: { _month: string; _staff_id: string }
+        Returns: {
+          deduction_days: number
+          id: string
+          leave_date: string
+          leave_type: Database["public"]["Enums"]["leave_type"]
+          remarks: string
+        }[]
+      }
       get_payment_account_code: {
         Args: { _payment_mode: Database["public"]["Enums"]["payment_mode"] }
         Returns: string
@@ -900,6 +991,10 @@ export type Database = {
         Returns: number
       }
       get_staff_salary_for_month: {
+        Args: { _month: string; _staff_id: string }
+        Returns: number
+      }
+      get_system_deduction_days: {
         Args: { _month: string; _staff_id: string }
         Returns: number
       }
@@ -950,6 +1045,8 @@ export type Database = {
         | "approved"
         | "rejected"
         | "reimbursed"
+      leave_status: "pending" | "approved" | "rejected"
+      leave_type: "paid" | "unpaid" | "penalty" | "custom"
       payment_mode: "cash" | "upi" | "bank_transfer" | "cheque"
       request_status: "pending" | "approved" | "rejected"
       settlement_status: "pending" | "settled"
@@ -1104,6 +1201,8 @@ export const Constants = {
         "rejected",
         "reimbursed",
       ],
+      leave_status: ["pending", "approved", "rejected"],
+      leave_type: ["paid", "unpaid", "penalty", "custom"],
       payment_mode: ["cash", "upi", "bank_transfer", "cheque"],
       request_status: ["pending", "approved", "rejected"],
       settlement_status: ["pending", "settled"],
