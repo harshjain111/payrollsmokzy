@@ -98,7 +98,7 @@ function getNavSections(
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
           { 
-            title: 'Requests', 
+            title: 'Request Advance', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
@@ -160,7 +160,7 @@ function getNavSections(
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
           { 
-            title: 'Requests', 
+            title: 'Request Advance', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
@@ -206,7 +206,7 @@ function getNavSections(
             { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
             { title: 'My Ledger', href: '/ledger', icon: FileText },
             { title: 'My Expenses', href: '/expenses', icon: Receipt },
-            { title: 'My Requests', href: '/requests', icon: ClipboardList },
+            { title: 'Request Advance', href: '/requests', icon: ClipboardList },
             { title: 'My Leaves', href: '/leave-records', icon: CalendarDays },
             { title: 'Settings', href: '/settings', icon: Settings },
           ],
@@ -220,7 +220,7 @@ function getNavSections(
           items: [
             { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
             { title: 'Staff', href: '/staff', icon: Briefcase },
-            { title: 'Requests', href: '/requests', icon: ClipboardList },
+            { title: 'Request Advance', href: '/requests', icon: ClipboardList },
             { 
               title: 'Expenses', 
               href: '/expenses', 
@@ -250,7 +250,7 @@ function getNavSections(
           { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
           { title: 'My Ledger', href: '/ledger', icon: FileText },
           { title: 'My Expenses', href: '/expenses', icon: Receipt },
-          { title: 'My Requests', href: '/requests', icon: ClipboardList },
+          { title: 'Request Advance', href: '/requests', icon: ClipboardList },
           { title: 'My Leaves', href: '/leave-records', icon: CalendarDays },
           { title: 'Settings', href: '/settings', icon: Settings },
         ],
