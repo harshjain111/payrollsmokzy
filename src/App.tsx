@@ -27,6 +27,7 @@ import Payouts from "./pages/Payouts";
 import Reports from "./pages/Reports";
 import AuditLog from "./pages/AuditLog";
 import Settings from "./pages/Settings";
+import LeaveRecords from "./pages/LeaveRecords";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -73,6 +74,7 @@ function AppRoutes() {
       <Route path="/expenses/new" element={<ProtectedRoute><NewExpense /></ProtectedRoute>} />
       <Route path="/payouts" element={<ProtectedRoute><Payouts /></ProtectedRoute>} />
       <Route path="/settlements" element={<ProtectedRoute><Settlements /></ProtectedRoute>} />
+      <Route path="/leave-records" element={<ProtectedRoute><LeaveRecords /></ProtectedRoute>} />
       <Route path="/salaries-advances" element={<ProtectedRoute><SalariesAdvances /></ProtectedRoute>} />
       <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
       <Route path="/audit-log" element={<ProtectedRoute><AuditLog /></ProtectedRoute>} />

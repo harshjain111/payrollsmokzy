@@ -24,13 +24,16 @@ import { toast } from '@/hooks/use-toast';
 import { EnhancedSettlementConfirmDialog } from '@/components/settlements/EnhancedSettlementConfirmDialog';
 import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentConfirmDialog';
 import { AdvanceAdjustmentInput } from '@/components/settlements/AdvanceAdjustmentInput';
+import { LeaveDeductionSection } from '@/components/settlements/LeaveDeductionSection';
 import { createSalarySettlementEntry } from '@/lib/journal-entries';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
   monthlySalary: number;
   dailySalary: number;
-  leaveDays: number;
+   systemDeductionDays: number;
+   finalDeductionDays: number;
+   deductionAdjustmentReason?: string;
   leaveDeduction: number;
   grossSalary: number;
   advancesOutstanding: number;
@@ -60,7 +63,10 @@ export default function Settlements() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>(searchParams.get('staff') || '');
   const [selectedMonth, setSelectedMonth] = useState<string>(searchParams.get('month') || format(subMonths(new Date(), 1), 'yyyy-MM'));
-  const [leaveDays, setLeaveDays] = useState(0);
+  // Leave deduction state (from LeaveDeductionSection)
+  const [systemDeductionDays, setSystemDeductionDays] = useState(0);
+  const [finalDeductionDays, setFinalDeductionDays] = useState(0);
+  const [deductionAdjustmentReason, setDeductionAdjustmentReason] = useState('');
   const [advanceToAdjust, setAdvanceToAdjust] = useState(0);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank_transfer');
   const [isCalculating, setIsCalculating] = useState(false);
@@ -81,9 +87,15 @@ export default function Settlements() {
   useEffect(() => {
     if (canAccessSettlements && selectedStaffId && selectedMonth) {
       validateSettlement();
+    }
+  }, [selectedStaffId, selectedMonth, canAccessSettlements]);
+
+  // Recalculate when deduction days change
+  useEffect(() => {
+    if (canAccessSettlements && selectedStaffId && selectedMonth) {
       calculateSettlement();
     }
-  }, [selectedStaffId, selectedMonth, leaveDays, canAccessSettlements]);
+  }, [selectedStaffId, selectedMonth, finalDeductionDays, canAccessSettlements]);
 
   // Recalculate when advance adjustment changes
   useEffect(() => {
@@ -166,6 +178,12 @@ export default function Settlements() {
       console.error('Error validating settlement:', error);
     }
   };
+  // Handle leave deduction changes from LeaveDeductionSection
+  const handleLeaveDeductionChange = (systemDays: number, finalDays: number, reason?: string) => {
+    setSystemDeductionDays(systemDays);
+    setFinalDeductionDays(finalDays);
+    setDeductionAdjustmentReason(reason || '');
+  };
 
   const calculateSettlement = async () => {
     if (!selectedStaffId || !selectedMonth) return;
@@ -194,7 +212,8 @@ export default function Settlements() {
       // CRITICAL FIX: Use actual days in month for per-day calculation (not hardcoded 30)
       // This ensures accurate leave deduction for 28/29/30/31 day months
       const dailySalary = monthlySalary / daysInMonth;
-      const leaveDeduction = dailySalary * leaveDays;
+      // Use finalDeductionDays from leave records (with owner override)
+      const leaveDeduction = dailySalary * finalDeductionDays;
       const grossSalary = monthlySalary - leaveDeduction;
       const advancesOutstanding = Number(advanceData) || 0;
       
@@ -207,18 +226,20 @@ export default function Settlements() {
       const carryForwardAdvance = advancesOutstanding - defaultAdjustment;
 
       const newWarnings = [...warnings.filter(w => !w.includes('leave'))];
-      if (leaveDays > 5) {
-        newWarnings.push(`High leave days (${leaveDays} days) - please verify`);
+      if (finalDeductionDays > 5) {
+        newWarnings.push(`High leave deduction (${finalDeductionDays} days) - please verify`);
       }
-      if (leaveDays > daysInMonth) {
-        newWarnings.push(`Leave days exceed days in month (${daysInMonth})`);
+      if (finalDeductionDays > daysInMonth) {
+        newWarnings.push(`Leave deduction exceeds days in month (${daysInMonth})`);
       }
       setWarnings(newWarnings);
 
       setCalculation({
         monthlySalary,
         dailySalary,
-        leaveDays,
+        systemDeductionDays,
+        finalDeductionDays,
+        deductionAdjustmentReason,
         leaveDeduction,
         grossSalary,
         advancesOutstanding,
@@ -263,19 +284,19 @@ export default function Settlements() {
     const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
     
     // VALIDATION 1: Leave days must be valid
-    if (leaveDays > 30) {
+    if (finalDeductionDays > 30) {
       toast({
         title: 'Invalid Leave Days',
-        description: 'Leave days cannot exceed 30.',
+        description: 'Leave deduction days cannot exceed 30.',
         variant: 'destructive',
       });
       return;
     }
 
-    if (leaveDays > daysInMonth) {
+    if (finalDeductionDays > daysInMonth) {
       toast({
         title: 'Invalid Leave Days',
-        description: `Leave days cannot exceed ${daysInMonth} for this month.`,
+        description: `Leave deduction cannot exceed ${daysInMonth} for this month.`,
         variant: 'destructive',
       });
       return;
@@ -383,7 +404,7 @@ export default function Settlements() {
           staff_id: selectedStaffId,
           settlement_month: selectedMonth,
           base_salary: calculation.monthlySalary,
-          leave_days: calculation.leaveDays,
+          leave_days: calculation.finalDeductionDays,
           leave_deduction: calculation.leaveDeduction,
           net_salary: calculation.grossSalary,
           advances_adjusted: calculation.advanceToAdjust,
@@ -394,6 +415,11 @@ export default function Settlements() {
           settled_at: new Date().toISOString(),
           settled_by: user.id,
           journal_entry_id: journalEntryId, // Link to double-entry journal
+          system_deduction_days: calculation.systemDeductionDays,
+          final_deduction_days: calculation.finalDeductionDays,
+          deduction_adjustment_reason: calculation.deductionAdjustmentReason || null,
+          deduction_adjusted_by: calculation.finalDeductionDays < calculation.systemDeductionDays ? user.id : null,
+          deduction_adjusted_at: calculation.finalDeductionDays < calculation.systemDeductionDays ? new Date().toISOString() : null,
           created_by: user.id,
         })
         .select()
@@ -435,6 +461,17 @@ export default function Settlements() {
 
         if (payoutRequestError) throw payoutRequestError;
       }
+      // Mark leave records for this month as immutable
+      const monthStart = format(parseISO(selectedMonth + '-01'), 'yyyy-MM-dd');
+      const monthEnd = format(new Date(parseISO(selectedMonth + '-01').getFullYear(), parseISO(selectedMonth + '-01').getMonth() + 1, 0), 'yyyy-MM-dd');
+      
+      await supabase
+        .from('leave_records')
+        .update({ is_immutable: true })
+        .eq('staff_id', selectedStaffId)
+        .eq('status', 'approved')
+        .gte('leave_date', monthStart)
+        .lte('leave_date', monthEnd);
 
       toast({
         title: 'Salary Settled',
@@ -443,7 +480,9 @@ export default function Settlements() {
 
       // Reset form
       setSelectedStaffId('');
-      setLeaveDays(0);
+      setSystemDeductionDays(0);
+      setFinalDeductionDays(0);
+      setDeductionAdjustmentReason('');
       setAdvanceToAdjust(0);
       setCalculation(null);
       setIsAlreadySettled(false);
@@ -476,7 +515,7 @@ export default function Settlements() {
 
   const selectedStaff = staff.find(s => s.id === selectedStaffId);
   const daysInMonth = selectedMonth ? getDaysInMonth(parseISO(selectedMonth + '-01')) : 30;
-  const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && leaveDays <= 30;
+  const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && finalDeductionDays <= 30;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -559,28 +598,16 @@ export default function Settlements() {
 
             <Separator />
 
-            <div className="space-y-2">
-              <Label htmlFor="leaveDays">
-                Leave Days to Deduct
-                <Badge variant="outline" className="ml-2">{daysInMonth} days in month</Badge>
-              </Label>
-              <Input
-                id="leaveDays"
-                type="number"
-                min="0"
-                max="30"
-                value={leaveDays}
-                onChange={(e) => {
-                  const value = Number(e.target.value) || 0;
-                  setLeaveDays(Math.min(30, Math.max(0, value)));
-                }}
-                placeholder="0"
+            {/* Leave Deduction Section - Integrated with Leave Records */}
+            {selectedStaffId && selectedMonth && !isAlreadySettled && (
+              <LeaveDeductionSection
+                staffId={selectedStaffId}
+                month={selectedMonth}
+                dailySalary={calculation?.dailySalary || 0}
+                onDeductionChange={handleLeaveDeductionChange}
                 disabled={isAlreadySettled}
               />
-              <p className="text-xs text-muted-foreground">
-                Unpaid leave days (max 30). Daily rate = Salary / 30
-              </p>
-            </div>
+            )}
 
             {/* Partial Advance Adjustment */}
             {calculation && calculation.advancesOutstanding > 0 && !isAlreadySettled && (
@@ -641,7 +668,7 @@ export default function Settlements() {
                 
                 <div className="flex justify-between items-center py-2">
                   <span className="text-muted-foreground">
-                    Leave Deduction ({calculation.leaveDays} days × ₹{calculation.dailySalary.toFixed(2)})
+                    Leave Deduction ({calculation.finalDeductionDays} days × ₹{calculation.dailySalary.toFixed(2)})
                   </span>
                   <span className="text-destructive font-medium">
                     -<Amount value={calculation.leaveDeduction} />
@@ -725,7 +752,7 @@ export default function Settlements() {
             month={format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
             snapshot={{
               baseSalary: calculation.monthlySalary,
-              leaveDays: calculation.leaveDays,
+              leaveDays: calculation.finalDeductionDays,
               leaveDeduction: calculation.leaveDeduction,
               grossSalary: calculation.grossSalary,
               openingAdvanceBalance: calculation.advancesOutstanding,

@@ -55,6 +55,7 @@ import {
   PanelLeft,
   Briefcase,
   ArrowUpRight,
+  CalendarDays,
 } from 'lucide-react';
 
 interface NavItem {
@@ -120,6 +121,7 @@ function getNavSections(
         title: 'Salary',
         items: [
           { title: 'Salaries & Advances', href: '/salaries-advances', icon: Wallet },
+          { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
           { title: 'Settlements', href: '/settlements', icon: Calculator },
         ],
       },
@@ -175,6 +177,7 @@ function getNavSections(
             icon: CreditCard,
             badge: counts.approvedExpenses,
           },
+          { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
         ],
       },
       {
@@ -204,6 +207,7 @@ function getNavSections(
             { title: 'My Ledger', href: '/ledger', icon: FileText },
             { title: 'My Expenses', href: '/expenses', icon: Receipt },
             { title: 'My Requests', href: '/requests', icon: ClipboardList },
+            { title: 'My Leaves', href: '/leave-records', icon: CalendarDays },
             { title: 'Settings', href: '/settings', icon: Settings },
           ],
         },
@@ -228,6 +232,7 @@ function getNavSections(
               icon: CreditCard,
               badge: counts.approvedExpenses,
             },
+            { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
             { title: 'Ledger', href: '/ledger', icon: FileText },
             { title: 'Reports', href: '/reports', icon: BarChart3 },
             { title: 'Settings', href: '/settings', icon: Settings },
@@ -246,6 +251,7 @@ function getNavSections(
           { title: 'My Ledger', href: '/ledger', icon: FileText },
           { title: 'My Expenses', href: '/expenses', icon: Receipt },
           { title: 'My Requests', href: '/requests', icon: ClipboardList },
+          { title: 'My Leaves', href: '/leave-records', icon: CalendarDays },
           { title: 'Settings', href: '/settings', icon: Settings },
         ],
       },
