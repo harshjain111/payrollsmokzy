@@ -231,11 +231,11 @@ export default function Requests() {
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
-        title="Payment Requests"
+        title="Request Advance"
         description={
           canApprove
-            ? "Review and approve payment requests"
-            : "View and create payment requests"
+            ? "Review and approve advance requests"
+            : "View and create advance requests"
         }
       >
         {canCreateRequest && (
