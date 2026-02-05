@@ -25,6 +25,13 @@ import { toast } from '@/hooks/use-toast';
 import type { ExpenseCategory, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 
+interface Event {
+  id: string;
+  event_date: string;
+  location: string;
+  client_name: string | null;
+}
+
 export default function NewExpense() {
   const navigate = useNavigate();
   const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
@@ -41,6 +48,9 @@ export default function NewExpense() {
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [proofFile, setProofFile] = useState<File | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<string>('');
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isFetchingEvents, setIsFetchingEvents] = useState(true);
 
   // Staff creating for themselves
   // Accountant in personal mode also creates for themselves
@@ -58,7 +68,25 @@ export default function NewExpense() {
     } else {
       setIsFetchingStaff(false);
     }
+    fetchEvents();
   }, [isPersonalRequest, staffData?.id, canRequestForOthers]);
+
+  const fetchEvents = async () => {
+    try {
+      setIsFetchingEvents(true);
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, event_date, location, client_name')
+        .order('event_date', { ascending: false });
+
+      if (error) throw error;
+      setEvents(data || []);
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    } finally {
+      setIsFetchingEvents(false);
+    }
+  };
 
   const fetchStaffList = async () => {
     try {
@@ -160,6 +188,7 @@ export default function NewExpense() {
           status: asDraft ? 'draft' as const : 'pending' as const,
           submitted_at: asDraft ? null : new Date().toISOString(),
           created_by: user?.id,
+          event_id: selectedEventId || null,
         })
         .select()
         .single();
@@ -322,6 +351,28 @@ export default function NewExpense() {
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          {/* Related Event (Optional) */}
+          <div className="space-y-2">
+            <Label htmlFor="event" className="text-sm">Related Event (Optional)</Label>
+            <Select value={selectedEventId} onValueChange={setSelectedEventId}>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Select an event (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">No event</SelectItem>
+                {events.map((event) => (
+                  <SelectItem key={event.id} value={event.id}>
+                    {format(new Date(event.event_date), 'dd MMM yyyy')} - {event.location}
+                    {event.client_name && ` (${event.client_name})`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Optionally link this expense to an event or party
+            </p>
           </div>
 
           {/* Description */}

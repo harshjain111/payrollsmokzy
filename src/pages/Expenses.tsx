@@ -17,7 +17,8 @@ import {
   Check, 
   X, 
   Eye,
-  ArrowRight
+  ArrowRight,
+  Calendar
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -26,6 +27,7 @@ import { EXPENSE_CATEGORY_LABELS, EXPENSE_STATUS_LABELS } from '@/types/database
 import { ExpenseDetailsDialog } from '@/components/expenses/ExpenseDetailsDialog';
 import { ApproveExpenseDialog } from '@/components/expenses/ApproveExpenseDialog';
 import { RejectExpenseDialog } from '@/components/expenses/RejectExpenseDialog';
+import { CreateEventDialog } from '@/components/events/CreateEventDialog';
 
 export default function Expenses() {
   const { 
@@ -47,6 +49,7 @@ export default function Expenses() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
+  const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
@@ -144,21 +147,37 @@ export default function Expenses() {
   // Only Owner and Admin can approve/reject (NOT Accountant)
   const canApprove = canApproveExpenses;
 
+  // Only Owner, Admin, Accountant can create events (NOT Staff)
+  const canCreateEvent = isOwner || isAdmin || isAccountant;
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
         title="Expenses"
         description="Submit and review expense claims"
       >
-        {canCreateExpense && (
-          <Link to="/expenses/new">
-            <Button className="text-sm sm:text-base px-3 sm:px-4">
-              <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">New Expense</span>
-              <span className="sm:hidden">New</span>
+        <div className="flex items-center gap-2">
+          {canCreateEvent && (
+            <Button 
+              variant="outline" 
+              className="text-sm sm:text-base px-3 sm:px-4"
+              onClick={() => setShowCreateEventDialog(true)}
+            >
+              <Calendar className="mr-1.5 sm:mr-2 h-4 w-4" />
+              <span className="hidden sm:inline">Create Event</span>
+              <span className="sm:hidden">Event</span>
             </Button>
-          </Link>
-        )}
+          )}
+          {canCreateExpense && (
+            <Link to="/expenses/new">
+              <Button className="text-sm sm:text-base px-3 sm:px-4">
+                <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">New Expense</span>
+                <span className="sm:hidden">New</span>
+              </Button>
+            </Link>
+          )}
+        </div>
       </PageHeader>
 
       {/* Search and Filters */}
@@ -314,6 +333,12 @@ export default function Expenses() {
           />
         </>
       )}
+
+      {/* Create Event Dialog */}
+      <CreateEventDialog
+        open={showCreateEventDialog}
+        onOpenChange={setShowCreateEventDialog}
+      />
     </div>
   );
 }
