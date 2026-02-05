@@ -12,6 +12,7 @@ import { Amount } from '@/components/ui/amount';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, Check, ArrowRight } from 'lucide-react';
+import { Calendar, Gift } from 'lucide-react';
 
 interface SettlementSnapshot {
   baseSalary: number;
@@ -22,6 +23,7 @@ interface SettlementSnapshot {
   advanceAdjusted: number;
   closingAdvanceBalance: number;
   netPayable: number;
+  systemDeductionDays?: number;
 }
 
 interface EnhancedSettlementConfirmDialogProps {
@@ -47,6 +49,8 @@ export function EnhancedSettlementConfirmDialog({
 }: EnhancedSettlementConfirmDialogProps) {
   const hasWarnings = snapshot.leaveDays > 5 || snapshot.openingAdvanceBalance > 0;
   const hasCarryForward = snapshot.closingAdvanceBalance > 0;
+  const hasLeaveOverride = snapshot.systemDeductionDays !== undefined && 
+    snapshot.leaveDays < snapshot.systemDeductionDays;
   
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -83,6 +87,33 @@ export function EnhancedSettlementConfirmDialog({
               <Separator />
 
               {/* Salary Calculation */}
+              {/* Leave Deduction Summary */}
+              {snapshot.leaveDays > 0 && (
+                <div className="p-3 rounded-lg bg-muted/50 space-y-1.5 text-sm">
+                  <p className="font-medium flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Leave Deduction
+                  </p>
+                  {snapshot.systemDeductionDays !== undefined && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">From approved leaves</span>
+                      <span>{snapshot.systemDeductionDays} days</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Final deduction</span>
+                    <span className="font-medium">{snapshot.leaveDays} days</span>
+                  </div>
+                  {hasLeaveOverride && (
+                    <div className="flex items-center gap-1.5 text-xs text-success pt-1">
+                      <Gift className="h-3 w-3" />
+                      <span>Owner reduced deduction</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Salary Breakdown */}
               <div className="text-sm space-y-2">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Base Salary</span>
