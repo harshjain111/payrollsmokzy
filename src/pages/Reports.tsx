@@ -54,9 +54,12 @@ import {
   exportSummaryPDF,
 } from '@/lib/pdf-export';
 import { TrialBalance } from '@/components/reports/TrialBalance';
+import { EventWiseExpenseReport } from '@/components/reports/EventWiseExpenseReport';
+import { CategoryWiseExpenseReport } from '@/components/reports/CategoryWiseExpenseReport';
+import { StaffExpenseReport } from '@/components/reports/StaffExpenseReport';
 import type { Staff } from '@/types/database';
 
-type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary' | 'trial_balance';
+type ReportType = 'ledger' | 'salary' | 'advance' | 'expense' | 'payment' | 'summary' | 'trial_balance' | 'event_expense' | 'category_expense' | 'staff_expense';
 
 interface DateRange {
   from: Date;
@@ -446,7 +449,7 @@ export default function Reports() {
         <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className={cn(
             "inline-flex w-max min-w-full sm:w-full sm:grid gap-1",
-            canSeeSalaryReports ? "sm:grid-cols-7" : "sm:grid-cols-5"
+            canSeeSalaryReports ? "sm:grid-cols-10" : "sm:grid-cols-8"
           )}>
             <TabsTrigger value="summary" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
               <BarChart3 className="h-4 w-4" />
@@ -473,6 +476,18 @@ export default function Reports() {
             <TabsTrigger value="expense" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
               <Receipt className="h-4 w-4" />
               <span className="text-xs sm:text-sm">Expenses</span>
+            </TabsTrigger>
+            <TabsTrigger value="event_expense" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <Receipt className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">By Event</span>
+            </TabsTrigger>
+            <TabsTrigger value="category_expense" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <Receipt className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">By Category</span>
+            </TabsTrigger>
+            <TabsTrigger value="staff_expense" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
+              <Users className="h-4 w-4" />
+              <span className="text-xs sm:text-sm">By Staff</span>
             </TabsTrigger>
             <TabsTrigger value="payment" className="flex items-center gap-1 px-3 sm:px-4 whitespace-nowrap">
               <FileSpreadsheet className="h-4 w-4" />
@@ -821,6 +836,21 @@ export default function Reports() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Event-Wise Expense Report */}
+        <TabsContent value="event_expense" className="mt-4">
+          <EventWiseExpenseReport />
+        </TabsContent>
+
+        {/* Category-Wise Expense Report */}
+        <TabsContent value="category_expense" className="mt-4">
+          <CategoryWiseExpenseReport />
+        </TabsContent>
+
+        {/* Staff Expense Report */}
+        <TabsContent value="staff_expense" className="mt-4">
+          <StaffExpenseReport />
         </TabsContent>
 
         <TabsContent value="payment" className="mt-4">
