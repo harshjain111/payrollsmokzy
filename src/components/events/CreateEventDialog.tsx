@@ -33,17 +33,17 @@
   * 
   * Event identity = date + location
   */
- export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEventDialogProps) {
-   const { user, isOwner, isAdmin, isAccountant } = useAuth();
-   const [isSubmitting, setIsSubmitting] = useState(false);
-   
-   // Form fields
-   const [eventDate, setEventDate] = useState<Date>(new Date());
-   const [location, setLocation] = useState('');
-   const [clientName, setClientName] = useState('');
- 
-   // Permission check
-   const canCreateEvent = isOwner || isAdmin || isAccountant;
+export function CreateEventDialog({ open, onOpenChange, onSuccess }: CreateEventDialogProps) {
+  const { user, isOwner, isAdmin, isAccountant } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Form fields
+  const [eventDate, setEventDate] = useState<Date>(new Date());
+  const [location, setLocation] = useState('');
+  const [clientName, setClientName] = useState('');
+
+  // Permission check - Owner, Admin, and Accountant can all create events
+  const canCreateEvent = isOwner || isAdmin || isAccountant;
  
    const handleSubmit = async () => {
      if (!canCreateEvent || !user) return;
