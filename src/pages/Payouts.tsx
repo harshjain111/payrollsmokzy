@@ -92,7 +92,7 @@ export default function Payouts() {
   
   // Payout dialog state
   const [selectedItem, setSelectedItem] = useState<PayoutItem | null>(null);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('bank_transfer');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
 
@@ -315,7 +315,7 @@ export default function Payouts() {
       });
 
       setSelectedItem(null);
-      setPaymentMode('bank_transfer');
+      setPaymentMode('cash');
       setPaidBy(null);
       fetchApprovedItems();
     } catch (error: any) {
@@ -332,7 +332,7 @@ export default function Payouts() {
 
   const openPayoutDialog = (item: PayoutItem) => {
     setSelectedItem(item);
-    setPaymentMode('bank_transfer');
+    setPaymentMode('cash');
     setPaidBy(null); // Will be set to current user by PaidBySelector
   };
 
