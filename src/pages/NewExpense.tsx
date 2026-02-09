@@ -47,7 +47,7 @@ export default function NewExpense() {
   const [category, setCategory] = useState<ExpenseCategory>('other');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
-  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proofFiles, setProofFiles] = useState<File[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [events, setEvents] = useState<Event[]>([]);
   const [isFetchingEvents, setIsFetchingEvents] = useState(true);
@@ -119,37 +119,62 @@ export default function NewExpense() {
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file size (max 5MB)
+    const files = e.target.files;
+    if (!files) return;
+    
+    const newFiles: File[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       if (file.size > 5 * 1024 * 1024) {
         toast({
           title: 'File too large',
-          description: 'Please select a file smaller than 5MB',
+          description: `"${file.name}" exceeds 5MB limit and was skipped`,
           variant: 'destructive',
         });
-        return;
+        continue;
       }
-      setProofFile(file);
+      newFiles.push(file);
     }
+    
+    const total = proofFiles.length + newFiles.length;
+    if (total > 5) {
+      toast({
+        title: 'Too many files',
+        description: 'Maximum 5 files allowed per expense',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    setProofFiles(prev => [...prev, ...newFiles]);
+    // Reset input so same file can be re-selected
+    e.target.value = '';
   };
 
-  const uploadProof = async (): Promise<string | null> => {
-    if (!proofFile || !user) return null;
+  const removeFile = (index: number) => {
+    setProofFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
-    const fileExt = proofFile.name.split('.').pop();
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+  const uploadProofs = async (): Promise<string | null> => {
+    if (proofFiles.length === 0 || !user) return null;
 
-    const { data, error } = await supabase.storage
-      .from('expense-proofs')
-      .upload(fileName, proofFile);
+    const paths: string[] = [];
+    for (const file of proofFiles) {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
 
-    if (error) {
-      console.error('Error uploading proof:', error);
-      throw new Error('Failed to upload proof');
+      const { data, error } = await supabase.storage
+        .from('expense-proofs')
+        .upload(fileName, file);
+
+      if (error) {
+        console.error('Error uploading proof:', error);
+        throw new Error(`Failed to upload ${file.name}`);
+      }
+      paths.push(data.path);
     }
 
-    return data.path;
+    return paths.join(',');
   };
 
   const handleSubmit = async (asDraft: boolean) => {
@@ -183,10 +208,10 @@ export default function NewExpense() {
     try {
       setIsSubmitting(true);
 
-      // Upload proof if present
+      // Upload proofs if present
       let proofUrl: string | null = null;
-      if (proofFile) {
-        proofUrl = await uploadProof();
+      if (proofFiles.length > 0) {
+        proofUrl = await uploadProofs();
       }
 
       const { data: newExpense, error } = await supabase
@@ -403,23 +428,39 @@ export default function NewExpense() {
 
           {/* Proof Upload */}
           <div className="space-y-2">
-            <Label htmlFor="proof" className="text-sm">Upload picture of receipt or proof of expense</Label>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+            <Label htmlFor="proof" className="text-sm">Upload pictures of receipt or proof of expense</Label>
+            <div className="flex flex-col gap-2">
               <Input
                 id="proof"
                 type="file"
                 accept="image/*,.pdf"
+                multiple
                 onChange={handleFileChange}
                 className="cursor-pointer h-11"
               />
-              {proofFile && (
-                <span className="text-xs sm:text-sm text-muted-foreground truncate max-w-[200px]">
-                  {proofFile.name}
-                </span>
+              {proofFiles.length > 0 && (
+                <div className="space-y-1.5">
+                  {proofFiles.map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-2 rounded-lg bg-muted/40">
+                      <span className="text-xs sm:text-sm text-muted-foreground truncate max-w-[200px]">
+                        {file.name}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        onClick={() => removeFile(index)}
+                      >
+                        ×
+                      </Button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
             <p className="text-[10px] sm:text-xs text-muted-foreground">
-              Max 5MB, images or PDF
+              Max 5MB per file, up to 5 files. Images or PDF.
             </p>
           </div>
 
