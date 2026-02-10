@@ -50,7 +50,7 @@ export function EnhancedSettlementConfirmDialog({
   const hasWarnings = snapshot.leaveDays > 5 || snapshot.openingAdvanceBalance > 0;
   const hasCarryForward = snapshot.closingAdvanceBalance > 0;
   const hasLeaveOverride = snapshot.systemDeductionDays !== undefined && 
-    snapshot.leaveDays < snapshot.systemDeductionDays;
+    snapshot.leaveDays !== snapshot.systemDeductionDays;
   
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
@@ -105,9 +105,9 @@ export function EnhancedSettlementConfirmDialog({
                     <span className="font-medium">{snapshot.leaveDays} days</span>
                   </div>
                   {hasLeaveOverride && (
-                    <div className="flex items-center gap-1.5 text-xs text-success pt-1">
+                    <div className="flex items-center gap-1.5 text-xs text-primary pt-1">
                       <Gift className="h-3 w-3" />
-                      <span>Owner reduced deduction</span>
+                      <span>Owner adjusted deduction ({snapshot.systemDeductionDays}d → {snapshot.leaveDays}d)</span>
                     </div>
                   )}
                 </div>
