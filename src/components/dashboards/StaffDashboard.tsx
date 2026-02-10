@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useStaffBalance } from '@/hooks/useStaffBalance';
 import { LanguageToggle } from '@/components/staff/LanguageToggle';
 import { QuickAdvanceForm } from '@/components/staff/QuickAdvanceForm';
-import { QuickExpenseForm } from '@/components/staff/QuickExpenseForm';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,6 +34,7 @@ type RecentItem = {
 };
 
 export function StaffDashboard() {
+  const navigate = useNavigate();
   const { staffData } = useAuth();
   const { t } = useLanguage();
   
@@ -46,7 +47,6 @@ export function StaffDashboard() {
   const [isLoadingRecent, setIsLoadingRecent] = useState(true);
   
   const [showAdvanceForm, setShowAdvanceForm] = useState(false);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   useEffect(() => {
     if (staffData?.id) {
@@ -268,7 +268,7 @@ export function StaffDashboard() {
           </Button>
 
           <Button
-            onClick={() => setShowExpenseForm(true)}
+            onClick={() => navigate('/expenses/new')}
             variant="secondary"
             className="w-full h-16 text-lg font-semibold shadow-lg"
             size="lg"
@@ -331,11 +331,6 @@ export function StaffDashboard() {
       <QuickAdvanceForm
         open={showAdvanceForm}
         onOpenChange={setShowAdvanceForm}
-        onSuccess={handleFormSuccess}
-      />
-      <QuickExpenseForm
-        open={showExpenseForm}
-        onOpenChange={setShowExpenseForm}
         onSuccess={handleFormSuccess}
       />
     </div>
