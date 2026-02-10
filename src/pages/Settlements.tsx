@@ -209,12 +209,44 @@ export default function Settlements() {
 
       const monthlySalary = Number(salaryData) || 0;
       const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
-      // CRITICAL FIX: Use actual days in month for per-day calculation (not hardcoded 30)
-      // This ensures accurate leave deduction for 28/29/30/31 day months
       const dailySalary = monthlySalary / daysInMonth;
+
+      // PRO-RATA: Calculate effective working days for mid-month joining/exit
+      const monthStart = parseISO(selectedMonth + '-01');
+      const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0);
+      
+      let effectiveDays = daysInMonth;
+      const currentStaff = staff.find(s => s.id === selectedStaffId);
+
+      if (currentStaff) {
+        const joiningDate = parseISO(currentStaff.date_of_joining);
+        
+        // If joined mid-month in the settlement month
+        if (joiningDate > monthStart && joiningDate <= monthEnd) {
+          // Days from joining date to end of month (inclusive)
+          effectiveDays = daysInMonth - joiningDate.getDate() + 1;
+        }
+        
+        // If staff is inactive, check if they were deactivated this month
+        // (pro-rata for exit — uses last day as end of active period)
+        if (!currentStaff.is_active) {
+          const updatedAt = parseISO(currentStaff.updated_at);
+          if (updatedAt >= monthStart && updatedAt <= monthEnd) {
+            const exitDay = updatedAt.getDate();
+            const joiningDay = (joiningDate > monthStart && joiningDate <= monthEnd) 
+              ? joiningDate.getDate() 
+              : 1;
+            effectiveDays = exitDay - joiningDay + 1;
+          }
+        }
+      }
+
+      // Pro-rata salary = (monthly / daysInMonth) * effectiveDays
+      const proRataSalary = dailySalary * effectiveDays;
+
       // Use finalDeductionDays from leave records (with owner override)
       const leaveDeduction = dailySalary * finalDeductionDays;
-      const grossSalary = monthlySalary - leaveDeduction;
+      const grossSalary = Math.max(0, proRataSalary - leaveDeduction);
       const advancesOutstanding = Number(advanceData) || 0;
       
       // Default: adjust full outstanding (up to gross salary)
@@ -225,17 +257,20 @@ export default function Settlements() {
       const netPayable = Math.max(0, grossSalary - defaultAdjustment);
       const carryForwardAdvance = advancesOutstanding - defaultAdjustment;
 
-      const newWarnings = [...warnings.filter(w => !w.includes('leave'))];
+      const newWarnings = [...warnings.filter(w => !w.includes('leave') && !w.includes('Pro-rata'))];
+      if (effectiveDays < daysInMonth) {
+        newWarnings.push(`Pro-rata: ${effectiveDays} of ${daysInMonth} days (₹${proRataSalary.toFixed(0)} of ₹${monthlySalary})`);
+      }
       if (finalDeductionDays > 5) {
         newWarnings.push(`High leave deduction (${finalDeductionDays} days) - please verify`);
       }
-      if (finalDeductionDays > daysInMonth) {
-        newWarnings.push(`Leave deduction exceeds days in month (${daysInMonth})`);
+      if (finalDeductionDays > effectiveDays) {
+        newWarnings.push(`Leave deduction exceeds effective working days (${effectiveDays})`);
       }
       setWarnings(newWarnings);
 
       setCalculation({
-        monthlySalary,
+        monthlySalary: proRataSalary, // Store pro-rata as the effective salary
         dailySalary,
         systemDeductionDays,
         finalDeductionDays,
@@ -283,20 +318,11 @@ export default function Settlements() {
 
     const daysInMonth = getDaysInMonth(parseISO(selectedMonth + '-01'));
     
-    // VALIDATION 1: Leave days must be valid
-    if (finalDeductionDays > 30) {
+    // VALIDATION 1: Leave days must be reasonable
+    if (finalDeductionDays < 0) {
       toast({
         title: 'Invalid Leave Days',
-        description: 'Leave deduction days cannot exceed 30.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (finalDeductionDays > daysInMonth) {
-      toast({
-        title: 'Invalid Leave Days',
-        description: `Leave deduction cannot exceed ${daysInMonth} for this month.`,
+        description: 'Leave deduction days cannot be negative.',
         variant: 'destructive',
       });
       return;
@@ -418,8 +444,8 @@ export default function Settlements() {
           system_deduction_days: calculation.systemDeductionDays,
           final_deduction_days: calculation.finalDeductionDays,
           deduction_adjustment_reason: calculation.deductionAdjustmentReason || null,
-          deduction_adjusted_by: calculation.finalDeductionDays < calculation.systemDeductionDays ? user.id : null,
-          deduction_adjusted_at: calculation.finalDeductionDays < calculation.systemDeductionDays ? new Date().toISOString() : null,
+          deduction_adjusted_by: calculation.finalDeductionDays !== calculation.systemDeductionDays ? user.id : null,
+          deduction_adjusted_at: calculation.finalDeductionDays !== calculation.systemDeductionDays ? new Date().toISOString() : null,
           created_by: user.id,
         })
         .select()
@@ -515,7 +541,7 @@ export default function Settlements() {
 
   const selectedStaff = staff.find(s => s.id === selectedStaffId);
   const daysInMonth = selectedMonth ? getDaysInMonth(parseISO(selectedMonth + '-01')) : 30;
-  const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && finalDeductionDays <= 30;
+  const canSettle = calculation && !isAlreadySettled && validation?.valid !== false && finalDeductionDays >= 0;
 
   return (
     <div className="space-y-4 md:space-y-6">

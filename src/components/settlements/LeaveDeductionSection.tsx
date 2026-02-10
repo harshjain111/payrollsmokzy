@@ -45,7 +45,7 @@ import { cn } from '@/lib/utils';
    const [adjustmentReason, setAdjustmentReason] = useState('');
  
    const isOwner = userRole === 'owner';
-   const hasOverride = finalDeductionDays < systemDeductionDays;
+   const hasOverride = finalDeductionDays !== systemDeductionDays;
  
    useEffect(() => {
      if (staffId && month) {
@@ -91,11 +91,11 @@ import { cn } from '@/lib/utils';
      }
    };
  
-   const handleFinalDeductionChange = (value: number) => {
-     // Owner can only REDUCE deduction, never increase
-     const clamped = Math.min(systemDeductionDays, Math.max(0, value));
-     setFinalDeductionDays(clamped);
-   };
+  const handleFinalDeductionChange = (value: number) => {
+    // Owner can freely set deduction days (increase or decrease)
+    const clamped = Math.max(0, value);
+    setFinalDeductionDays(clamped);
+  };
  
    const systemDeductionAmount = systemDeductionDays * dailySalary;
    const finalDeductionAmount = finalDeductionDays * dailySalary;
@@ -182,11 +182,11 @@ import { cn } from '@/lib/utils';
          <Separator />
  
         {/* Owner Override Section */}
-        {isOwner && systemDeductionDays > 0 ? (
+        {isOwner && (
           <div className="space-y-3 p-3 rounded-lg border bg-card">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Gift className="h-4 w-4 text-success" />
+                <Gift className="h-4 w-4 text-primary" />
                 <Label htmlFor="finalDeduction" className="text-sm font-medium">
                   Final Deduction (Owner Override)
                 </Label>
@@ -196,7 +196,6 @@ import { cn } from '@/lib/utils';
                   id="finalDeduction"
                   type="number"
                   min="0"
-                  max={systemDeductionDays}
                   step="0.5"
                   value={finalDeductionDays}
                   onChange={(e) => handleFinalDeductionChange(Number(e.target.value) || 0)}
@@ -208,16 +207,24 @@ import { cn } from '@/lib/utils';
             </div>
             
             {hasOverride && (
-              <div className="flex items-center gap-2 p-2 rounded-md bg-success/10 text-success">
+              <div className={cn(
+                "flex items-center gap-2 p-2 rounded-md",
+                finalDeductionDays < systemDeductionDays 
+                  ? "bg-success/10 text-success" 
+                  : "bg-warning/10 text-warning"
+              )}>
                 <CheckCircle className="h-4 w-4" />
                 <span className="text-sm">
-                  Saving <Amount value={adjustmentAmount} className="font-medium" /> for staff
+                  {finalDeductionDays < systemDeductionDays 
+                    ? <>Saving <Amount value={adjustmentAmount} className="font-medium" /> for staff</>
+                    : <>Adding {finalDeductionDays - systemDeductionDays} extra deduction days</>
+                  }
                 </span>
               </div>
             )}
             
             <p className="text-xs text-muted-foreground">
-              You can reduce deduction for goodwill but cannot exceed system value.
+              System value: {systemDeductionDays} days. You can adjust freely as Owner.
             </p>
             
             {hasOverride && (
@@ -227,7 +234,7 @@ import { cn } from '@/lib/utils';
                   id="adjustmentReason"
                   value={adjustmentReason}
                   onChange={(e) => setAdjustmentReason(e.target.value)}
-                  placeholder="e.g., Good performance, medical emergency..."
+                  placeholder="e.g., Good performance, absence without leave, medical emergency..."
                   rows={2}
                   disabled={disabled}
                   className="text-sm"
@@ -235,14 +242,15 @@ import { cn } from '@/lib/utils';
               </div>
             )}
           </div>
-        ) : !isOwner && systemDeductionDays > 0 ? (
+        )}
+        {!isOwner && systemDeductionDays > 0 && (
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
               Only the Owner can adjust final deduction amounts.
             </AlertDescription>
           </Alert>
-        ) : null}
+        )}
  
          {leaveRecords.length === 0 && systemDeductionDays === 0 && (
           <Alert className="bg-muted/30">
