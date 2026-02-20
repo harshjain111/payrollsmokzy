@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.sync-to-financial]
 verify_jwt = false
+
+[functions.receive-reimbursement]
+verify_jwt = false
