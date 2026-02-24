@@ -31,7 +31,7 @@ export function RejectExpenseDialog({
   onOpenChange,
   onSuccess,
 }: RejectExpenseDialogProps) {
-  const { user } = useAuth();
+  const { user, staffData } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [reason, setReason] = useState('');
 
@@ -59,6 +59,8 @@ export function RejectExpenseDialog({
     try {
       setIsSubmitting(true);
 
+      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+
       const { error } = await supabase
         .from('expenses')
         .update({
@@ -66,6 +68,7 @@ export function RejectExpenseDialog({
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           rejection_reason: reason.trim(),
+          approved_by_user_name: approverName,
         })
         .eq('id', expense.id);
 

@@ -126,6 +126,7 @@ export type Database = {
           amount: number
           approved_at: string | null
           approved_by: string | null
+          approved_by_user_name: string | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at: string
           created_by: string | null
@@ -148,6 +149,7 @@ export type Database = {
           amount: number
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_user_name?: string | null
           category: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by?: string | null
@@ -170,6 +172,7 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_user_name?: string | null
           category?: Database["public"]["Enums"]["expense_category"]
           created_at?: string
           created_by?: string | null
@@ -535,6 +538,7 @@ export type Database = {
           amount: number
           approved_at: string | null
           approved_by: string | null
+          approved_by_user_name: string | null
           created_at: string
           id: string
           ledger_entry_id: string | null
@@ -554,6 +558,7 @@ export type Database = {
           amount: number
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_user_name?: string | null
           created_at?: string
           id?: string
           ledger_entry_id?: string | null
@@ -573,6 +578,7 @@ export type Database = {
           amount?: number
           approved_at?: string | null
           approved_by?: string | null
+          approved_by_user_name?: string | null
           created_at?: string
           id?: string
           ledger_entry_id?: string | null
