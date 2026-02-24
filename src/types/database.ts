@@ -138,6 +138,7 @@ export interface PaymentRequest {
   reason: string;
   status: RequestStatus;
   approved_by?: string;
+  approved_by_user_name?: string;
   approved_at?: string;
   rejection_reason?: string;
   paid_at?: string;
@@ -186,6 +187,7 @@ export interface Expense {
   status: ExpenseStatus;
   submitted_at?: string;
   approved_by?: string;
+  approved_by_user_name?: string;
   approved_at?: string;
   rejection_reason?: string;
   reimbursed_at?: string;

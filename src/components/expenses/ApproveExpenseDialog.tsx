@@ -31,7 +31,7 @@ export function ApproveExpenseDialog({
   onOpenChange,
   onSuccess,
 }: ApproveExpenseDialogProps) {
-  const { user } = useAuth();
+  const { user, staffData } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleApprove = async () => {
@@ -74,6 +74,9 @@ export function ApproveExpenseDialog({
         createdBy: user.id,
       });
 
+      // Get approver name from staff data or user metadata
+      const approverName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
+
       // Update expense status and link to journal entry
       const { error } = await supabase
         .from('expenses')
@@ -81,6 +84,7 @@ export function ApproveExpenseDialog({
           status: 'approved',
           approved_by: user.id,
           approved_at: new Date().toISOString(),
+          approved_by_user_name: approverName,
         })
         .eq('id', expense.id);
 

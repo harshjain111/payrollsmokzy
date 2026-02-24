@@ -147,6 +147,19 @@ export function ExpenseDetailsDialog({
             </>
           )}
 
+          {/* Approved/Rejected By */}
+          {expense.approved_by_user_name && (
+            <>
+              <Separator />
+              <div className="text-sm">
+                <p className="text-muted-foreground">
+                  {expense.status === 'rejected' ? 'Rejected by' : 'Approved by'}
+                </p>
+                <p className="font-medium">{expense.approved_by_user_name}</p>
+              </div>
+            </>
+          )}
+
           {/* Timeline */}
           <Separator />
           <div className="space-y-2 text-xs text-muted-foreground">

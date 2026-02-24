@@ -257,6 +257,11 @@ export default function Expenses() {
                         <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                           <span className="truncate max-w-[120px] sm:max-w-none">{expense.staff?.full_name}</span>
                           <span>{format(new Date(expense.expense_date), 'dd MMM')}</span>
+                          {expense.approved_by_user_name && (
+                            <span className="text-[10px] sm:text-xs italic">
+                              {expense.status === 'rejected' ? 'Rejected' : 'Approved'} by: {expense.approved_by_user_name}
+                            </span>
+                          )}
                         </div>
                         
                         <div className="flex items-center gap-1 sm:gap-2">

@@ -46,7 +46,7 @@ export default function Requests() {
     user, 
     isAccountant, 
     accountingMode,
-    canApproveRequests 
+    canApproveRequests
   } = useAuth();
   
   const [requests, setRequests] = useState<RequestWithStaff[]>([]);
@@ -116,12 +116,15 @@ export default function Requests() {
 
     setIsProcessing(true);
     try {
+      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+
       const { error } = await supabase
         .from('payment_requests')
         .update({
           status: 'approved',
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
+          approved_by_user_name: approverName,
         })
         .eq('id', request.id);
 
@@ -180,6 +183,8 @@ export default function Requests() {
     
     setIsProcessing(true);
     try {
+      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+
       const { error } = await supabase
         .from('payment_requests')
         .update({
@@ -187,6 +192,7 @@ export default function Requests() {
           approved_by: user?.id,
           approved_at: new Date().toISOString(),
           rejection_reason: rejectionReason,
+          approved_by_user_name: approverName,
         })
         .eq('id', selectedRequest.id);
 
@@ -286,9 +292,14 @@ export default function Requests() {
                       <StatusBadge status={request.status} />
                     </div>
                     <p className="text-xs sm:text-sm text-muted-foreground line-clamp-2">{request.reason}</p>
+                    {request.approved_by_user_name && request.status !== 'pending' && (
+                      <p className="text-[10px] sm:text-xs text-muted-foreground italic">
+                        {request.status === 'rejected' ? 'Rejected' : 'Approved'} by: {request.approved_by_user_name}
+                      </p>
+                    )}
                     {request.rejection_reason && (
                       <p className="text-[10px] sm:text-xs text-destructive line-clamp-1">
-                        Rejected: {request.rejection_reason}
+                        Reason: {request.rejection_reason}
                       </p>
                     )}
                     <div className="flex items-center justify-between pt-1 sm:pt-2">
@@ -334,14 +345,15 @@ export default function Requests() {
               <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-secondary/50">
-                      <TableHead>Date</TableHead>
-                      <TableHead>Staff</TableHead>
-                      <TableHead className="max-w-[300px]">Reason</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
+                     <TableRow className="bg-secondary/50">
+                       <TableHead>Date</TableHead>
+                       <TableHead>Staff</TableHead>
+                       <TableHead className="max-w-[300px]">Reason</TableHead>
+                       <TableHead className="text-right">Amount</TableHead>
+                       <TableHead>Status</TableHead>
+                       <TableHead>Approved By</TableHead>
+                       <TableHead className="text-right">Actions</TableHead>
+                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {requests.map((request) => (
@@ -368,10 +380,17 @@ export default function Requests() {
                         <TableCell className="text-right">
                           <Amount value={request.amount} />
                         </TableCell>
-                        <TableCell>
-                          <StatusBadge status={request.status} />
-                        </TableCell>
-                        <TableCell className="text-right">
+                         <TableCell>
+                           <StatusBadge status={request.status} />
+                         </TableCell>
+                         <TableCell>
+                           {request.approved_by_user_name ? (
+                             <span className="text-sm text-muted-foreground">{request.approved_by_user_name}</span>
+                           ) : (
+                             <span className="text-sm text-muted-foreground">—</span>
+                           )}
+                         </TableCell>
+                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             {canApprove && request.status === 'pending' && (
                               <>
