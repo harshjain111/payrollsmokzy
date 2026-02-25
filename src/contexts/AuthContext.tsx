@@ -44,13 +44,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accountingMode, setAccountingMode] = useState(false);
 
   useEffect(() => {
+    let initTimedOut = false;
+
+    // Hard timeout: if auth init takes > 8s, force to login screen
+    const initTimeout = window.setTimeout(() => {
+      initTimedOut = true;
+      console.warn('Auth initialization timed out — clearing stale session');
+      // Clear any stale supabase auth tokens
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch (_) { /* ignore */ }
+      setSession(null);
+      setUser(null);
+      setUserRole(null);
+      setStaffData(null);
+      setIsLoading(false);
+    }, 8000);
+
+    const clearInitTimeout = () => window.clearTimeout(initTimeout);
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (initTimedOut) return; // ignore late callbacks
+        clearInitTimeout();
         setSession(session);
         setUser(session?.user ?? null);
 
-        // Defer fetching additional data
         if (session?.user) {
           setTimeout(() => {
             fetchUserData(session.user.id);
@@ -66,6 +93,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // THEN check for existing session
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
+        if (initTimedOut) return;
+        clearInitTimeout();
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -76,7 +105,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((error) => {
+        if (initTimedOut) return;
+        clearInitTimeout();
         console.error('Error restoring auth session:', error);
+        // Clear stale tokens on session restore failure
+        try {
+          const keysToRemove: string[] = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(k => localStorage.removeItem(k));
+        } catch (_) { /* ignore */ }
         setSession(null);
         setUser(null);
         setUserRole(null);
@@ -84,7 +126,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(false);
       });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearInitTimeout();
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchUserData = async (userId: string) => {
