@@ -40,6 +40,21 @@ export default function Auth() {
       navigate('/dashboard');
     }
   }, [user, authLoading, navigate]);
+
+  // Clear stale auth session on mount to prevent infinite refresh loops
+  useEffect(() => {
+    if (!user && !authLoading) {
+      // Remove stale supabase auth keys from localStorage
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    }
+  }, [user, authLoading]);
   const formatPhoneInput = (value: string) => {
     // Remove all non-digits
     const digits = value.replace(/\D/g, '');
