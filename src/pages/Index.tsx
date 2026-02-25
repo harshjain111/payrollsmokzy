@@ -9,12 +9,15 @@ const Index = () => {
 
   useEffect(() => {
     if (!isLoading) {
-      if (user) {
-        navigate('/dashboard');
-      } else {
-        navigate('/auth');
-      }
+      navigate(user ? '/dashboard' : '/auth');
+      return;
     }
+
+    const timeoutId = window.setTimeout(() => {
+      navigate('/auth');
+    }, 7000);
+
+    return () => window.clearTimeout(timeoutId);
   }, [user, isLoading, navigate]);
 
   return (

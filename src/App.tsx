@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -35,6 +36,24 @@ const queryClient = new QueryClient();
 // Protected route wrapper
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
+  const [loadingTimedOut, setLoadingTimedOut] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingTimedOut(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLoadingTimedOut(true);
+    }, 7000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isLoading]);
+
+  if (loadingTimedOut) {
+    return <Navigate to="/auth" replace />;
+  }
 
   if (isLoading) {
     return (
