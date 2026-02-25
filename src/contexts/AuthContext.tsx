@@ -64,16 +64,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchUserData(session.user.id);
-      } else {
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          fetchUserData(session.user.id);
+        } else {
+          setIsLoading(false);
+        }
+      })
+      .catch((error) => {
+        console.error('Error restoring auth session:', error);
+        setSession(null);
+        setUser(null);
+        setUserRole(null);
+        setStaffData(null);
         setIsLoading(false);
-      }
-    });
+      });
 
     return () => subscription.unsubscribe();
   }, []);
