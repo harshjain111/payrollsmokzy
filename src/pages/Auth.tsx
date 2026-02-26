@@ -20,6 +20,7 @@ const phoneToEmail = (phone: string) => {
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SIGN_IN_TIMEOUT_MS = 12000;
+const SIGN_IN_SPINNER_FAILSAFE_MS = 20000;
 
 const isLikelyNetworkError = (message = '') => {
   const normalized = message.toLowerCase();
@@ -93,6 +94,18 @@ export default function Auth() {
 
   const formatPhoneInput = (value: string) => value.replace(/\D/g, '');
 
+  useEffect(() => {
+    if (!isLoading) return;
+
+    const spinnerFailsafe = window.setTimeout(() => {
+      setIsLoading(false);
+      setNetworkError(true);
+      toast.error('Sign-in is taking too long. Please check your network and try again.');
+    }, SIGN_IN_SPINNER_FAILSAFE_MS);
+
+    return () => window.clearTimeout(spinnerFailsafe);
+  }, [isLoading]);
+
   const checkConnection = async () => {
     setIsCheckingConnection(true);
     try {
@@ -140,53 +153,62 @@ export default function Auth() {
 
     setIsLoading(true);
     const pseudoEmail = phoneToEmail(cleanPhone);
+    let isAuthenticated = false;
 
-    // Attempt with one retry for transient network drops
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const { error } = await runSignInWithTimeout(
-        () => signIn(pseudoEmail, loginPassword),
-        SIGN_IN_TIMEOUT_MS
-      );
+    try {
+      // Attempt with one retry for transient network drops
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { error } = await runSignInWithTimeout(
+          () => signIn(pseudoEmail, loginPassword),
+          SIGN_IN_TIMEOUT_MS
+        );
 
-      if (!error) {
-        // Success
-        if (rememberMe) {
-          localStorage.setItem('rememberMe', 'true');
-          localStorage.setItem('savedPhone', cleanPhone);
-        } else {
-          localStorage.removeItem('rememberMe');
-          localStorage.removeItem('savedPhone');
+        if (!error) {
+          // Success
+          if (rememberMe) {
+            localStorage.setItem('rememberMe', 'true');
+            localStorage.setItem('savedPhone', cleanPhone);
+          } else {
+            localStorage.removeItem('rememberMe');
+            localStorage.removeItem('savedPhone');
+          }
+          isAuthenticated = true;
+          toast.success('Welcome back!');
+          setIsLoading(false);
+          navigate('/dashboard');
+          return;
         }
-        toast.success('Welcome back!');
-        navigate('/dashboard');
-        setIsLoading(false);
-        return;
+
+        lastError = error;
+
+        // Only retry on network errors, not auth errors
+        const isNetworkErr = isLikelyNetworkError(error.message);
+        if (!isNetworkErr || attempt === 1) break;
+
+        // Brief backoff before retry
+        await new Promise(r => setTimeout(r, 1500));
       }
 
-      lastError = error;
+      if (lastError) {
+        const msg = lastError.message || '';
+        const isNetworkErr = isLikelyNetworkError(msg);
 
-      // Only retry on network errors, not auth errors
-      const isNetworkErr = isLikelyNetworkError(error.message);
-      if (!isNetworkErr || attempt === 1) break;
-
-      // Brief backoff before retry
-      await new Promise(r => setTimeout(r, 1500));
-    }
-
-    setIsLoading(false);
-
-    if (lastError) {
-      const msg = lastError.message || '';
-      const isNetworkErr = isLikelyNetworkError(msg);
-
-      if (isNetworkErr) {
-        setNetworkError(true);
-        toast.error('Network error — unable to reach the server.');
-      } else if (msg.includes('Invalid login credentials')) {
-        toast.error('Invalid phone number or password');
-      } else {
-        toast.error(msg);
+        if (isNetworkErr) {
+          setNetworkError(true);
+          toast.error('Network error — unable to reach the server.');
+        } else if (msg.includes('Invalid login credentials')) {
+          toast.error('Invalid phone number or password');
+        } else {
+          toast.error(msg);
+        }
+      }
+    } catch {
+      setNetworkError(true);
+      toast.error('Sign-in request was interrupted. Please try again.');
+    } finally {
+      if (!isAuthenticated) {
+        setIsLoading(false);
       }
     }
   };
