@@ -19,6 +19,41 @@ const phoneToEmail = (phone: string) => {
 };
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SIGN_IN_TIMEOUT_MS = 12000;
+
+const isLikelyNetworkError = (message = '') => {
+  const normalized = message.toLowerCase();
+  return [
+    'failed to fetch',
+    'networkerror',
+    'load failed',
+    'fetch',
+    'timed out',
+    'timeout',
+    'network request failed',
+  ].some(pattern => normalized.includes(pattern));
+};
+
+const runSignInWithTimeout = async (
+  signInFn: () => Promise<{ error: Error | null }>,
+  timeoutMs: number
+): Promise<{ error: Error | null }> => {
+  let timeoutId: number | undefined;
+
+  const timeoutPromise = new Promise<{ error: Error }>((resolve) => {
+    timeoutId = window.setTimeout(() => {
+      resolve({ error: new Error('Sign-in request timed out') });
+    }, timeoutMs);
+  });
+
+  const result = await Promise.race([signInFn(), timeoutPromise]);
+
+  if (timeoutId) {
+    window.clearTimeout(timeoutId);
+  }
+
+  return result;
+};
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -84,6 +119,13 @@ export default function Auth() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setNetworkError(false);
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setNetworkError(true);
+      toast.error('You appear to be offline. Please check your internet and try again.');
+      return;
+    }
+
     const cleanPhone = formatPhoneInput(loginPhone);
 
     try {
@@ -102,7 +144,11 @@ export default function Auth() {
     // Attempt with one retry for transient network drops
     let lastError: Error | null = null;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const { error } = await signIn(pseudoEmail, loginPassword);
+      const { error } = await runSignInWithTimeout(
+        () => signIn(pseudoEmail, loginPassword),
+        SIGN_IN_TIMEOUT_MS
+      );
+
       if (!error) {
         // Success
         if (rememberMe) {
@@ -117,14 +163,13 @@ export default function Auth() {
         setIsLoading(false);
         return;
       }
+
       lastError = error;
 
       // Only retry on network errors, not auth errors
-      const isNetworkErr = error.message?.includes('Failed to fetch') ||
-        error.message?.includes('NetworkError') ||
-        error.message?.includes('Load failed') ||
-        error.message?.includes('fetch');
+      const isNetworkErr = isLikelyNetworkError(error.message);
       if (!isNetworkErr || attempt === 1) break;
+
       // Brief backoff before retry
       await new Promise(r => setTimeout(r, 1500));
     }
@@ -133,10 +178,7 @@ export default function Auth() {
 
     if (lastError) {
       const msg = lastError.message || '';
-      const isNetworkErr = msg.includes('Failed to fetch') ||
-        msg.includes('NetworkError') ||
-        msg.includes('Load failed') ||
-        msg.includes('fetch');
+      const isNetworkErr = isLikelyNetworkError(msg);
 
       if (isNetworkErr) {
         setNetworkError(true);
