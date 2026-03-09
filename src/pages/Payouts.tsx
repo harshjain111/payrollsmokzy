@@ -728,7 +728,7 @@ export default function Payouts() {
             <Button variant="outline" onClick={() => setSelectedItem(null)} disabled={isProcessing} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleExecutePayout} disabled={isProcessing} className="w-full sm:w-auto">
+            <Button onClick={handleExecutePayout} disabled={isProcessing || (paymentMode === 'petty_cash' && !!selectedItem && pettyCashBalance < selectedItem.amount)} className="w-full sm:w-auto">
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
