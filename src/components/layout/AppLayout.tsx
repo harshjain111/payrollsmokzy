@@ -179,6 +179,7 @@ function getNavSections(
             icon: CreditCard,
             badge: counts.approvedExpenses,
           },
+          { title: 'Petty Cash', href: '/petty-cash', icon: Coins },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
         ],
       },
