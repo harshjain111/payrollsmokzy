@@ -76,7 +76,7 @@ export function ExpenseExplorer() {
         .gte('expense_date', format(dateRange.from, 'yyyy-MM-dd'))
         .lte('expense_date', format(dateRange.to, 'yyyy-MM-dd'));
 
-      if (selectedStatus !== 'all') query = query.eq('status', selectedStatus);
+      if (selectedStatus !== 'all') query = query.eq('status', selectedStatus as 'draft' | 'pending' | 'approved' | 'rejected' | 'reimbursed');
       else query = query.in('status', ['pending', 'approved', 'reimbursed', 'rejected']);
       if (selectedStaffId !== 'all') query = query.eq('staff_id', selectedStaffId);
       if (selectedEventId !== 'all') query = query.eq('event_id', selectedEventId);
