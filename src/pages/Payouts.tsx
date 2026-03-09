@@ -51,6 +51,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'upi', label: 'UPI' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'cheque', label: 'Cheque' },
+  { value: 'petty_cash', label: 'Petty Cash' },
 ];
 
 interface ApprovedExpense extends Expense {
@@ -96,14 +97,30 @@ export default function Payouts() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
+  const [pettyCashBalance, setPettyCashBalance] = useState<number>(0);
 
   useEffect(() => {
     if (canExecutePayout) {
       fetchApprovedItems();
+      fetchPettyCashBalance();
     } else {
       setIsLoading(false);
     }
   }, [canExecutePayout]);
+
+  const fetchPettyCashBalance = async () => {
+    try {
+      const { data, error } = await (supabase.from as any)('petty_cash_transactions')
+        .select('balance_after')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (!error && data && data.length > 0) {
+        setPettyCashBalance(data[0].balance_after);
+      }
+    } catch (e) {
+      console.error('Failed to fetch petty cash balance:', e);
+    }
+  };
 
   const fetchApprovedItems = async () => {
     setIsLoading(true);
@@ -253,7 +270,22 @@ export default function Payouts() {
         });
       }
 
-      // Update the source record based on type
+      // Record petty cash transaction if paid via petty cash
+      if (paymentMode === 'petty_cash' && user) {
+        const newPcBalance = pettyCashBalance - selectedItem.amount;
+        const pcType = selectedItem.type === 'expense' ? 'expense_payment' : 'advance_payment';
+        await (supabase.from as any)('petty_cash_transactions').insert({
+          transaction_type: pcType,
+          amount: selectedItem.amount,
+          balance_after: newPcBalance,
+          reference_type: selectedItem.type === 'expense' ? 'expense' : 'payment_request',
+          reference_id: selectedItem.id,
+          notes: `${selectedItem.description} - ${selectedItem.staffName}`,
+          created_by: user.id,
+        });
+        setPettyCashBalance(newPcBalance);
+      }
+
       // NOTE: ledger_entry_id references legacy ledger_entries table
       // Journal entries are tracked separately via journal_entry_id where applicable
       if (selectedItem.type === 'expense') {
@@ -664,6 +696,18 @@ export default function Payouts() {
                     ))}
                   </SelectContent>
                 </Select>
+                {paymentMode === 'petty_cash' && selectedItem && (
+                  <div className={`mt-2 p-2 rounded-lg text-xs ${
+                    pettyCashBalance < selectedItem.amount 
+                      ? 'bg-destructive/10 text-destructive' 
+                      : 'bg-muted/50 text-muted-foreground'
+                  }`}>
+                    <p>Petty Cash Balance: ₹{pettyCashBalance.toLocaleString('en-IN')}</p>
+                    {pettyCashBalance < selectedItem.amount && (
+                      <p className="font-medium mt-1">Insufficient petty cash balance!</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <PaidBySelector
@@ -684,7 +728,7 @@ export default function Payouts() {
             <Button variant="outline" onClick={() => setSelectedItem(null)} disabled={isProcessing} className="w-full sm:w-auto">
               Cancel
             </Button>
-            <Button onClick={handleExecutePayout} disabled={isProcessing} className="w-full sm:w-auto">
+            <Button onClick={handleExecutePayout} disabled={isProcessing || (paymentMode === 'petty_cash' && !!selectedItem && pettyCashBalance < selectedItem.amount)} className="w-full sm:w-auto">
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
