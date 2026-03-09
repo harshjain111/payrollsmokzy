@@ -97,14 +97,30 @@ export default function Payouts() {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
+  const [pettyCashBalance, setPettyCashBalance] = useState<number>(0);
 
   useEffect(() => {
     if (canExecutePayout) {
       fetchApprovedItems();
+      fetchPettyCashBalance();
     } else {
       setIsLoading(false);
     }
   }, [canExecutePayout]);
+
+  const fetchPettyCashBalance = async () => {
+    try {
+      const { data, error } = await (supabase.from as any)('petty_cash_transactions')
+        .select('balance_after')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      if (!error && data && data.length > 0) {
+        setPettyCashBalance(data[0].balance_after);
+      }
+    } catch (e) {
+      console.error('Failed to fetch petty cash balance:', e);
+    }
+  };
 
   const fetchApprovedItems = async () => {
     setIsLoading(true);
