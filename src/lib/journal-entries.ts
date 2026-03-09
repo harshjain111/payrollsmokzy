@@ -17,7 +17,7 @@ export type TransactionType =
   | 'advance_paid'         // Debit: Staff Advances (Receivable), Credit: Bank/Cash
   | 'advance_adjustment';  // Debit: Salary Expense (adjusted), Credit: Staff Advances
 
-export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque';
+export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'petty_cash';
 
 export type ExpenseCategory = 
   | 'travel' 
@@ -109,6 +109,7 @@ const ACCOUNT_CODES = {
   CASH: '1000',
   BANK: '1100',
   STAFF_ADVANCES: '1200',
+  PETTY_CASH: '1300',
   STAFF_PAYABLE: '2000',
   SALARY_EXPENSE: '5000',
   TRAVEL_EXPENSE: '5100',
@@ -135,6 +136,7 @@ const PAYMENT_MODE_TO_ACCOUNT: Record<PaymentMode, string> = {
   upi: ACCOUNT_CODES.BANK,
   bank_transfer: ACCOUNT_CODES.BANK,
   cheque: ACCOUNT_CODES.BANK,
+  petty_cash: ACCOUNT_CODES.PETTY_CASH,
 };
 
 /**

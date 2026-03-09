@@ -51,6 +51,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'upi', label: 'UPI' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
   { value: 'cheque', label: 'Cheque' },
+  { value: 'petty_cash', label: 'Petty Cash' },
 ];
 
 interface ApprovedExpense extends Expense {
