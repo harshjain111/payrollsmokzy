@@ -76,6 +76,7 @@ type PayoutItem = {
   date: string;
   referenceMonth?: string;
   settlementId?: string;
+  approvedByUserName?: string | null;
 };
 
 export default function Payouts() {
@@ -371,6 +372,7 @@ export default function Payouts() {
           description: `Expense: ${expense.description}`,
           category: EXPENSE_CATEGORY_LABELS[expense.category],
           date: expense.approved_at || expense.expense_date,
+          approvedByUserName: expense.approved_by_user_name,
         });
       });
     }
@@ -388,6 +390,7 @@ export default function Payouts() {
           amount: request.amount,
           description: `Advance: ${request.reason}`,
           date: request.approved_at || request.created_at,
+          approvedByUserName: request.approved_by_user_name,
         });
       });
     }
@@ -410,6 +413,7 @@ export default function Payouts() {
           description: salary.reason,
           date: salary.approved_at || salary.created_at,
           settlementId: salary.settlement_id,
+          approvedByUserName: salary.approved_by_user_name,
         });
       });
     }
@@ -575,11 +579,18 @@ export default function Payouts() {
                           {item.description}
                         </p>
                         
-                        {/* Bottom row: Date + Pay button */}
+                        {/* Bottom row: Approved info + Pay button */}
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[10px] sm:text-xs text-muted-foreground">
-                            Approved: {item.date ? format(new Date(item.date), 'dd MMM') : '-'}
-                          </p>
+                          <div className="flex flex-col">
+                            <p className="text-[10px] sm:text-xs text-muted-foreground">
+                              Approved: {item.date ? format(new Date(item.date), 'dd MMM') : '-'}
+                            </p>
+                            {item.approvedByUserName && (
+                              <p className="text-[10px] sm:text-xs text-muted-foreground italic">
+                                by {item.approvedByUserName}
+                              </p>
+                            )}
+                          </div>
                           <Button 
                             onClick={() => openPayoutDialog(item)}
                             size="sm"
@@ -626,6 +637,12 @@ export default function Payouts() {
                   <span className="text-muted-foreground shrink-0">Description</span>
                   <span className="text-right line-clamp-2 text-[10px] sm:text-xs">{selectedItem.description}</span>
                 </div>
+                {selectedItem.approvedByUserName && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Approved By</span>
+                    <span className="font-medium text-right">{selectedItem.approvedByUserName}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Amount</span>
