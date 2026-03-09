@@ -696,6 +696,18 @@ export default function Payouts() {
                     ))}
                   </SelectContent>
                 </Select>
+                {paymentMode === 'petty_cash' && selectedItem && (
+                  <div className={`mt-2 p-2 rounded-lg text-xs ${
+                    pettyCashBalance < selectedItem.amount 
+                      ? 'bg-destructive/10 text-destructive' 
+                      : 'bg-muted/50 text-muted-foreground'
+                  }`}>
+                    <p>Petty Cash Balance: ₹{pettyCashBalance.toLocaleString('en-IN')}</p>
+                    {pettyCashBalance < selectedItem.amount && (
+                      <p className="font-medium mt-1">Insufficient petty cash balance!</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <PaidBySelector
