@@ -58,7 +58,7 @@ const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
 export default function Settlements() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, canAccessSettlements } = useAuth();
+  const { user, staffData, canAccessSettlements } = useAuth();
   
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState<string>(searchParams.get('staff') || '');
@@ -471,6 +471,7 @@ export default function Settlements() {
       // - Debit: Staff Payable (clear liability)
       // - Credit: Bank/Cash (money out)
       if (calculation.netPayable > 0) {
+        const approverName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
         const { error: payoutRequestError } = await supabase
           .from('payment_requests')
           .insert({
@@ -481,6 +482,7 @@ export default function Settlements() {
             status: 'approved',
             approved_by: user.id,
             approved_at: new Date().toISOString(),
+            approved_by_user_name: approverName,
             payout_type: 'salary',
             settlement_id: settlementRecord.id,
           });
