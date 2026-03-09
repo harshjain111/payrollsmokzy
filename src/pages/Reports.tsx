@@ -211,7 +211,7 @@ export default function Reports() {
           <Card className="mt-4">
             <CardContent className="pt-4 px-3 sm:px-6">
               <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
-                {activeReport !== 'advance' && (
+                {activeReport !== 'summary' && activeReport !== 'salary' && (
                   <div className="space-y-1 col-span-2 sm:col-span-1">
                     <Label className="text-xs">Staff</Label>
                     <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
