@@ -270,7 +270,22 @@ export default function Payouts() {
         });
       }
 
-      // Update the source record based on type
+      // Record petty cash transaction if paid via petty cash
+      if (paymentMode === 'petty_cash' && user) {
+        const newPcBalance = pettyCashBalance - selectedItem.amount;
+        const pcType = selectedItem.type === 'expense' ? 'expense_payment' : 'advance_payment';
+        await (supabase.from as any)('petty_cash_transactions').insert({
+          transaction_type: pcType,
+          amount: selectedItem.amount,
+          balance_after: newPcBalance,
+          reference_type: selectedItem.type === 'expense' ? 'expense' : 'payment_request',
+          reference_id: selectedItem.id,
+          notes: `${selectedItem.description} - ${selectedItem.staffName}`,
+          created_by: user.id,
+        });
+        setPettyCashBalance(newPcBalance);
+      }
+
       // NOTE: ledger_entry_id references legacy ledger_entries table
       // Journal entries are tracked separately via journal_entry_id where applicable
       if (selectedItem.type === 'expense') {
