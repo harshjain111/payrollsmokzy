@@ -37,8 +37,6 @@ import {
 import {
   Coins,
   Plus,
-  ArrowUpCircle,
-  ArrowDownCircle,
   Wallet,
   TrendingUp,
   TrendingDown,
@@ -88,6 +86,10 @@ const SOURCE_OPTIONS = [
   { value: 'other', label: 'Other' },
 ];
 
+function formatCurrency(value: number): string {
+  return `₹${value.toLocaleString('en-IN')}`;
+}
+
 export default function PettyCash() {
   const { user, isOwner, isAdmin } = useAuth();
   const canAccess = isOwner || isAdmin;
@@ -113,8 +115,8 @@ export default function PettyCash() {
   const fetchTransactions = useCallback(async () => {
     setIsLoading(true);
     try {
-      let query = supabase
-        .from('petty_cash_transactions')
+      // Build filtered query
+      let query = (supabase.from as any)('petty_cash_transactions')
         .select('*')
         .order('created_at', { ascending: false });
 
@@ -134,26 +136,21 @@ export default function PettyCash() {
       setTransactions((data || []) as PettyCashTransaction[]);
 
       // Compute summary from ALL transactions (unfiltered)
-      const { data: allData, error: allError } = await supabase
-        .from('petty_cash_transactions')
+      const { data: allData, error: allError } = await (supabase.from as any)('petty_cash_transactions')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (allError) throw allError;
       const all = (allData || []) as PettyCashTransaction[];
 
-      // Current balance = balance_after of most recent transaction
       setCurrentBalance(all.length > 0 ? all[0].balance_after : 0);
 
-      // Total top-ups
       const topUps = all.filter(t => t.transaction_type === 'top_up' || t.transaction_type === 'opening_balance');
       setTotalTopUps(topUps.reduce((sum, t) => sum + t.amount, 0));
 
-      // Total spent
       const spent = all.filter(t => t.transaction_type === 'expense_payment' || t.transaction_type === 'advance_payment');
       setTotalSpent(spent.reduce((sum, t) => sum + t.amount, 0));
 
-      // Last top-up date
       const lastTopUp = all.find(t => t.transaction_type === 'top_up' || t.transaction_type === 'opening_balance');
       setLastTopUpDate(lastTopUp ? lastTopUp.transaction_date : null);
     } catch (error: any) {
@@ -177,14 +174,14 @@ export default function PettyCash() {
       const amount = Number(topUpAmount);
       const newBalance = currentBalance + amount;
 
-      const { error } = await supabase.from('petty_cash_transactions').insert({
+      const { error } = await (supabase.from as any)('petty_cash_transactions').insert({
         transaction_type: transactions.length === 0 && currentBalance === 0 ? 'opening_balance' : 'top_up',
         amount,
         balance_after: newBalance,
         notes: topUpNotes || null,
         source: topUpSource,
         created_by: user.id,
-      } as any);
+      });
 
       if (error) throw error;
 
@@ -219,35 +216,38 @@ export default function PettyCash() {
       <PageHeader
         title="Petty Cash"
         description="Track and manage petty cash float"
-        action={
-          <Button onClick={() => setShowTopUpDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add Top-Up
-          </Button>
-        }
-      />
+      >
+        <Button onClick={() => setShowTopUpDialog(true)}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Top-Up
+        </Button>
+      </PageHeader>
 
       {/* Summary Tiles */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <StatCard
           title="Current Balance"
-          value={<Amount value={currentBalance} />}
+          value={formatCurrency(currentBalance)}
           icon={Wallet}
+          color="green"
         />
         <StatCard
           title="Total Top-Ups"
-          value={<Amount value={totalTopUps} />}
+          value={formatCurrency(totalTopUps)}
           icon={TrendingUp}
+          color="blue"
         />
         <StatCard
           title="Total Spent"
-          value={<Amount value={totalSpent} />}
+          value={formatCurrency(totalSpent)}
           icon={TrendingDown}
+          color="orange"
         />
         <StatCard
           title="Last Top-Up"
           value={lastTopUpDate ? format(new Date(lastTopUpDate), 'dd MMM yyyy') : 'N/A'}
           icon={CalendarDays}
+          color="purple"
         />
       </div>
 
@@ -340,13 +340,12 @@ export default function PettyCash() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      <span className={isInflow(txn.transaction_type) ? 'text-green-600' : 'text-red-600'}>
-                        {isInflow(txn.transaction_type) ? '+' : '-'}
-                        <Amount value={txn.amount} />
+                      <span className={isInflow(txn.transaction_type) ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}>
+                        {isInflow(txn.transaction_type) ? '+' : '-'}₹{txn.amount.toLocaleString('en-IN')}
                       </span>
                     </TableCell>
                     <TableCell className="text-right font-medium">
-                      <Amount value={txn.balance_after} />
+                      ₹{txn.balance_after.toLocaleString('en-IN')}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell text-xs text-muted-foreground max-w-[200px] truncate">
                       {txn.notes || '-'}
@@ -410,12 +409,14 @@ export default function PettyCash() {
             <div className="p-3 rounded-lg bg-muted/50 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Current Balance:</span>
-                <Amount value={currentBalance} className="font-medium" />
+                <span className="font-medium">₹{currentBalance.toLocaleString('en-IN')}</span>
               </div>
               {topUpAmount && Number(topUpAmount) > 0 && (
                 <div className="flex justify-between mt-1">
                   <span className="text-muted-foreground">New Balance:</span>
-                  <Amount value={currentBalance + Number(topUpAmount)} className="font-bold text-green-600" />
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                    ₹{(currentBalance + Number(topUpAmount)).toLocaleString('en-IN')}
+                  </span>
                 </div>
               )}
             </div>

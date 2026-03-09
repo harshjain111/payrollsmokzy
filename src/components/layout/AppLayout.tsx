@@ -56,6 +56,7 @@ import {
   Briefcase,
   ArrowUpRight,
   CalendarDays,
+  Coins,
 } from 'lucide-react';
 
 interface NavItem {
@@ -115,6 +116,7 @@ function getNavSections(
             icon: CreditCard,
             badge: counts.approvedExpenses,
           },
+          { title: 'Petty Cash', href: '/petty-cash', icon: Coins },
         ],
       },
       {
