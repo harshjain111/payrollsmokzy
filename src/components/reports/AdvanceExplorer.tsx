@@ -75,26 +75,28 @@ export function AdvanceExplorer() {
   };
 
   const staffSummary = useMemo(() => {
-    const map: Record<string, { name: string; empId: string; total: number; paid: number; pending: number; rejected: number; items: any[] }> = {};
-    advances.forEach(a => {
+    const map: Record<string, { name: string; empId: string; total: number; paid: number; pending: number; items: any[] }> = {};
+    // Only include approved (paid) and pending advances — exclude rejected
+    advances.filter(a => a.status !== 'rejected').forEach(a => {
       const sid = a.staff_id;
-      if (!map[sid]) map[sid] = { name: a.staff?.full_name || 'Unknown', empId: a.staff?.employee_id || '', total: 0, paid: 0, pending: 0, rejected: 0, items: [] };
+      if (!map[sid]) map[sid] = { name: a.staff?.full_name || 'Unknown', empId: a.staff?.employee_id || '', total: 0, paid: 0, pending: 0, items: [] };
       const amt = Number(a.amount);
       map[sid].total += amt;
       if (a.status === 'approved') map[sid].paid += amt;
       if (a.status === 'pending') map[sid].pending += amt;
-      if (a.status === 'rejected') map[sid].rejected += amt;
       map[sid].items.push(a);
     });
     return Object.entries(map).map(([id, v]) => ({ staffId: id, ...v })).sort((a, b) => b.total - a.total);
   }, [advances]);
 
+  const activeAdvances = useMemo(() => advances.filter(a => a.status !== 'rejected'), [advances]);
+
   const totals = useMemo(() => ({
-    total: advances.reduce((s, a) => s + Number(a.amount), 0),
-    paid: advances.filter(a => a.status === 'approved').reduce((s, a) => s + Number(a.amount), 0),
-    pending: advances.filter(a => a.status === 'pending').reduce((s, a) => s + Number(a.amount), 0),
-    count: advances.length,
-  }), [advances]);
+    total: activeAdvances.reduce((s, a) => s + Number(a.amount), 0),
+    paid: activeAdvances.filter(a => a.status === 'approved').reduce((s, a) => s + Number(a.amount), 0),
+    pending: activeAdvances.filter(a => a.status === 'pending').reduce((s, a) => s + Number(a.amount), 0),
+    count: activeAdvances.length,
+  }), [activeAdvances]);
 
   const chartData = staffSummary.slice(0, 8).map(s => ({ name: s.name.split(' ')[0], total: s.total, paid: s.paid, pending: s.pending }));
 
