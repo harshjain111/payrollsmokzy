@@ -625,6 +625,48 @@ export type Database = {
           },
         ]
       }
+      petty_cash_transactions: {
+        Row: {
+          amount: number
+          balance_after: number
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          reference_id: string | null
+          reference_type: string | null
+          source: string | null
+          transaction_date: string
+          transaction_type: Database["public"]["Enums"]["petty_cash_transaction_type"]
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          source?: string | null
+          transaction_date?: string
+          transaction_type: Database["public"]["Enums"]["petty_cash_transaction_type"]
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          source?: string | null
+          transaction_date?: string
+          transaction_type?: Database["public"]["Enums"]["petty_cash_transaction_type"]
+        }
+        Relationships: []
+      }
       salary_history: {
         Row: {
           change_reason: string | null
@@ -980,6 +1022,7 @@ export type Database = {
         Args: { _payment_mode: Database["public"]["Enums"]["payment_mode"] }
         Returns: string
       }
+      get_petty_cash_balance: { Args: never; Returns: number }
       get_reconciliation_status: {
         Args: { _month: string; _staff_id: string }
         Returns: Json
@@ -1053,7 +1096,12 @@ export type Database = {
         | "reimbursed"
       leave_status: "pending" | "approved" | "rejected"
       leave_type: "paid" | "unpaid" | "penalty" | "custom"
-      payment_mode: "cash" | "upi" | "bank_transfer" | "cheque"
+      payment_mode: "cash" | "upi" | "bank_transfer" | "cheque" | "petty_cash"
+      petty_cash_transaction_type:
+        | "opening_balance"
+        | "top_up"
+        | "expense_payment"
+        | "advance_payment"
       request_status: "pending" | "approved" | "rejected"
       settlement_status: "pending" | "settled"
       voucher_type:
@@ -1209,7 +1257,13 @@ export const Constants = {
       ],
       leave_status: ["pending", "approved", "rejected"],
       leave_type: ["paid", "unpaid", "penalty", "custom"],
-      payment_mode: ["cash", "upi", "bank_transfer", "cheque"],
+      payment_mode: ["cash", "upi", "bank_transfer", "cheque", "petty_cash"],
+      petty_cash_transaction_type: [
+        "opening_balance",
+        "top_up",
+        "expense_payment",
+        "advance_payment",
+      ],
       request_status: ["pending", "approved", "rejected"],
       settlement_status: ["pending", "settled"],
       voucher_type: [
