@@ -89,12 +89,14 @@ export function AdvanceExplorer() {
     return Object.entries(map).map(([id, v]) => ({ staffId: id, ...v })).sort((a, b) => b.total - a.total);
   }, [advances]);
 
+  const activeAdvances = useMemo(() => advances.filter(a => a.status !== 'rejected'), [advances]);
+
   const totals = useMemo(() => ({
-    total: advances.reduce((s, a) => s + Number(a.amount), 0),
-    paid: advances.filter(a => a.status === 'approved').reduce((s, a) => s + Number(a.amount), 0),
-    pending: advances.filter(a => a.status === 'pending').reduce((s, a) => s + Number(a.amount), 0),
-    count: advances.length,
-  }), [advances]);
+    total: activeAdvances.reduce((s, a) => s + Number(a.amount), 0),
+    paid: activeAdvances.filter(a => a.status === 'approved').reduce((s, a) => s + Number(a.amount), 0),
+    pending: activeAdvances.filter(a => a.status === 'pending').reduce((s, a) => s + Number(a.amount), 0),
+    count: activeAdvances.length,
+  }), [activeAdvances]);
 
   const chartData = staffSummary.slice(0, 8).map(s => ({ name: s.name.split(' ')[0], total: s.total, paid: s.paid, pending: s.pending }));
 
