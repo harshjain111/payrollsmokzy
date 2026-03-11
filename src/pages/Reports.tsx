@@ -379,20 +379,24 @@ export default function Reports() {
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Staff</TableHead>
-                    <TableHead>Type</TableHead><TableHead>Mode</TableHead><TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Staff</TableHead>
+                    <TableHead>Type</TableHead><TableHead>Paid By</TableHead><TableHead className="text-right">Amount</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {reportData.map(entry => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
-                        <TableCell>{entry.staff?.full_name}</TableCell>
-                        <TableCell className="capitalize">{entry.voucher_type}</TableCell>
-                        <TableCell className="capitalize">{entry.payment_mode?.replace('_', ' ') || '-'}</TableCell>
-                        <TableCell className="text-right"><Amount value={Number(entry.debit) || Number(entry.credit)} /></TableCell>
-                      </TableRow>
-                    ))}
+                    {reportData.map((entry: any) => {
+                      const amount = (entry.lines || []).reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0) / 2;
+                      const typeLabel = entry.transaction_type?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
+                          <TableCell className="font-mono text-xs">{entry.reference_no}</TableCell>
+                          <TableCell>{entry.staff?.full_name || '-'}</TableCell>
+                          <TableCell className="capitalize text-sm">{typeLabel}</TableCell>
+                          <TableCell className="text-sm">{entry.paid_by_user_name || '-'}</TableCell>
+                          <TableCell className="text-right"><Amount value={amount} /></TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No payments found</TableCell></TableRow>}
                   </TableBody>
                 </Table>
