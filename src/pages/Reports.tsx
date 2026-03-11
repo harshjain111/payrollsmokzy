@@ -316,18 +316,18 @@ export default function Reports() {
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Staff</TableHead>
+                    <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Account</TableHead>
                     <TableHead>Description</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {reportData.map(entry => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
-                        <TableCell>{entry.staff?.full_name}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{entry.description}</TableCell>
-                        <TableCell className="text-right">{entry.debit > 0 && <Amount value={entry.debit} />}</TableCell>
-                        <TableCell className="text-right">{entry.credit > 0 && <Amount value={entry.credit} />}</TableCell>
+                    {reportData.map((line: any) => (
+                      <TableRow key={line.id}>
+                        <TableCell>{line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
+                        <TableCell className="font-mono text-xs">{line.journal_entry?.reference_no}</TableCell>
+                        <TableCell className="text-sm">{line.account?.name || line.account?.code}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{line.journal_entry?.description || line.description}</TableCell>
+                        <TableCell className="text-right">{Number(line.debit) > 0 && <Amount value={line.debit} />}</TableCell>
+                        <TableCell className="text-right">{Number(line.credit) > 0 && <Amount value={line.credit} />}</TableCell>
                       </TableRow>
                     ))}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No entries found</TableCell></TableRow>}
