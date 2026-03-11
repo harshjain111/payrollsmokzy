@@ -109,13 +109,29 @@ export default function Reports() {
   };
 
   const fetchLedgerReport = async () => {
-    let query = supabase.from('ledger_entries').select('*, staff:staff_public(full_name, employee_id)')
-      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd')).lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
-      .order('entry_date', { ascending: true }).order('created_at', { ascending: true });
+    let query = supabase
+      .from('journal_lines')
+      .select(`
+        id, debit, credit, description, staff_id, created_at,
+        journal_entry:journal_entry_id(id, entry_date, reference_no, description, transaction_type, is_immutable, paid_by_user_name),
+        account:account_id(code, name, account_type)
+      `)
+      .not('staff_id', 'is', null)
+      .order('created_at', { ascending: true });
+
     if (selectedStaffId !== 'all') query = query.eq('staff_id', selectedStaffId);
+
     const { data, error } = await query;
     if (error) throw error;
-    setReportData(data || []);
+
+    // Filter by date range using journal_entry.entry_date
+    const fromStr = format(dateRange.from, 'yyyy-MM-dd');
+    const toStr = format(dateRange.to, 'yyyy-MM-dd');
+    const filtered = (data || []).filter((line: any) => {
+      const entryDate = line.journal_entry?.entry_date;
+      return entryDate && entryDate >= fromStr && entryDate <= toStr;
+    });
+    setReportData(filtered);
   };
 
   const fetchSalaryReport = async () => {
@@ -128,10 +144,18 @@ export default function Reports() {
   };
 
   const fetchPaymentReport = async () => {
-    let query = supabase.from('ledger_entries').select('*, staff:staff_public(full_name, employee_id)')
-      .in('voucher_type', ['payment', 'settlement', 'advance'])
-      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd')).lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
+    let query = supabase
+      .from('journal_entries')
+      .select(`
+        id, entry_date, reference_no, description, transaction_type, paid_by_user_name,
+        staff:staff_public(full_name, employee_id),
+        lines:journal_lines(id, debit, credit, account:accounts(code, name))
+      `)
+      .in('transaction_type', ['salary_payout', 'expense_payout', 'advance_paid'])
+      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd'))
+      .lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
       .order('entry_date', { ascending: false });
+
     if (selectedStaffId !== 'all') query = query.eq('staff_id', selectedStaffId);
     const { data, error } = await query;
     if (error) throw error;
