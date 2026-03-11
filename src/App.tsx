@@ -119,6 +119,7 @@ const App = () => (
             <AppRoutes />
           </AuthProvider>
         </BrowserRouter>
+        <InstallPrompt />
       </TooltipProvider>
     </LanguageProvider>
   </QueryClientProvider>
