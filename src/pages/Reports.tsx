@@ -109,13 +109,29 @@ export default function Reports() {
   };
 
   const fetchLedgerReport = async () => {
-    let query = supabase.from('ledger_entries').select('*, staff:staff_public(full_name, employee_id)')
-      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd')).lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
-      .order('entry_date', { ascending: true }).order('created_at', { ascending: true });
+    let query = supabase
+      .from('journal_lines')
+      .select(`
+        id, debit, credit, description, staff_id, created_at,
+        journal_entry:journal_entry_id(id, entry_date, reference_no, description, transaction_type, is_immutable, paid_by_user_name),
+        account:account_id(code, name, account_type)
+      `)
+      .not('staff_id', 'is', null)
+      .order('created_at', { ascending: true });
+
     if (selectedStaffId !== 'all') query = query.eq('staff_id', selectedStaffId);
+
     const { data, error } = await query;
     if (error) throw error;
-    setReportData(data || []);
+
+    // Filter by date range using journal_entry.entry_date
+    const fromStr = format(dateRange.from, 'yyyy-MM-dd');
+    const toStr = format(dateRange.to, 'yyyy-MM-dd');
+    const filtered = (data || []).filter((line: any) => {
+      const entryDate = line.journal_entry?.entry_date;
+      return entryDate && entryDate >= fromStr && entryDate <= toStr;
+    });
+    setReportData(filtered);
   };
 
   const fetchSalaryReport = async () => {
@@ -128,10 +144,18 @@ export default function Reports() {
   };
 
   const fetchPaymentReport = async () => {
-    let query = supabase.from('ledger_entries').select('*, staff:staff_public(full_name, employee_id)')
-      .in('voucher_type', ['payment', 'settlement', 'advance'])
-      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd')).lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
+    let query = supabase
+      .from('journal_entries')
+      .select(`
+        id, entry_date, reference_no, description, transaction_type, paid_by_user_name,
+        staff:staff_public(full_name, employee_id),
+        lines:journal_lines(id, debit, credit, account:accounts(code, name))
+      `)
+      .in('transaction_type', ['salary_payout', 'expense_payout', 'advance_paid'])
+      .gte('entry_date', format(dateRange.from, 'yyyy-MM-dd'))
+      .lte('entry_date', format(dateRange.to, 'yyyy-MM-dd'))
       .order('entry_date', { ascending: false });
+
     if (selectedStaffId !== 'all') query = query.eq('staff_id', selectedStaffId);
     const { data, error } = await query;
     if (error) throw error;
@@ -211,7 +235,7 @@ export default function Reports() {
           <Card className="mt-4">
             <CardContent className="pt-4 px-3 sm:px-6">
               <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-4">
-                {activeReport !== 'summary' && activeReport !== 'salary' && (
+                {activeReport !== 'summary' && (
                   <div className="space-y-1 col-span-2 sm:col-span-1">
                     <Label className="text-xs">Staff</Label>
                     <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
@@ -292,18 +316,18 @@ export default function Reports() {
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Staff</TableHead>
+                    <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Account</TableHead>
                     <TableHead>Description</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {reportData.map(entry => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
-                        <TableCell>{entry.staff?.full_name}</TableCell>
-                        <TableCell className="max-w-[200px] truncate">{entry.description}</TableCell>
-                        <TableCell className="text-right">{entry.debit > 0 && <Amount value={entry.debit} />}</TableCell>
-                        <TableCell className="text-right">{entry.credit > 0 && <Amount value={entry.credit} />}</TableCell>
+                    {reportData.map((line: any) => (
+                      <TableRow key={line.id}>
+                        <TableCell>{line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
+                        <TableCell className="font-mono text-xs">{line.journal_entry?.reference_no}</TableCell>
+                        <TableCell className="text-sm">{line.account?.name || line.account?.code}</TableCell>
+                        <TableCell className="max-w-[200px] truncate">{line.journal_entry?.description || line.description}</TableCell>
+                        <TableCell className="text-right">{Number(line.debit) > 0 && <Amount value={line.debit} />}</TableCell>
+                        <TableCell className="text-right">{Number(line.credit) > 0 && <Amount value={line.credit} />}</TableCell>
                       </TableRow>
                     ))}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No entries found</TableCell></TableRow>}
@@ -355,20 +379,24 @@ export default function Reports() {
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <Table>
                   <TableHeader><TableRow>
-                    <TableHead>Date</TableHead><TableHead>Voucher</TableHead><TableHead>Staff</TableHead>
-                    <TableHead>Type</TableHead><TableHead>Mode</TableHead><TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Staff</TableHead>
+                    <TableHead>Type</TableHead><TableHead>Paid By</TableHead><TableHead className="text-right">Amount</TableHead>
                   </TableRow></TableHeader>
                   <TableBody>
-                    {reportData.map(entry => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
-                        <TableCell className="font-mono text-xs">{entry.voucher_no}</TableCell>
-                        <TableCell>{entry.staff?.full_name}</TableCell>
-                        <TableCell className="capitalize">{entry.voucher_type}</TableCell>
-                        <TableCell className="capitalize">{entry.payment_mode?.replace('_', ' ') || '-'}</TableCell>
-                        <TableCell className="text-right"><Amount value={Number(entry.debit) || Number(entry.credit)} /></TableCell>
-                      </TableRow>
-                    ))}
+                    {reportData.map((entry: any) => {
+                      const amount = (entry.lines || []).reduce((s: number, l: any) => s + (Number(l.debit) || 0), 0) / 2;
+                      const typeLabel = entry.transaction_type?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell>{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</TableCell>
+                          <TableCell className="font-mono text-xs">{entry.reference_no}</TableCell>
+                          <TableCell>{entry.staff?.full_name || '-'}</TableCell>
+                          <TableCell className="capitalize text-sm">{typeLabel}</TableCell>
+                          <TableCell className="text-sm">{entry.paid_by_user_name || '-'}</TableCell>
+                          <TableCell className="text-right"><Amount value={amount} /></TableCell>
+                        </TableRow>
+                      );
+                    })}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No payments found</TableCell></TableRow>}
                   </TableBody>
                 </Table>
