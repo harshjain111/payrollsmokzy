@@ -11,6 +11,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Validate webhook secret
+    const secret = req.headers.get("x-webhook-secret");
+    const expectedSecret = Deno.env.get("SMOKZY_ORDER_WEBHOOK_SECRET");
+
+    if (!secret || secret !== expectedSecret) {
+      return new Response(
+        JSON.stringify({ error: "Unauthorized" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { customer_name, event_date_start, event_date_end, venue_name } = await req.json();
 
     // Validate required fields
