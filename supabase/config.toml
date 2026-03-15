@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.daily-summary-email]
 verify_jwt = false
+
+[functions.receive-smokzy-order]
+verify_jwt = false
