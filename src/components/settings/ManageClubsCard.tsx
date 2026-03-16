@@ -22,11 +22,12 @@ export function ManageClubsCard() {
   const [isAdding, setIsAdding] = useState(false);
 
   const canManage = isOwner || isAdmin || isAccountant;
-  if (!canManage) return null;
 
   useEffect(() => {
-    fetchClubs();
-  }, []);
+    if (canManage) fetchClubs();
+  }, [canManage]);
+
+  if (!canManage) return null;
 
   const fetchClubs = async () => {
     const { data, error } = await supabase

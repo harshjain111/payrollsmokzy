@@ -24,11 +24,12 @@ export function ManageCategoriesCard() {
   const [isAdding, setIsAdding] = useState(false);
 
   const canManage = isOwner || isAdmin || isAccountant;
-  if (!canManage) return null;
 
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    if (canManage) fetchCategories();
+  }, [canManage]);
+
+  if (!canManage) return null;
 
   const fetchCategories = async () => {
     const { data, error } = await supabase
