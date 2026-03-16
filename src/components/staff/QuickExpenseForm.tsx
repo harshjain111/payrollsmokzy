@@ -173,6 +173,7 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         setCategory(null);
         setDescription('');
         setCustomCategory('');
+        setSelectedClubId('');
         setPhoto(null);
         setPhotoPreview(null);
         onOpenChange(false);
