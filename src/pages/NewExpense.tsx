@@ -388,14 +388,42 @@ export default function NewExpense() {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
-                  <SelectItem key={cat} value={cat}>
-                    {EXPENSE_CATEGORY_LABELS[cat]}
-                  </SelectItem>
-                ))}
+                {customCategories.length > 0 ? (
+                  customCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name.toLowerCase().replace(/[^a-z]/g, '_') as string}>
+                      {cat.name}
+                    </SelectItem>
+                  ))
+                ) : (
+                  (Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
+                    <SelectItem key={cat} value={cat}>
+                      {EXPENSE_CATEGORY_LABELS[cat]}
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Club (Optional) */}
+          {clubs.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
+              <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select a club (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No club</SelectItem>
+                  {clubs.map((club) => (
+                    <SelectItem key={club.id} value={club.id}>
+                      {club.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Expense Date */}
           <div className="space-y-2">
