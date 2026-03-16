@@ -410,7 +410,7 @@ export default function NewExpense() {
           </div>
 
           {/* Club (Optional) */}
-          {clubs.length > 0 && (
+          {true && (
             <div className="space-y-2">
               <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
               <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
