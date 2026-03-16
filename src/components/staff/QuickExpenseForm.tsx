@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,6 +12,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { 
   Loader2, 
   CheckCircle2, 
@@ -36,6 +43,11 @@ interface QuickExpenseFormProps {
   onSuccess: () => void;
 }
 
+interface Club {
+  id: string;
+  name: string;
+}
+
 const categories: { id: ExpenseCategory; icon: React.ReactNode; labelKey: string }[] = [
   { id: 'travel', icon: <Plane className="h-6 w-6" />, labelKey: 'travel' },
   { id: 'food', icon: <UtensilsCrossed className="h-6 w-6" />, labelKey: 'food' },
@@ -57,8 +69,17 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [customCategory, setCustomCategory] = useState('');
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      supabase.from('clubs').select('id, name').eq('is_active', true).order('name')
+        .then(({ data }) => { if (data) setClubs(data); });
+    }
+  }, [open]);
 
   // Custom category name is required for "other" category
   const isOtherCategory = category === 'other';
