@@ -84,7 +84,27 @@ export default function NewExpense() {
       setIsFetchingStaff(false);
     }
     fetchEvents();
+    fetchCustomCategories();
+    fetchClubs();
   }, [isPersonalRequest, staffData?.id, canRequestForOthers]);
+
+  const fetchCustomCategories = async () => {
+    const { data } = await supabase
+      .from('custom_expense_categories')
+      .select('id, name, is_active')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (data) setCustomCategories(data);
+  };
+
+  const fetchClubs = async () => {
+    const { data } = await supabase
+      .from('clubs')
+      .select('id, name, is_active')
+      .eq('is_active', true)
+      .order('name');
+    if (data) setClubs(data);
+  };
 
   const fetchEvents = async () => {
     try {
