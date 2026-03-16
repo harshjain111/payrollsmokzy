@@ -607,7 +607,7 @@ function AppHeader() {
                 <User className="mr-2 h-3.5 w-3.5" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
+              <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-3.5 w-3.5" />
                 Settings
               </DropdownMenuItem>
