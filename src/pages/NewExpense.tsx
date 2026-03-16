@@ -32,6 +32,18 @@ interface Event {
   client_name: string | null;
 }
 
+interface CustomCategory {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
+interface Club {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
 export default function NewExpense() {
   const navigate = useNavigate();
   const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
@@ -51,6 +63,9 @@ export default function NewExpense() {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [events, setEvents] = useState<Event[]>([]);
   const [isFetchingEvents, setIsFetchingEvents] = useState(true);
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string>('');
 
   // Staff creating for themselves
   // Accountant in personal mode also creates for themselves
