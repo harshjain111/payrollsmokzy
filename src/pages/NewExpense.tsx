@@ -389,19 +389,22 @@ export default function NewExpense() {
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
-                {customCategories.length > 0 ? (
-                  customCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.name.toLowerCase().replace(/[^a-z]/g, '_') as string}>
+                {(Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
+                  <SelectItem key={cat} value={cat}>
+                    {EXPENSE_CATEGORY_LABELS[cat]}
+                  </SelectItem>
+                ))}
+                {/* Show custom categories that don't match built-in ones */}
+                {customCategories
+                  .filter(cc => !Object.values(EXPENSE_CATEGORY_LABELS).some(
+                    label => label.toLowerCase() === cc.name.toLowerCase()
+                  ))
+                  .map((cat) => (
+                    <SelectItem key={cat.id} value="other">
                       {cat.name}
                     </SelectItem>
                   ))
-                ) : (
-                  (Object.keys(EXPENSE_CATEGORY_LABELS) as ExpenseCategory[]).map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {EXPENSE_CATEGORY_LABELS[cat]}
-                    </SelectItem>
-                  ))
-                )}
+                }
               </SelectContent>
             </Select>
           </div>
