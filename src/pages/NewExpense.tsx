@@ -32,6 +32,18 @@ interface Event {
   client_name: string | null;
 }
 
+interface CustomCategory {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
+interface Club {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
 export default function NewExpense() {
   const navigate = useNavigate();
   const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
@@ -51,6 +63,9 @@ export default function NewExpense() {
   const [selectedEventId, setSelectedEventId] = useState<string>('');
   const [events, setEvents] = useState<Event[]>([]);
   const [isFetchingEvents, setIsFetchingEvents] = useState(true);
+  const [customCategories, setCustomCategories] = useState<CustomCategory[]>([]);
+  const [clubs, setClubs] = useState<Club[]>([]);
+  const [selectedClubId, setSelectedClubId] = useState<string>('');
 
   // Staff creating for themselves
   // Accountant in personal mode also creates for themselves
@@ -69,7 +84,27 @@ export default function NewExpense() {
       setIsFetchingStaff(false);
     }
     fetchEvents();
+    fetchCustomCategories();
+    fetchClubs();
   }, [isPersonalRequest, staffData?.id, canRequestForOthers]);
+
+  const fetchCustomCategories = async () => {
+    const { data } = await supabase
+      .from('custom_expense_categories')
+      .select('id, name, is_active')
+      .eq('is_active', true)
+      .order('sort_order');
+    if (data) setCustomCategories(data);
+  };
+
+  const fetchClubs = async () => {
+    const { data } = await supabase
+      .from('clubs')
+      .select('id, name, is_active')
+      .eq('is_active', true)
+      .order('name');
+    if (data) setClubs(data);
+  };
 
   const fetchEvents = async () => {
     try {
@@ -227,6 +262,7 @@ export default function NewExpense() {
           submitted_at: asDraft ? null : new Date().toISOString(),
           created_by: user?.id,
           event_id: selectedEventId || null,
+          club_id: selectedClubId || null,
         })
         .select()
         .single();
@@ -358,9 +394,40 @@ export default function NewExpense() {
                     {EXPENSE_CATEGORY_LABELS[cat]}
                   </SelectItem>
                 ))}
+                {/* Show custom categories that don't match built-in ones */}
+                {customCategories
+                  .filter(cc => !Object.values(EXPENSE_CATEGORY_LABELS).some(
+                    label => label.toLowerCase() === cc.name.toLowerCase()
+                  ))
+                  .map((cat) => (
+                    <SelectItem key={cat.id} value="other">
+                      {cat.name}
+                    </SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>
+
+          {/* Club (Optional) */}
+          {clubs.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
+              <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-11">
+                  <SelectValue placeholder="Select a club (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No club</SelectItem>
+                  {clubs.map((club) => (
+                    <SelectItem key={club.id} value={club.id}>
+                      {club.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Expense Date */}
           <div className="space-y-2">
