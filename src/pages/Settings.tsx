@@ -409,6 +409,12 @@ export default function Settings() {
 
         {/* Clear Transaction Data - Owner Only */}
         <ClearTransactionDataCard />
+
+        {/* Expense Categories Management */}
+        <ManageCategoriesCard />
+
+        {/* Clubs Management */}
+        <ManageClubsCard />
       </div>
     </div>
   );
