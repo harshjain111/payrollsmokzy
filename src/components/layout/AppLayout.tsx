@@ -503,7 +503,7 @@ function AppSidebar() {
           <DropdownMenuContent align="end" side="top" className="w-48 rounded-lg">
             <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="rounded-md text-sm">
+            <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
               <Settings className="mr-2 h-3.5 w-3.5" />
               Settings
             </DropdownMenuItem>
@@ -607,7 +607,7 @@ function AppHeader() {
                 <User className="mr-2 h-3.5 w-3.5" />
                 Profile
               </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
+              <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
                 <Settings className="mr-2 h-3.5 w-3.5" />
                 Settings
               </DropdownMenuItem>

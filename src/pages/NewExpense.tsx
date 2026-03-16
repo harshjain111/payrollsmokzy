@@ -410,24 +410,29 @@ export default function NewExpense() {
           </div>
 
           {/* Club (Optional) */}
-          {clubs.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
-              <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select a club (optional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">No club</SelectItem>
-                  {clubs.map((club) => (
+          <div className="space-y-2">
+            <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
+            <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
+              <SelectTrigger className="h-11">
+                <SelectValue placeholder="Select a club (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No club</SelectItem>
+                {clubs.length > 0 ? (
+                  clubs.map((club) => (
                     <SelectItem key={club.id} value={club.id}>
                       {club.name}
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                  ))
+                ) : (
+                  <SelectItem value="no-clubs" disabled>No clubs added yet — add in Settings</SelectItem>
+                )}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Manage clubs from Settings
+            </p>
+          </div>
 
           {/* Expense Date */}
           <div className="space-y-2">
