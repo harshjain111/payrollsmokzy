@@ -288,6 +288,27 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
               className="min-h-[80px] text-base"
             />
           </div>
+          {/* Club Selection (Optional) */}
+          {clubs.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Club
+              </label>
+              <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
+                <SelectTrigger className="h-12 text-base">
+                  <SelectValue placeholder="Select club (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No club</SelectItem>
+                  {clubs.map((club) => (
+                    <SelectItem key={club.id} value={club.id}>
+                      {club.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Photo Upload */}
           <div className="space-y-2">
