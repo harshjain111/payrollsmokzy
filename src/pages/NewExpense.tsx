@@ -262,6 +262,7 @@ export default function NewExpense() {
           submitted_at: asDraft ? null : new Date().toISOString(),
           created_by: user?.id,
           event_id: selectedEventId || null,
+          club_id: selectedClubId || null,
         })
         .select()
         .single();
