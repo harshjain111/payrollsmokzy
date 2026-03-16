@@ -161,6 +161,7 @@ export function QuickExpenseForm({ open, onOpenChange, onSuccess }: QuickExpense
         status: 'pending',
         submitted_at: new Date().toISOString(),
         proof_url: proofUrl,
+        club_id: selectedClubId || null,
       });
 
       if (error) throw error;
