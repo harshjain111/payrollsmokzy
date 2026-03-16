@@ -44,6 +44,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ClearTransactionDataCard } from '@/components/settings/ClearTransactionDataCard';
+import { ManageCategoriesCard } from '@/components/settings/ManageCategoriesCard';
+import { ManageClubsCard } from '@/components/settings/ManageClubsCard';
 
 export default function Settings() {
   const { user, userRole, signOut, staffData } = useAuth();
