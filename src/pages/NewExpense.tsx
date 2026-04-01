@@ -56,7 +56,7 @@ export default function NewExpense() {
   
   // Form fields
   const [amount, setAmount] = useState(0);
-  const [category, setCategory] = useState<ExpenseCategory>('other');
+  const [category, setCategory] = useState<string>('other');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [proofFiles, setProofFiles] = useState<File[]>([]);
@@ -249,12 +249,15 @@ export default function NewExpense() {
         proofUrl = await uploadProofs();
       }
 
+      // Map custom categories back to 'other' enum for DB storage
+      const dbCategory: ExpenseCategory = category.startsWith('custom:') ? 'other' : category as ExpenseCategory;
+
       const { data: newExpense, error } = await supabase
         .from('expenses')
         .insert({
           staff_id: selectedStaff,
           amount,
-          category,
+          category: dbCategory,
           description: description.trim(),
           expense_date: format(expenseDate, 'yyyy-MM-dd'),
           proof_url: proofUrl,
@@ -394,13 +397,13 @@ export default function NewExpense() {
                     {EXPENSE_CATEGORY_LABELS[cat]}
                   </SelectItem>
                 ))}
-                {/* Show custom categories that don't match built-in ones */}
+                {/* Show custom categories with unique values */}
                 {customCategories
                   .filter(cc => !Object.values(EXPENSE_CATEGORY_LABELS).some(
                     label => label.toLowerCase() === cc.name.toLowerCase()
                   ))
                   .map((cat) => (
-                    <SelectItem key={cat.id} value="other">
+                    <SelectItem key={cat.id} value={`custom:${cat.id}`}>
                       {cat.name}
                     </SelectItem>
                   ))
