@@ -56,7 +56,7 @@ export default function NewExpense() {
   
   // Form fields
   const [amount, setAmount] = useState(0);
-  const [category, setCategory] = useState<ExpenseCategory>('other');
+  const [category, setCategory] = useState<string>('other');
   const [description, setDescription] = useState('');
   const [expenseDate, setExpenseDate] = useState<Date>(new Date());
   const [proofFiles, setProofFiles] = useState<File[]>([]);
