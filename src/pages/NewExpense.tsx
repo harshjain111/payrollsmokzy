@@ -394,13 +394,13 @@ export default function NewExpense() {
                     {EXPENSE_CATEGORY_LABELS[cat]}
                   </SelectItem>
                 ))}
-                {/* Show custom categories that don't match built-in ones */}
+                {/* Show custom categories with unique values */}
                 {customCategories
                   .filter(cc => !Object.values(EXPENSE_CATEGORY_LABELS).some(
                     label => label.toLowerCase() === cc.name.toLowerCase()
                   ))
                   .map((cat) => (
-                    <SelectItem key={cat.id} value="other">
+                    <SelectItem key={cat.id} value={`custom:${cat.id}`}>
                       {cat.name}
                     </SelectItem>
                   ))
