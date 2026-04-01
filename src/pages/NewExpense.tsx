@@ -249,12 +249,15 @@ export default function NewExpense() {
         proofUrl = await uploadProofs();
       }
 
+      // Map custom categories back to 'other' enum for DB storage
+      const dbCategory: ExpenseCategory = category.startsWith('custom:') ? 'other' : category as ExpenseCategory;
+
       const { data: newExpense, error } = await supabase
         .from('expenses')
         .insert({
           staff_id: selectedStaff,
           amount,
-          category,
+          category: dbCategory,
           description: description.trim(),
           expense_date: format(expenseDate, 'yyyy-MM-dd'),
           proof_url: proofUrl,
