@@ -25,8 +25,10 @@
  import { CheckCircle, XCircle, Calendar, User } from 'lucide-react';
  import { format } from 'date-fns';
  import { toast } from '@/hooks/use-toast';
- import type { LeaveRecord, LeaveType } from '@/types/leave';
- import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
+  import type { LeaveRecord, LeaveType } from '@/types/leave';
+  import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
+  import { NotificationEvents } from '@/lib/notifications';
+  import { format as formatDate } from 'date-fns';
  
  interface LeaveApprovalDialogProps {
    open: boolean;
@@ -79,14 +81,25 @@
          })
          .eq('id', leaveRecord.id);
  
-       if (error) throw error;
- 
-       toast({
-         title: 'Leave Approved',
-         description: `Leave record for ${format(new Date(leaveRecord.leave_date), 'dd MMM yyyy')} has been approved.`,
-       });
- 
-       onSuccess();
+        if (error) throw error;
+
+        // Notify staff and owner
+        const dateStr = format(new Date(leaveRecord.leave_date), 'dd MMM yyyy');
+        if (leaveRecord.staff?.user_id) {
+          NotificationEvents.leaveApproved(
+            leaveRecord.staff.user_id,
+            leaveRecord.staff.full_name || 'Staff',
+            dateStr,
+            deductionDays
+          );
+        }
+
+        toast({
+          title: 'Leave Approved',
+          description: `Leave record for ${dateStr} has been approved.`,
+        });
+
+        onSuccess();
        onOpenChange(false);
      } catch (error: any) {
        console.error('Error approving leave:', error);
@@ -125,14 +138,25 @@
          })
          .eq('id', leaveRecord.id);
  
-       if (error) throw error;
- 
-       toast({
-         title: 'Leave Rejected',
-         description: `Leave request has been rejected.`,
-       });
- 
-       onSuccess();
+        if (error) throw error;
+
+        // Notify staff and owner
+        if (leaveRecord.staff?.user_id) {
+          const dateStr = format(new Date(leaveRecord.leave_date), 'dd MMM yyyy');
+          NotificationEvents.leaveRejected(
+            leaveRecord.staff.user_id,
+            leaveRecord.staff.full_name || 'Staff',
+            dateStr,
+            rejectionReason
+          );
+        }
+
+        toast({
+          title: 'Leave Rejected',
+          description: `Leave request has been rejected.`,
+        });
+
+        onSuccess();
        onOpenChange(false);
      } catch (error: any) {
        console.error('Error rejecting leave:', error);

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
+import { NotificationEvents } from '@/lib/notifications';
 import {
   Dialog,
   DialogContent,
@@ -52,6 +53,13 @@ export function QuickAdvanceForm({ open, onOpenChange, onSuccess }: QuickAdvance
       });
 
       if (error) throw error;
+
+      // Send notifications to owners and admins
+      NotificationEvents.advanceRequested(
+        staffData.full_name,
+        numAmount,
+        '' // request ID not available from insert
+      );
 
       setShowSuccess(true);
       setTimeout(() => {
