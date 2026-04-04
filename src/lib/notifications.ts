@@ -120,6 +120,7 @@ export const NotificationEvents = {
       'staff',
       staffId
     );
+    sendTelegramToOwner('New Staff Added', `${staffName} has been added by ${creatorRole}. Please set their monthly salary.`);
   },
   
   // Request events
