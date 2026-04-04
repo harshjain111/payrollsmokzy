@@ -11,6 +11,19 @@ interface NotificationRecipients {
 }
 
 /**
+ * Send Telegram message to owner via edge function (fire-and-forget)
+ */
+async function sendTelegramToOwner(title: string, message: string): Promise<void> {
+  try {
+    await supabase.functions.invoke('send-telegram', {
+      body: { title, message },
+    });
+  } catch (error) {
+    console.error('Failed to send Telegram notification:', error);
+  }
+}
+
+/**
  * Send notification to specific user
  */
 export async function sendNotification(
@@ -85,6 +98,11 @@ export async function sendNotificationsByRole(
         referenceId
       );
     }
+
+    // Send Telegram to owner for all important events
+    if (recipients.owners) {
+      sendTelegramToOwner(title, message);
+    }
   } catch (error) {
     console.error('Failed to send notifications by role:', error);
   }
@@ -116,11 +134,11 @@ export const NotificationEvents = {
     );
   },
   
-  expenseSubmitted: async (staffName: string, amount: number, expenseId: string) => {
+  expenseSubmitted: async (staffName: string, amount: number, description: string, expenseId: string) => {
     await sendNotificationsByRole(
       { owners: true, admins: true },
       'New Expense Submitted',
-      `${staffName} has submitted an expense of ₹${amount.toLocaleString('en-IN')} for approval.`,
+      `${staffName} has submitted an expense of ₹${amount.toLocaleString('en-IN')} for "${description.slice(0, 50)}${description.length > 50 ? '...' : ''}".`,
       'info',
       'expense',
       expenseId
@@ -128,7 +146,7 @@ export const NotificationEvents = {
   },
   
   // Approval events
-  advanceApproved: async (staffUserId: string, amount: number, requestId: string) => {
+  advanceApproved: async (staffUserId: string, staffName: string, amount: number, requestId: string) => {
     // Notify staff
     await sendNotification(
       staffUserId,
@@ -142,14 +160,16 @@ export const NotificationEvents = {
     await sendNotificationsByRole(
       { accountants: true },
       'Advance Ready for Payout',
-      `An advance of ₹${amount.toLocaleString('en-IN')} has been approved and is ready for payout.`,
+      `An advance of ₹${amount.toLocaleString('en-IN')} for ${staffName} has been approved and is ready for payout.`,
       'info',
       'payment_request',
       requestId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Advance Approved', `Advance of ₹${amount.toLocaleString('en-IN')} for ${staffName} has been approved.`);
   },
   
-  advanceRejected: async (staffUserId: string, amount: number, reason: string, requestId: string) => {
+  advanceRejected: async (staffUserId: string, staffName: string, amount: number, reason: string, requestId: string) => {
     await sendNotification(
       staffUserId,
       'Advance Rejected',
@@ -158,9 +178,11 @@ export const NotificationEvents = {
       'payment_request',
       requestId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Advance Rejected', `Advance of ₹${amount.toLocaleString('en-IN')} for ${staffName} rejected. Reason: ${reason}`);
   },
   
-  expenseApproved: async (staffUserId: string, amount: number, expenseId: string) => {
+  expenseApproved: async (staffUserId: string, staffName: string, amount: number, expenseId: string) => {
     // Notify staff
     await sendNotification(
       staffUserId,
@@ -174,14 +196,16 @@ export const NotificationEvents = {
     await sendNotificationsByRole(
       { accountants: true },
       'Expense Ready for Reimbursement',
-      `An expense of ₹${amount.toLocaleString('en-IN')} has been approved and is ready for reimbursement.`,
+      `An expense of ₹${amount.toLocaleString('en-IN')} for ${staffName} has been approved and is ready for reimbursement.`,
       'info',
       'expense',
       expenseId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Expense Approved', `Expense of ₹${amount.toLocaleString('en-IN')} for ${staffName} approved.`);
   },
   
-  expenseRejected: async (staffUserId: string, amount: number, reason: string, expenseId: string) => {
+  expenseRejected: async (staffUserId: string, staffName: string, amount: number, reason: string, expenseId: string) => {
     await sendNotification(
       staffUserId,
       'Expense Rejected',
@@ -190,10 +214,12 @@ export const NotificationEvents = {
       'expense',
       expenseId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Expense Rejected', `Expense of ₹${amount.toLocaleString('en-IN')} for ${staffName} rejected. Reason: ${reason}`);
   },
   
   // Payment events
-  advancePaid: async (staffUserId: string, amount: number, requestId: string) => {
+  advancePaid: async (staffUserId: string, staffName: string, amount: number, requestId: string) => {
     await sendNotification(
       staffUserId,
       'Advance Paid',
@@ -202,9 +228,11 @@ export const NotificationEvents = {
       'payment_request',
       requestId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Advance Paid', `Advance of ₹${amount.toLocaleString('en-IN')} paid to ${staffName}.`);
   },
   
-  expenseReimbursed: async (staffUserId: string, amount: number, expenseId: string) => {
+  expenseReimbursed: async (staffUserId: string, staffName: string, amount: number, expenseId: string) => {
     await sendNotification(
       staffUserId,
       'Expense Reimbursed',
@@ -213,21 +241,23 @@ export const NotificationEvents = {
       'expense',
       expenseId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Expense Reimbursed', `Expense of ₹${amount.toLocaleString('en-IN')} reimbursed to ${staffName}.`);
   },
   
   // Salary events
-  salarySettled: async (staffName: string, month: string, settlementId: string) => {
+  salarySettled: async (staffName: string, month: string, amount: number, settlementId: string) => {
     await sendNotificationsByRole(
       { owners: true },
       'Salary Settled',
-      `Salary for ${staffName} for ${month} has been settled.`,
+      `Salary for ${staffName} for ${month} has been settled. Net payable: ₹${amount.toLocaleString('en-IN')}.`,
       'success',
       'salary_settlement',
       settlementId
     );
   },
   
-  salaryPaid: async (staffUserId: string, month: string, amount: number, settlementId: string) => {
+  salaryPaid: async (staffUserId: string, staffName: string, month: string, amount: number, settlementId: string) => {
     await sendNotification(
       staffUserId,
       'Salary Paid',
@@ -236,5 +266,52 @@ export const NotificationEvents = {
       'salary_settlement',
       settlementId
     );
+    // Telegram to owner
+    sendTelegramToOwner('Salary Paid', `Salary of ₹${amount.toLocaleString('en-IN')} paid to ${staffName} for ${month}.`);
+  },
+
+  // Leave events
+  leaveRequested: async (staffName: string, leaveDate: string) => {
+    await sendNotificationsByRole(
+      { owners: true, admins: true },
+      'New Leave Request',
+      `${staffName} has requested leave on ${leaveDate}.`,
+      'info',
+      'leave',
+    );
+  },
+
+  leaveApproved: async (staffUserId: string, staffName: string, leaveDate: string, deductionDays: number) => {
+    await sendNotification(
+      staffUserId,
+      'Leave Approved',
+      `Your leave on ${leaveDate} has been approved with ${deductionDays} day(s) deduction.`,
+      'success',
+      'leave',
+    );
+    // Telegram to owner
+    sendTelegramToOwner('Leave Approved', `Leave for ${staffName} on ${leaveDate} approved (${deductionDays} day deduction).`);
+  },
+
+  leaveRejected: async (staffUserId: string, staffName: string, leaveDate: string, reason: string) => {
+    await sendNotification(
+      staffUserId,
+      'Leave Rejected',
+      `Your leave on ${leaveDate} has been rejected. Reason: ${reason}`,
+      'error',
+      'leave',
+    );
+    // Telegram to owner
+    sendTelegramToOwner('Leave Rejected', `Leave for ${staffName} on ${leaveDate} rejected. Reason: ${reason}`);
+  },
+
+  leaveMarked: async (staffName: string, leaveDate: string, leaveType: string) => {
+    // Telegram to owner for leave marked by admin/accountant
+    sendTelegramToOwner('Leave Marked', `Leave marked for ${staffName} on ${leaveDate} (${leaveType}).`);
+  },
+
+  // Payout events
+  payoutMade: async (staffName: string, amount: number, payoutType: string) => {
+    sendTelegramToOwner('Payout Made', `${payoutType} payout of ₹${amount.toLocaleString('en-IN')} made to ${staffName}.`);
   },
 };
