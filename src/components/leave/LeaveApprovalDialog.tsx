@@ -138,14 +138,25 @@
          })
          .eq('id', leaveRecord.id);
  
-       if (error) throw error;
- 
-       toast({
-         title: 'Leave Rejected',
-         description: `Leave request has been rejected.`,
-       });
- 
-       onSuccess();
+        if (error) throw error;
+
+        // Notify staff and owner
+        if (leaveRecord.staff?.user_id) {
+          const dateStr = format(new Date(leaveRecord.leave_date), 'dd MMM yyyy');
+          NotificationEvents.leaveRejected(
+            leaveRecord.staff.user_id,
+            leaveRecord.staff.full_name || 'Staff',
+            dateStr,
+            rejectionReason
+          );
+        }
+
+        toast({
+          title: 'Leave Rejected',
+          description: `Leave request has been rejected.`,
+        });
+
+        onSuccess();
        onOpenChange(false);
      } catch (error: any) {
        console.error('Error rejecting leave:', error);

@@ -54,6 +54,13 @@ export function QuickAdvanceForm({ open, onOpenChange, onSuccess }: QuickAdvance
 
       if (error) throw error;
 
+      // Send notifications to owners and admins
+      NotificationEvents.advanceRequested(
+        staffData.full_name,
+        numAmount,
+        '' // request ID not available from insert
+      );
+
       setShowSuccess(true);
       setTimeout(() => {
         setShowSuccess(false);
