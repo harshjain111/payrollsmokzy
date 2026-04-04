@@ -120,6 +120,7 @@ export const NotificationEvents = {
       'staff',
       staffId
     );
+    sendTelegramToOwner('New Staff Added', `${staffName} has been added by ${creatorRole}. Please set their monthly salary.`);
   },
   
   // Request events
@@ -255,6 +256,7 @@ export const NotificationEvents = {
       'salary_settlement',
       settlementId
     );
+    sendTelegramToOwner('Salary Settled', `Salary for ${staffName} for ${month} settled. Net payable: ₹${amount.toLocaleString('en-IN')}.`);
   },
   
   salaryPaid: async (staffUserId: string, staffName: string, month: string, amount: number, settlementId: string) => {
