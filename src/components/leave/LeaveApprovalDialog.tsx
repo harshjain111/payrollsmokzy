@@ -81,14 +81,25 @@
          })
          .eq('id', leaveRecord.id);
  
-       if (error) throw error;
- 
-       toast({
-         title: 'Leave Approved',
-         description: `Leave record for ${format(new Date(leaveRecord.leave_date), 'dd MMM yyyy')} has been approved.`,
-       });
- 
-       onSuccess();
+        if (error) throw error;
+
+        // Notify staff and owner
+        const dateStr = format(new Date(leaveRecord.leave_date), 'dd MMM yyyy');
+        if (leaveRecord.staff?.user_id) {
+          NotificationEvents.leaveApproved(
+            leaveRecord.staff.user_id,
+            leaveRecord.staff.full_name || 'Staff',
+            dateStr,
+            deductionDays
+          );
+        }
+
+        toast({
+          title: 'Leave Approved',
+          description: `Leave record for ${dateStr} has been approved.`,
+        });
+
+        onSuccess();
        onOpenChange(false);
      } catch (error: any) {
        console.error('Error approving leave:', error);
