@@ -19,11 +19,12 @@
    is_immutable: boolean;
    created_at: string;
    updated_at: string;
-   staff?: {
-     id: string;
-     full_name: string;
-     employee_id: string;
-   };
+    staff?: {
+      id: string;
+      full_name: string;
+      employee_id: string;
+      user_id: string | null;
+    };
  }
  
  export const LEAVE_TYPE_CONFIG: Record<LeaveType, { label: string; defaultDeduction: number; description: string }> = {
