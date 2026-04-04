@@ -21,12 +21,32 @@ Deno.serve(async (req) => {
       throw new Error('TELEGRAM_API_KEY is not configured');
     }
 
+    const body = await req.json();
+
+    // Support getUpdates action to discover chat IDs
+    if (body.action === 'getUpdates') {
+      const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
+          'X-Connection-Api-Key': TELEGRAM_API_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ limit: 10 }),
+      });
+      const data = await response.json();
+      return new Response(
+        JSON.stringify(data),
+        { status: response.ok ? 200 : 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const OWNER_CHAT_ID = Deno.env.get('TELEGRAM_OWNER_CHAT_ID');
     if (!OWNER_CHAT_ID) {
       throw new Error('TELEGRAM_OWNER_CHAT_ID is not configured');
     }
 
-    const { title, message } = await req.json();
+    const { title, message } = body;
 
     if (!title || !message) {
       return new Response(
