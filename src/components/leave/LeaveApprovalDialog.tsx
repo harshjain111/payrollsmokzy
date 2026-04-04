@@ -25,8 +25,10 @@
  import { CheckCircle, XCircle, Calendar, User } from 'lucide-react';
  import { format } from 'date-fns';
  import { toast } from '@/hooks/use-toast';
- import type { LeaveRecord, LeaveType } from '@/types/leave';
- import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
+  import type { LeaveRecord, LeaveType } from '@/types/leave';
+  import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
+  import { NotificationEvents } from '@/lib/notifications';
+  import { format as formatDate } from 'date-fns';
  
  interface LeaveApprovalDialogProps {
    open: boolean;
