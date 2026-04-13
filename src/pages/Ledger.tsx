@@ -582,7 +582,19 @@ export default function Ledger() {
                           Bal: ₹{Math.abs(line.running_balance || 0).toLocaleString('en-IN')}
                         </p>
                       </div>
-                    </div>
+                     </div>
+                    {/* Rectify button for owner on non-rectification entries */}
+                    {isOwner && line.journal_entry?.transaction_type !== 'rectification' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-warning h-6 px-2 mt-1"
+                        onClick={() => handleRectify(line)}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Rectify
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -601,6 +613,7 @@ export default function Ledger() {
                       <TableHead className="font-semibold text-right">Debit</TableHead>
                       <TableHead className="font-semibold text-right">Credit</TableHead>
                       <TableHead className="font-semibold text-right">Balance</TableHead>
+                      {isOwner && <TableHead className="font-semibold w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
