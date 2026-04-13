@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Amount } from '@/components/ui/amount';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import type { Expense } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
@@ -59,7 +60,7 @@ export function RejectExpenseDialog({
     try {
       setIsSubmitting(true);
 
-      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+      const approverName = getUserDisplayName(user, staffData);
 
       const { error } = await supabase
         .from('expenses')

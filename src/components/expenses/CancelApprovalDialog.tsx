@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Amount } from '@/components/ui/amount';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { createCancellationReversalEntry } from '@/lib/journal-entries';
@@ -47,7 +48,7 @@ export function CancelApprovalDialog({
 
     setIsProcessing(true);
     try {
-      const cancellerName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
+      const cancellerName = getUserDisplayName(user, staffData);
 
       if (item.type === 'expense') {
         // Find the journal entry created during expense approval

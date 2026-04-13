@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -118,7 +119,7 @@ export default function Requests() {
 
     setIsProcessing(true);
     try {
-      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+      const approverName = getUserDisplayName(user, staffData);
 
       const { error } = await supabase
         .from('payment_requests')
@@ -185,7 +186,7 @@ export default function Requests() {
     
     setIsProcessing(true);
     try {
-      const approverName = staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
+      const approverName = getUserDisplayName(user, staffData);
 
       const { error } = await supabase
         .from('payment_requests')
