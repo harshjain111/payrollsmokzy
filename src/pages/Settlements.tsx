@@ -68,6 +68,7 @@ export default function Settlements() {
   const [finalDeductionDays, setFinalDeductionDays] = useState(0);
   const [deductionAdjustmentReason, setDeductionAdjustmentReason] = useState('');
   const [advanceToAdjust, setAdvanceToAdjust] = useState(0);
+  const [netPayableOverride, setNetPayableOverride] = useState<number | null>(null);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
@@ -311,6 +312,30 @@ export default function Settlements() {
       netPayable,
       carryForwardAdvance: carryForward,
     });
+
+    // Reset net payable override when advance changes
+    setNetPayableOverride(null);
+  };
+
+  const handleNetPayableOverride = (desiredNetPayable: number) => {
+    if (!calculation) return;
+    
+    const monthlySalary = calculation.monthlySalary;
+    const dailySalary = calculation.dailySalary;
+    const advanceAdj = calculation.advanceToAdjust;
+    
+    // Clamp desired net payable between 0 and (monthlySalary - advanceAdj)
+    const maxNetPayable = Math.max(0, monthlySalary - advanceAdj);
+    const clampedNet = Math.min(maxNetPayable, Math.max(0, desiredNetPayable));
+    
+    setNetPayableOverride(clampedNet);
+    
+    // Back-calculate: leaveDeduction = monthlySalary - advanceAdj - desiredNetPayable
+    const leaveDeduction = Math.max(0, monthlySalary - advanceAdj - clampedNet);
+    const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
+    
+    // Update deduction days (this triggers recalculation)
+    setFinalDeductionDays(backCalculatedDays);
   };
 
   const handleSettleClick = () => {
@@ -512,6 +537,7 @@ export default function Settlements() {
       setFinalDeductionDays(0);
       setDeductionAdjustmentReason('');
       setAdvanceToAdjust(0);
+      setNetPayableOverride(null);
       setCalculation(null);
       setIsAlreadySettled(false);
       setShowConfirmDialog(false);
@@ -646,6 +672,48 @@ export default function Settlements() {
                 onAdjustmentChange={handleAdvanceAdjustmentChange}
                 disabled={isAlreadySettled}
               />
+            )}
+
+            {/* Net Payable Override */}
+            {calculation && !isAlreadySettled && (
+              <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium">Desired Net Payable (Optional)</Label>
+                  <Badge variant="outline" className="text-xs">Override</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Enter the exact amount you want to pay. Leave deduction will be auto-calculated.
+                </p>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={Math.max(0, calculation.monthlySalary - calculation.advanceToAdjust)}
+                    value={netPayableOverride !== null ? netPayableOverride : ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === '') {
+                        setNetPayableOverride(null);
+                        // Recalculate with original leave days
+                        calculateSettlement();
+                      } else {
+                        handleNetPayableOverride(Number(val));
+                      }
+                    }}
+                    className="pl-8 font-mono"
+                    placeholder={`Auto: ₹${calculation.netPayable.toLocaleString('en-IN')}`}
+                  />
+                </div>
+                {netPayableOverride !== null && (
+                  <div className="flex items-center gap-2 text-xs text-primary">
+                    <Info className="h-3 w-3" />
+                    <span>
+                      Leave deduction auto-set to {finalDeductionDays} days (₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)})
+                    </span>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="space-y-2">
