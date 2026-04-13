@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Amount } from '@/components/ui/amount';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { createCancellationReversalEntry } from '@/lib/journal-entries';
