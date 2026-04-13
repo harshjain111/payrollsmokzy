@@ -56,6 +56,7 @@ export default function Requests() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
+  const [cancelRequest, setCancelRequest] = useState<RequestWithStaff | null>(null);
 
   useEffect(() => {
     fetchRequests();
