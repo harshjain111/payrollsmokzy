@@ -250,13 +250,13 @@ export default function Settlements() {
       const grossSalary = Math.max(0, proRataSalary - leaveDeduction);
       const advancesOutstanding = Number(advanceData) || 0;
       
-      // Default: adjust full outstanding (up to gross salary)
+      // Don't auto-set advance adjustment — let admin enter it manually (default 0)
+      // Only use current advanceToAdjust if it's within bounds
       const maxAdjustable = Math.min(advancesOutstanding, grossSalary);
-      const defaultAdjustment = maxAdjustable;
-      setAdvanceToAdjust(defaultAdjustment);
+      const currentAdj = Math.min(advanceToAdjust, maxAdjustable);
       
-      const netPayable = Math.max(0, grossSalary - defaultAdjustment);
-      const carryForwardAdvance = advancesOutstanding - defaultAdjustment;
+      const netPayable = Math.max(0, grossSalary - currentAdj);
+      const carryForwardAdvance = advancesOutstanding - currentAdj;
 
       const newWarnings = [...warnings.filter(w => !w.includes('leave') && !w.includes('Pro-rata'))];
       if (effectiveDays < daysInMonth) {
