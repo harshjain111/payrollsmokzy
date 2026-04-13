@@ -312,6 +312,30 @@ export default function Settlements() {
       netPayable,
       carryForwardAdvance: carryForward,
     });
+
+    // Reset net payable override when advance changes
+    setNetPayableOverride(null);
+  };
+
+  const handleNetPayableOverride = (desiredNetPayable: number) => {
+    if (!calculation) return;
+    
+    const monthlySalary = calculation.monthlySalary;
+    const dailySalary = calculation.dailySalary;
+    const advanceAdj = calculation.advanceToAdjust;
+    
+    // Clamp desired net payable between 0 and (monthlySalary - advanceAdj)
+    const maxNetPayable = Math.max(0, monthlySalary - advanceAdj);
+    const clampedNet = Math.min(maxNetPayable, Math.max(0, desiredNetPayable));
+    
+    setNetPayableOverride(clampedNet);
+    
+    // Back-calculate: leaveDeduction = monthlySalary - advanceAdj - desiredNetPayable
+    const leaveDeduction = Math.max(0, monthlySalary - advanceAdj - clampedNet);
+    const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
+    
+    // Update deduction days (this triggers recalculation)
+    setFinalDeductionDays(backCalculatedDays);
   };
 
   const handleSettleClick = () => {
