@@ -98,9 +98,9 @@ export default function Settlements() {
     }
   }, [selectedStaffId, selectedMonth, finalDeductionDays, canAccessSettlements]);
 
-  // Recalculate when advance adjustment changes
+  // Recalculate netPayable when advance adjustment changes (without resetting overrides)
   useEffect(() => {
-    if (calculation && calculation.advancesOutstanding > 0) {
+    if (calculation) {
       const maxAdjustable = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
       const clampedAdjustment = Math.min(advanceToAdjust, maxAdjustable);
       const netPayable = calculation.grossSalary - clampedAdjustment;
