@@ -100,6 +100,7 @@ export default function Payouts() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
   const [pettyCashBalance, setPettyCashBalance] = useState<number>(0);
+  const [cancelItem, setCancelItem] = useState<PayoutItem | null>(null);
 
   useEffect(() => {
     if (canExecutePayout) {
