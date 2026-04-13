@@ -47,7 +47,7 @@ export function CancelApprovalDialog({
 
     setIsProcessing(true);
     try {
-      const cancellerName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
+      const cancellerName = getUserDisplayName(user, staffData);
 
       if (item.type === 'expense') {
         // Find the journal entry created during expense approval

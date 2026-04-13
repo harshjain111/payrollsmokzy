@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { Amount } from '@/components/ui/amount';
 import { createExpenseApprovalEntry } from '@/lib/journal-entries';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import type { Expense } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
@@ -75,7 +76,7 @@ export function ApproveExpenseDialog({
       });
 
       // Get approver name from staff data or user metadata
-      const approverName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
+      const approverName = getUserDisplayName(user, staffData);
 
       // Update expense status and link to journal entry
       const { error } = await supabase
