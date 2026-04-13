@@ -130,6 +130,11 @@ export default function Expenses() {
     setShowRejectDialog(true);
   };
 
+  const handleCancelApproval = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setShowCancelDialog(true);
+  };
+
   const getStatusVariant = (status: ExpenseStatus) => {
     switch (status) {
       case 'draft': return 'secondary';
