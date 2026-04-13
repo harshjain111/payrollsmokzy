@@ -68,6 +68,7 @@ export default function Settlements() {
   const [finalDeductionDays, setFinalDeductionDays] = useState(0);
   const [deductionAdjustmentReason, setDeductionAdjustmentReason] = useState('');
   const [advanceToAdjust, setAdvanceToAdjust] = useState(0);
+  const [netPayableOverride, setNetPayableOverride] = useState<number | null>(null);
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('cash');
   const [isCalculating, setIsCalculating] = useState(false);
   const [isSettling, setIsSettling] = useState(false);
