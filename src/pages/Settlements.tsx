@@ -647,18 +647,7 @@ export default function Settlements() {
 
             <Separator />
 
-            {/* Leave Deduction Section - Integrated with Leave Records */}
-            {selectedStaffId && selectedMonth && !isAlreadySettled && (
-              <LeaveDeductionSection
-                staffId={selectedStaffId}
-                month={selectedMonth}
-                dailySalary={calculation?.dailySalary || 0}
-                onDeductionChange={handleLeaveDeductionChange}
-                disabled={isAlreadySettled}
-              />
-            )}
-
-            {/* Partial Advance Adjustment */}
+            {/* Step 1: Advance Adjustment (if advances exist) */}
             {calculation && calculation.advancesOutstanding > 0 && !isAlreadySettled && (
               <AdvanceAdjustmentInput
                 totalAdvanceOutstanding={calculation.advancesOutstanding}
@@ -669,7 +658,18 @@ export default function Settlements() {
               />
             )}
 
-            {/* Net Payable Override */}
+            {/* Step 2: Leave Deduction Section */}
+            {selectedStaffId && selectedMonth && !isAlreadySettled && (
+              <LeaveDeductionSection
+                staffId={selectedStaffId}
+                month={selectedMonth}
+                dailySalary={calculation?.dailySalary || 0}
+                onDeductionChange={handleLeaveDeductionChange}
+                disabled={isAlreadySettled}
+              />
+            )}
+
+            {/* Step 3: Desired Net Payable Override */}
             {calculation && !isAlreadySettled && (
               <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between">
@@ -677,14 +677,15 @@ export default function Settlements() {
                   <Badge variant="outline" className="text-xs">Override</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter the exact amount you want to pay. Leave deduction will be auto-calculated.
+                  Enter the exact amount you want to pay. Leave deduction will be auto-calculated using: 
+                  <span className="font-mono text-[10px] block mt-1">Salary − Advance Adj − Deduction = Net Payable</span>
                 </p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                   <Input
                     type="number"
                     min="0"
-                    max={Math.max(0, calculation.monthlySalary - calculation.advanceToAdjust)}
+                    max={Math.max(0, calculation.monthlySalary - advanceToAdjust)}
                     value={netPayableOverride !== null ? netPayableOverride : ''}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -701,11 +702,16 @@ export default function Settlements() {
                   />
                 </div>
                 {netPayableOverride !== null && (
-                  <div className="flex items-center gap-2 text-xs text-primary">
-                    <Info className="h-3 w-3" />
-                    <span>
-                      Leave deduction auto-set to {finalDeductionDays} days (₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)})
-                    </span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs text-primary">
+                      <Info className="h-3 w-3" />
+                      <span>
+                        Leave deduction auto-set to {finalDeductionDays} days (₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)})
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/50 p-2 rounded">
+                      ₹{calculation.monthlySalary.toFixed(0)} − ₹{advanceToAdjust.toFixed(0)} − ₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)} = ₹{netPayableOverride.toFixed(0)}
+                    </div>
                   </div>
                 )}
               </div>
