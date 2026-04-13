@@ -15,7 +15,8 @@ export type TransactionType =
   | 'expense_approval'     // Debit: Expense Head, Credit: Staff Payable
   | 'expense_payout'       // Debit: Staff Payable, Credit: Bank/Cash
   | 'advance_paid'         // Debit: Staff Advances (Receivable), Credit: Bank/Cash
-  | 'advance_adjustment';  // Debit: Salary Expense (adjusted), Credit: Staff Advances
+  | 'advance_adjustment'   // Debit: Salary Expense (adjusted), Credit: Staff Advances
+  | 'rectification';       // Equal & opposite reversal of a wrong entry
 
 export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'petty_cash';
 
