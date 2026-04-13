@@ -27,11 +27,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, Check, X, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, Loader2, ArrowRight, Ban } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
 import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
+import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
 
 interface RequestWithStaff extends PaymentRequest {
   staff: StaffPublic;
@@ -55,6 +56,7 @@ export default function Requests() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [activeTab, setActiveTab] = useState('pending');
+  const [cancelRequest, setCancelRequest] = useState<RequestWithStaff | null>(null);
 
   useEffect(() => {
     fetchRequests();
@@ -335,6 +337,17 @@ export default function Requests() {
                             </Button>
                           </Link>
                         )}
+                        {request.status === 'approved' && !request.paid_at && (isOwner || isAdmin) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                            onClick={() => setCancelRequest(request)}
+                            title="Cancel Approval"
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -426,6 +439,17 @@ export default function Requests() {
                                 </Button>
                               </Link>
                             )}
+                            {request.status === 'approved' && !request.paid_at && (isOwner || isAdmin) && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-destructive hover:text-destructive gap-1 text-xs"
+                                onClick={() => setCancelRequest(request)}
+                              >
+                                <Ban className="h-3.5 w-3.5" />
+                                Cancel
+                              </Button>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -483,6 +507,25 @@ export default function Requests() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Approval Dialog */}
+      <CancelApprovalDialog
+        open={!!cancelRequest}
+        onOpenChange={(open) => !open && setCancelRequest(null)}
+        onSuccess={() => {
+          setCancelRequest(null);
+          fetchRequests();
+        }}
+        item={cancelRequest ? {
+          id: cancelRequest.id,
+          type: 'advance',
+          staffName: cancelRequest.staff?.full_name || 'Staff',
+          staffId: cancelRequest.staff_id,
+          staffUserId: cancelRequest.staff?.user_id,
+          amount: cancelRequest.amount,
+          description: cancelRequest.reason,
+        } : null}
+      />
     </div>
   );
 }

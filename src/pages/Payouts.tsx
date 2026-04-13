@@ -33,7 +33,8 @@ import {
   Loader2,
   CheckCircle2,
   Banknote,
-  ArrowRight
+  ArrowRight,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -45,6 +46,7 @@ import {
 import { PaidBySelector } from '@/components/payouts/PaidBySelector';
 import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
+import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
 
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
@@ -98,6 +100,7 @@ export default function Payouts() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
   const [pettyCashBalance, setPettyCashBalance] = useState<number>(0);
+  const [cancelItem, setCancelItem] = useState<PayoutItem | null>(null);
 
   useEffect(() => {
     if (canExecutePayout) {
@@ -623,6 +626,18 @@ export default function Payouts() {
                               </p>
                             )}
                           </div>
+                          {(isOwner || isAdmin) && item.type !== 'salary' && (
+                            <Button 
+                              onClick={() => setCancelItem(item)}
+                              size="sm"
+                              variant="outline"
+                              className="shrink-0 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 text-destructive hover:text-destructive border-destructive/30"
+                              title="Cancel Approval"
+                            >
+                              <Ban className="mr-1 h-3.5 w-3.5" />
+                              Cancel
+                            </Button>
+                          )}
                           <Button 
                             onClick={() => openPayoutDialog(item)}
                             size="sm"
@@ -744,6 +759,25 @@ export default function Payouts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Approval Dialog */}
+      <CancelApprovalDialog
+        open={!!cancelItem}
+        onOpenChange={(open) => !open && setCancelItem(null)}
+        onSuccess={() => {
+          setCancelItem(null);
+          fetchApprovedItems();
+        }}
+        item={cancelItem ? {
+          id: cancelItem.id,
+          type: cancelItem.type as 'expense' | 'advance',
+          staffName: cancelItem.staffName,
+          staffId: cancelItem.staffId,
+          staffUserId: cancelItem.staffUserId,
+          amount: cancelItem.amount,
+          description: cancelItem.description,
+        } : null}
+      />
     </div>
   );
 }

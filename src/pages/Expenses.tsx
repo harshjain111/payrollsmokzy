@@ -18,7 +18,8 @@ import {
   X, 
   Eye,
   ArrowRight,
-  Calendar
+  Calendar,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -27,6 +28,7 @@ import { EXPENSE_CATEGORY_LABELS, EXPENSE_STATUS_LABELS } from '@/types/database
 import { ExpenseDetailsDialog } from '@/components/expenses/ExpenseDetailsDialog';
 import { ApproveExpenseDialog } from '@/components/expenses/ApproveExpenseDialog';
 import { RejectExpenseDialog } from '@/components/expenses/RejectExpenseDialog';
+import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
 import { CreateEventDialog } from '@/components/events/CreateEventDialog';
 
 export default function Expenses() {
@@ -50,6 +52,7 @@ export default function Expenses() {
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [showRejectDialog, setShowRejectDialog] = useState(false);
   const [showCreateEventDialog, setShowCreateEventDialog] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
 
   useEffect(() => {
     fetchExpenses();
@@ -125,6 +128,11 @@ export default function Expenses() {
   const handleReject = (expense: Expense) => {
     setSelectedExpense(expense);
     setShowRejectDialog(true);
+  };
+
+  const handleCancelApproval = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setShowCancelDialog(true);
   };
 
   const getStatusVariant = (status: ExpenseStatus) => {
@@ -305,6 +313,19 @@ export default function Expenses() {
                               </Button>
                             </Link>
                           )}
+
+                          {/* Cancel approval button for Owner/Admin on approved expenses */}
+                          {expense.status === 'approved' && (isOwner || isAdmin) && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9"
+                              onClick={() => handleCancelApproval(expense)}
+                              title="Cancel Approval"
+                            >
+                              <Ban className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -335,6 +356,20 @@ export default function Expenses() {
             open={showRejectDialog}
             onOpenChange={setShowRejectDialog}
             onSuccess={fetchExpenses}
+          />
+          <CancelApprovalDialog
+            open={showCancelDialog}
+            onOpenChange={setShowCancelDialog}
+            onSuccess={fetchExpenses}
+            item={{
+              id: selectedExpense.id,
+              type: 'expense',
+              staffName: selectedExpense.staff?.full_name || 'Staff',
+              staffId: selectedExpense.staff_id,
+              staffUserId: selectedExpense.staff?.user_id,
+              amount: selectedExpense.amount,
+              description: selectedExpense.description,
+            }}
           />
         </>
       )}
