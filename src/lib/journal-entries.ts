@@ -829,3 +829,70 @@ export async function createRectificationEntry(params: RectificationParams): Pro
     isImmutable: true,
   });
 }
+
+/**
+ * CANCELLATION ENTRY
+ * 
+ * Creates a reversal journal entry to undo an approval that was done by mistake.
+ * Used when admin/owner wants to cancel an approved expense or advance before payout.
+ * 
+ * For expense approvals:
+ * - Original: Dr Expense Account, Cr Staff Payable
+ * - Cancellation: Dr Staff Payable, Cr Expense Account (exact opposite)
+ * 
+ * The cancellation entry is immutable and references the original for audit trail.
+ */
+export interface CancellationParams {
+  originalJournalEntryId: string;
+  staffId: string;
+  staffName: string;
+  reason: string;
+  createdBy: string;
+  cancelledByUserName: string;
+}
+
+export async function createCancellationReversalEntry(params: CancellationParams): Promise<string> {
+  const { originalJournalEntryId, staffId, staffName, reason, createdBy, cancelledByUserName } = params;
+
+  // Fetch the original journal entry and its lines
+  const { data: originalEntry, error: entryError } = await supabase
+    .from('journal_entries')
+    .select('*')
+    .eq('id', originalJournalEntryId)
+    .single();
+
+  if (entryError || !originalEntry) {
+    throw new Error('Original journal entry not found');
+  }
+
+  const { data: originalLines, error: linesError } = await supabase
+    .from('journal_lines')
+    .select('*, account:account_id(code)')
+    .eq('journal_entry_id', originalJournalEntryId);
+
+  if (linesError || !originalLines || originalLines.length === 0) {
+    throw new Error('Original journal lines not found');
+  }
+
+  // Create reversed lines (swap debit and credit)
+  const reversedLines: JournalLine[] = originalLines.map(line => ({
+    accountCode: (line.account as any)?.code || '',
+    debit: Number(line.credit),
+    credit: Number(line.debit),
+    staffId: line.staff_id || undefined,
+    description: `[CANCELLED] ${line.description || ''}`,
+  }));
+
+  validateBalance(reversedLines);
+
+  return createJournalEntry({
+    transactionType: 'cancellation',
+    staffId,
+    description: `Cancellation by ${cancelledByUserName}: ${reason} (reversal of ${originalEntry.reference_no})`,
+    referenceId: originalJournalEntryId,
+    referenceType: 'cancellation',
+    createdBy,
+    lines: reversedLines,
+    isImmutable: true,
+  });
+}
