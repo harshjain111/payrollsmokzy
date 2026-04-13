@@ -87,6 +87,9 @@ export default function Settlements() {
 
   useEffect(() => {
     if (canAccessSettlements && selectedStaffId && selectedMonth) {
+      // Reset overrides when staff/month changes
+      setAdvanceToAdjust(0);
+      setNetPayableOverride(null);
       validateSettlement();
     }
   }, [selectedStaffId, selectedMonth, canAccessSettlements]);
