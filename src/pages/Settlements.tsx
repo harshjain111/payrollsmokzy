@@ -303,18 +303,13 @@ export default function Settlements() {
     
     setAdvanceToAdjust(clampedAmount);
     
-    const netPayable = Math.max(0, calculation.grossSalary - clampedAmount);
-    const carryForward = calculation.advancesOutstanding - clampedAmount;
-    
-    setCalculation({
-      ...calculation,
-      advanceToAdjust: clampedAmount,
-      netPayable,
-      carryForwardAdvance: carryForward,
-    });
-
-    // Reset net payable override when advance changes
-    setNetPayableOverride(null);
+    // If there's a net payable override active, recalculate deduction based on override
+    if (netPayableOverride !== null) {
+      const leaveDeduction = Math.max(0, calculation.monthlySalary - clampedAmount - netPayableOverride);
+      const dailySalary = calculation.dailySalary;
+      const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
+      setFinalDeductionDays(backCalculatedDays);
+    }
   };
 
   const handleNetPayableOverride = (desiredNetPayable: number) => {
@@ -322,7 +317,7 @@ export default function Settlements() {
     
     const monthlySalary = calculation.monthlySalary;
     const dailySalary = calculation.dailySalary;
-    const advanceAdj = calculation.advanceToAdjust;
+    const advanceAdj = advanceToAdjust;
     
     // Clamp desired net payable between 0 and (monthlySalary - advanceAdj)
     const maxNetPayable = Math.max(0, monthlySalary - advanceAdj);
@@ -330,7 +325,7 @@ export default function Settlements() {
     
     setNetPayableOverride(clampedNet);
     
-    // Back-calculate: leaveDeduction = monthlySalary - advanceAdj - desiredNetPayable
+    // Formula: deduction = monthlySalary - advanceAdj - desiredNetPayable
     const leaveDeduction = Math.max(0, monthlySalary - advanceAdj - clampedNet);
     const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
     
