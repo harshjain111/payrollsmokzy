@@ -340,14 +340,44 @@ export default function Ledger() {
       'expense_payout': 'Expense Reimbursed',
       'advance_paid': 'Advance Given',
       'advance_adjustment': 'Advance Adjusted',
+      'rectification': 'Rectification',
     };
     return labels[type] || type;
   };
 
   const getTransactionTypeBadgeVariant = (type: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
+    if (type === 'rectification') return 'destructive';
     if (type.includes('payout') || type.includes('paid')) return 'default';
     if (type.includes('settlement') || type.includes('approval')) return 'secondary';
     return 'outline';
+  };
+
+  // Helper to open rectification dialog for a journal entry
+  const handleRectify = (line: JournalLineWithDetails) => {
+    if (!line.journal_entry || !line.staff_id) return;
+    const staffInfo = staffList.find(s => s.id === line.staff_id);
+    
+    // Collect all lines for this journal entry from journalLines
+    const entryLines = journalLines.filter(
+      l => l.journal_entry?.id === line.journal_entry?.id
+    );
+
+    setRectificationTarget({
+      journalEntryId: line.journal_entry.id,
+      referenceNo: line.journal_entry.reference_no,
+      description: line.journal_entry.description,
+      transactionType: line.journal_entry.transaction_type,
+      staffId: line.staff_id,
+      staffName: staffInfo?.full_name || 'Unknown',
+      lines: entryLines.map(l => ({
+        id: l.id,
+        debit: l.debit,
+        credit: l.credit,
+        description: l.description,
+        staff_id: l.staff_id,
+        account: l.account,
+      })),
+    });
   };
 
   return (
