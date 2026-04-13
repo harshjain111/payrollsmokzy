@@ -67,7 +67,7 @@ interface StaffBalance {
 
 export default function Ledger() {
   const [searchParams] = useSearchParams();
-  const { isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
+  const { user, isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
   
   const [journalLines, setJournalLines] = useState<JournalLineWithDetails[]>([]);
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
@@ -78,6 +78,15 @@ export default function Ledger() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [rectificationTarget, setRectificationTarget] = useState<{
+    journalEntryId: string;
+    referenceNo: string;
+    description: string;
+    transactionType: string;
+    staffId: string;
+    staffName: string;
+    lines: any[];
+  } | null>(null);
 
   // Calculate totals from journal lines - ONLY staff-side entries (staff_id IS NOT NULL)
   // Also calculate per-account totals for proper balance formula
