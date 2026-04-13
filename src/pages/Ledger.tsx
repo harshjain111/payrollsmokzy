@@ -675,6 +675,21 @@ export default function Ledger() {
                             {(line.running_balance || 0) >= 0 ? '+' : '-'}₹{Math.abs(line.running_balance || 0).toLocaleString('en-IN')}
                           </span>
                         </TableCell>
+                        {isOwner && (
+                          <TableCell>
+                            {line.journal_entry?.transaction_type !== 'rectification' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-warning h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleRectify(line)}
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Rectify
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -684,6 +699,26 @@ export default function Ledger() {
           )}
         </CardContent>
       </Card>
+
+      {/* Rectification Dialog */}
+      {rectificationTarget && user && (
+        <RectificationDialog
+          open={!!rectificationTarget}
+          onOpenChange={(open) => !open && setRectificationTarget(null)}
+          journalEntryId={rectificationTarget.journalEntryId}
+          referenceNo={rectificationTarget.referenceNo}
+          description={rectificationTarget.description}
+          transactionType={rectificationTarget.transactionType}
+          staffId={rectificationTarget.staffId}
+          staffName={rectificationTarget.staffName}
+          lines={rectificationTarget.lines}
+          userId={user.id}
+          onSuccess={() => {
+            setRectificationTarget(null);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 }
