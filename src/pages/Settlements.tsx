@@ -87,6 +87,9 @@ export default function Settlements() {
 
   useEffect(() => {
     if (canAccessSettlements && selectedStaffId && selectedMonth) {
+      // Reset overrides when staff/month changes
+      setAdvanceToAdjust(0);
+      setNetPayableOverride(null);
       validateSettlement();
     }
   }, [selectedStaffId, selectedMonth, canAccessSettlements]);
@@ -98,9 +101,9 @@ export default function Settlements() {
     }
   }, [selectedStaffId, selectedMonth, finalDeductionDays, canAccessSettlements]);
 
-  // Recalculate when advance adjustment changes
+  // Recalculate netPayable when advance adjustment changes (without resetting overrides)
   useEffect(() => {
-    if (calculation && calculation.advancesOutstanding > 0) {
+    if (calculation) {
       const maxAdjustable = Math.min(calculation.advancesOutstanding, calculation.grossSalary);
       const clampedAdjustment = Math.min(advanceToAdjust, maxAdjustable);
       const netPayable = calculation.grossSalary - clampedAdjustment;
@@ -250,13 +253,13 @@ export default function Settlements() {
       const grossSalary = Math.max(0, proRataSalary - leaveDeduction);
       const advancesOutstanding = Number(advanceData) || 0;
       
-      // Default: adjust full outstanding (up to gross salary)
+      // Don't auto-set advance adjustment — let admin enter it manually (default 0)
+      // Only use current advanceToAdjust if it's within bounds
       const maxAdjustable = Math.min(advancesOutstanding, grossSalary);
-      const defaultAdjustment = maxAdjustable;
-      setAdvanceToAdjust(defaultAdjustment);
+      const currentAdj = Math.min(advanceToAdjust, maxAdjustable);
       
-      const netPayable = Math.max(0, grossSalary - defaultAdjustment);
-      const carryForwardAdvance = advancesOutstanding - defaultAdjustment;
+      const netPayable = Math.max(0, grossSalary - currentAdj);
+      const carryForwardAdvance = advancesOutstanding - currentAdj;
 
       const newWarnings = [...warnings.filter(w => !w.includes('leave') && !w.includes('Pro-rata'))];
       if (effectiveDays < daysInMonth) {
@@ -279,7 +282,7 @@ export default function Settlements() {
         leaveDeduction,
         grossSalary,
         advancesOutstanding,
-        advanceToAdjust: defaultAdjustment,
+        advanceToAdjust: currentAdj,
         netPayable,
         carryForwardAdvance,
       });
@@ -303,18 +306,13 @@ export default function Settlements() {
     
     setAdvanceToAdjust(clampedAmount);
     
-    const netPayable = Math.max(0, calculation.grossSalary - clampedAmount);
-    const carryForward = calculation.advancesOutstanding - clampedAmount;
-    
-    setCalculation({
-      ...calculation,
-      advanceToAdjust: clampedAmount,
-      netPayable,
-      carryForwardAdvance: carryForward,
-    });
-
-    // Reset net payable override when advance changes
-    setNetPayableOverride(null);
+    // If there's a net payable override active, recalculate deduction based on override
+    if (netPayableOverride !== null) {
+      const leaveDeduction = Math.max(0, calculation.monthlySalary - clampedAmount - netPayableOverride);
+      const dailySalary = calculation.dailySalary;
+      const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
+      setFinalDeductionDays(backCalculatedDays);
+    }
   };
 
   const handleNetPayableOverride = (desiredNetPayable: number) => {
@@ -322,7 +320,7 @@ export default function Settlements() {
     
     const monthlySalary = calculation.monthlySalary;
     const dailySalary = calculation.dailySalary;
-    const advanceAdj = calculation.advanceToAdjust;
+    const advanceAdj = advanceToAdjust;
     
     // Clamp desired net payable between 0 and (monthlySalary - advanceAdj)
     const maxNetPayable = Math.max(0, monthlySalary - advanceAdj);
@@ -330,7 +328,7 @@ export default function Settlements() {
     
     setNetPayableOverride(clampedNet);
     
-    // Back-calculate: leaveDeduction = monthlySalary - advanceAdj - desiredNetPayable
+    // Formula: deduction = monthlySalary - advanceAdj - desiredNetPayable
     const leaveDeduction = Math.max(0, monthlySalary - advanceAdj - clampedNet);
     const backCalculatedDays = dailySalary > 0 ? Math.round((leaveDeduction / dailySalary) * 100) / 100 : 0;
     
@@ -652,18 +650,7 @@ export default function Settlements() {
 
             <Separator />
 
-            {/* Leave Deduction Section - Integrated with Leave Records */}
-            {selectedStaffId && selectedMonth && !isAlreadySettled && (
-              <LeaveDeductionSection
-                staffId={selectedStaffId}
-                month={selectedMonth}
-                dailySalary={calculation?.dailySalary || 0}
-                onDeductionChange={handleLeaveDeductionChange}
-                disabled={isAlreadySettled}
-              />
-            )}
-
-            {/* Partial Advance Adjustment */}
+            {/* Step 1: Advance Adjustment (if advances exist) */}
             {calculation && calculation.advancesOutstanding > 0 && !isAlreadySettled && (
               <AdvanceAdjustmentInput
                 totalAdvanceOutstanding={calculation.advancesOutstanding}
@@ -674,7 +661,18 @@ export default function Settlements() {
               />
             )}
 
-            {/* Net Payable Override */}
+            {/* Step 2: Leave Deduction Section */}
+            {selectedStaffId && selectedMonth && !isAlreadySettled && (
+              <LeaveDeductionSection
+                staffId={selectedStaffId}
+                month={selectedMonth}
+                dailySalary={calculation?.dailySalary || 0}
+                onDeductionChange={handleLeaveDeductionChange}
+                disabled={isAlreadySettled}
+              />
+            )}
+
+            {/* Step 3: Desired Net Payable Override */}
             {calculation && !isAlreadySettled && (
               <div className="space-y-2 p-4 rounded-lg border bg-muted/30">
                 <div className="flex items-center justify-between">
@@ -682,14 +680,15 @@ export default function Settlements() {
                   <Badge variant="outline" className="text-xs">Override</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  Enter the exact amount you want to pay. Leave deduction will be auto-calculated.
+                  Enter the exact amount you want to pay. Leave deduction will be auto-calculated using: 
+                  <span className="font-mono text-[10px] block mt-1">Salary − Advance Adj − Deduction = Net Payable</span>
                 </p>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₹</span>
                   <Input
                     type="number"
                     min="0"
-                    max={Math.max(0, calculation.monthlySalary - calculation.advanceToAdjust)}
+                    max={Math.max(0, calculation.monthlySalary - advanceToAdjust)}
                     value={netPayableOverride !== null ? netPayableOverride : ''}
                     onChange={(e) => {
                       const val = e.target.value;
@@ -706,11 +705,16 @@ export default function Settlements() {
                   />
                 </div>
                 {netPayableOverride !== null && (
-                  <div className="flex items-center gap-2 text-xs text-primary">
-                    <Info className="h-3 w-3" />
-                    <span>
-                      Leave deduction auto-set to {finalDeductionDays} days (₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)})
-                    </span>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs text-primary">
+                      <Info className="h-3 w-3" />
+                      <span>
+                        Leave deduction auto-set to {finalDeductionDays} days (₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)})
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-muted-foreground font-mono bg-muted/50 p-2 rounded">
+                      ₹{calculation.monthlySalary.toFixed(0)} − ₹{advanceToAdjust.toFixed(0)} − ₹{(calculation.dailySalary * finalDeductionDays).toFixed(0)} = ₹{netPayableOverride.toFixed(0)}
+                    </div>
                   </div>
                 )}
               </div>
