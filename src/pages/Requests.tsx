@@ -507,6 +507,25 @@ export default function Requests() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Approval Dialog */}
+      <CancelApprovalDialog
+        open={!!cancelRequest}
+        onOpenChange={(open) => !open && setCancelRequest(null)}
+        onSuccess={() => {
+          setCancelRequest(null);
+          fetchRequests();
+        }}
+        item={cancelRequest ? {
+          id: cancelRequest.id,
+          type: 'advance',
+          staffName: cancelRequest.staff?.full_name || 'Staff',
+          staffId: cancelRequest.staff_id,
+          staffUserId: cancelRequest.staff?.user_id,
+          amount: cancelRequest.amount,
+          description: cancelRequest.reason,
+        } : null}
+      />
     </div>
   );
 }
