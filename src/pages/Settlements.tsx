@@ -279,7 +279,7 @@ export default function Settlements() {
         leaveDeduction,
         grossSalary,
         advancesOutstanding,
-        advanceToAdjust: defaultAdjustment,
+        advanceToAdjust: currentAdj,
         netPayable,
         carryForwardAdvance,
       });
