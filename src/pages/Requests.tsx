@@ -27,11 +27,12 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, Check, X, Loader2, ArrowRight } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, Loader2, ArrowRight, Ban } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
 import { refetchNotificationCounts } from '@/hooks/useNotificationCounts';
+import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
 
 interface RequestWithStaff extends PaymentRequest {
   staff: StaffPublic;
