@@ -759,6 +759,25 @@ export default function Payouts() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Approval Dialog */}
+      <CancelApprovalDialog
+        open={!!cancelItem}
+        onOpenChange={(open) => !open && setCancelItem(null)}
+        onSuccess={() => {
+          setCancelItem(null);
+          fetchApprovedItems();
+        }}
+        item={cancelItem ? {
+          id: cancelItem.id,
+          type: cancelItem.type as 'expense' | 'advance',
+          staffName: cancelItem.staffName,
+          staffId: cancelItem.staffId,
+          staffUserId: cancelItem.staffUserId,
+          amount: cancelItem.amount,
+          description: cancelItem.description,
+        } : null}
+      />
     </div>
   );
 }
