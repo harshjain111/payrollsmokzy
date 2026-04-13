@@ -22,9 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock } from 'lucide-react';
+import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import type { StaffPublic } from '@/types/database';
+import { RectificationDialog } from '@/components/ledger/RectificationDialog';
 
 interface JournalLineWithDetails {
   id: string;
