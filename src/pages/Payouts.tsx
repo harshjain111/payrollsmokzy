@@ -626,6 +626,18 @@ export default function Payouts() {
                               </p>
                             )}
                           </div>
+                          {(isOwner || isAdmin) && item.type !== 'salary' && (
+                            <Button 
+                              onClick={() => setCancelItem(item)}
+                              size="sm"
+                              variant="outline"
+                              className="shrink-0 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 text-destructive hover:text-destructive border-destructive/30"
+                              title="Cancel Approval"
+                            >
+                              <Ban className="mr-1 h-3.5 w-3.5" />
+                              Cancel
+                            </Button>
+                          )}
                           <Button 
                             onClick={() => openPayoutDialog(item)}
                             size="sm"
