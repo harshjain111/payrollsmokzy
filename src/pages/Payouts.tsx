@@ -33,7 +33,8 @@ import {
   Loader2,
   CheckCircle2,
   Banknote,
-  ArrowRight
+  ArrowRight,
+  Ban
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -45,6 +46,7 @@ import {
 import { PaidBySelector } from '@/components/payouts/PaidBySelector';
 import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
+import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
 
 const PAYMENT_MODES: { value: PaymentMode; label: string }[] = [
   { value: 'cash', label: 'Cash' },
