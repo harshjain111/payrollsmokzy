@@ -537,6 +537,7 @@ export default function Settlements() {
       setFinalDeductionDays(0);
       setDeductionAdjustmentReason('');
       setAdvanceToAdjust(0);
+      setNetPayableOverride(null);
       setCalculation(null);
       setIsAlreadySettled(false);
       setShowConfirmDialog(false);
