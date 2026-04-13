@@ -337,6 +337,17 @@ export default function Requests() {
                             </Button>
                           </Link>
                         )}
+                        {request.status === 'approved' && !request.paid_at && (isOwner || isAdmin) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                            onClick={() => setCancelRequest(request)}
+                            title="Cancel Approval"
+                          >
+                            <Ban className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
