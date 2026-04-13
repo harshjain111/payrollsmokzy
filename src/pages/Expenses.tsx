@@ -357,6 +357,20 @@ export default function Expenses() {
             onOpenChange={setShowRejectDialog}
             onSuccess={fetchExpenses}
           />
+          <CancelApprovalDialog
+            open={showCancelDialog}
+            onOpenChange={setShowCancelDialog}
+            onSuccess={fetchExpenses}
+            item={{
+              id: selectedExpense.id,
+              type: 'expense',
+              staffName: selectedExpense.staff?.full_name || 'Staff',
+              staffId: selectedExpense.staff_id,
+              staffUserId: selectedExpense.staff?.user_id,
+              amount: selectedExpense.amount,
+              description: selectedExpense.description,
+            }}
+          />
         </>
       )}
 
