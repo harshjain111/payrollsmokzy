@@ -84,7 +84,7 @@ type PayoutItem = {
 };
 
 export default function Payouts() {
-  const { user, isOwner, isAdmin, isAccountant, isStaff, canRecordSalaryPayments } = useAuth();
+  const { user, staffData, isOwner, isAdmin, isAccountant, isStaff, canRecordSalaryPayments } = useAuth();
   
   // Access check - Staff cannot execute payouts
   const canExecutePayout = isOwner || isAdmin || isAccountant;
