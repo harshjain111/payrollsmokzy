@@ -22,9 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock } from 'lucide-react';
+import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import type { StaffPublic } from '@/types/database';
+import { RectificationDialog } from '@/components/ledger/RectificationDialog';
 
 interface JournalLineWithDetails {
   id: string;
@@ -66,7 +67,7 @@ interface StaffBalance {
 
 export default function Ledger() {
   const [searchParams] = useSearchParams();
-  const { isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
+  const { user, isOwner, isAdmin, isStaff, isCA, staffData, isAccountant, accountingMode } = useAuth();
   
   const [journalLines, setJournalLines] = useState<JournalLineWithDetails[]>([]);
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
@@ -77,6 +78,15 @@ export default function Ledger() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [rectificationTarget, setRectificationTarget] = useState<{
+    journalEntryId: string;
+    referenceNo: string;
+    description: string;
+    transactionType: string;
+    staffId: string;
+    staffName: string;
+    lines: any[];
+  } | null>(null);
 
   // Calculate totals from journal lines - ONLY staff-side entries (staff_id IS NOT NULL)
   // Also calculate per-account totals for proper balance formula
@@ -330,14 +340,44 @@ export default function Ledger() {
       'expense_payout': 'Expense Reimbursed',
       'advance_paid': 'Advance Given',
       'advance_adjustment': 'Advance Adjusted',
+      'rectification': 'Rectification',
     };
     return labels[type] || type;
   };
 
   const getTransactionTypeBadgeVariant = (type: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
+    if (type === 'rectification') return 'destructive';
     if (type.includes('payout') || type.includes('paid')) return 'default';
     if (type.includes('settlement') || type.includes('approval')) return 'secondary';
     return 'outline';
+  };
+
+  // Helper to open rectification dialog for a journal entry
+  const handleRectify = (line: JournalLineWithDetails) => {
+    if (!line.journal_entry || !line.staff_id) return;
+    const staffInfo = staffList.find(s => s.id === line.staff_id);
+    
+    // Collect all lines for this journal entry from journalLines
+    const entryLines = journalLines.filter(
+      l => l.journal_entry?.id === line.journal_entry?.id
+    );
+
+    setRectificationTarget({
+      journalEntryId: line.journal_entry.id,
+      referenceNo: line.journal_entry.reference_no,
+      description: line.journal_entry.description,
+      transactionType: line.journal_entry.transaction_type,
+      staffId: line.staff_id,
+      staffName: staffInfo?.full_name || 'Unknown',
+      lines: entryLines.map(l => ({
+        id: l.id,
+        debit: l.debit,
+        credit: l.credit,
+        description: l.description,
+        staff_id: l.staff_id,
+        account: l.account,
+      })),
+    });
   };
 
   return (
@@ -542,7 +582,19 @@ export default function Ledger() {
                           Bal: ₹{Math.abs(line.running_balance || 0).toLocaleString('en-IN')}
                         </p>
                       </div>
-                    </div>
+                     </div>
+                    {/* Rectify button for owner on non-rectification entries */}
+                    {isOwner && line.journal_entry?.transaction_type !== 'rectification' && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-warning h-6 px-2 mt-1"
+                        onClick={() => handleRectify(line)}
+                      >
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        Rectify
+                      </Button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -561,6 +613,7 @@ export default function Ledger() {
                       <TableHead className="font-semibold text-right">Debit</TableHead>
                       <TableHead className="font-semibold text-right">Credit</TableHead>
                       <TableHead className="font-semibold text-right">Balance</TableHead>
+                      {isOwner && <TableHead className="font-semibold w-[80px]"></TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -622,6 +675,21 @@ export default function Ledger() {
                             {(line.running_balance || 0) >= 0 ? '+' : '-'}₹{Math.abs(line.running_balance || 0).toLocaleString('en-IN')}
                           </span>
                         </TableCell>
+                        {isOwner && (
+                          <TableCell>
+                            {line.journal_entry?.transaction_type !== 'rectification' && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-xs text-warning h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={() => handleRectify(line)}
+                              >
+                                <RotateCcw className="h-3 w-3 mr-1" />
+                                Rectify
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -631,6 +699,26 @@ export default function Ledger() {
           )}
         </CardContent>
       </Card>
+
+      {/* Rectification Dialog */}
+      {rectificationTarget && user && (
+        <RectificationDialog
+          open={!!rectificationTarget}
+          onOpenChange={(open) => !open && setRectificationTarget(null)}
+          journalEntryId={rectificationTarget.journalEntryId}
+          referenceNo={rectificationTarget.referenceNo}
+          description={rectificationTarget.description}
+          transactionType={rectificationTarget.transactionType}
+          staffId={rectificationTarget.staffId}
+          staffName={rectificationTarget.staffName}
+          lines={rectificationTarget.lines}
+          userId={user.id}
+          onSuccess={() => {
+            setRectificationTarget(null);
+            fetchData();
+          }}
+        />
+      )}
     </div>
   );
 }

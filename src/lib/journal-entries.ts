@@ -15,7 +15,8 @@ export type TransactionType =
   | 'expense_approval'     // Debit: Expense Head, Credit: Staff Payable
   | 'expense_payout'       // Debit: Staff Payable, Credit: Bank/Cash
   | 'advance_paid'         // Debit: Staff Advances (Receivable), Credit: Bank/Cash
-  | 'advance_adjustment';  // Debit: Salary Expense (adjusted), Credit: Staff Advances
+  | 'advance_adjustment'   // Debit: Salary Expense (adjusted), Credit: Staff Advances
+  | 'rectification';       // Equal & opposite reversal of a wrong entry
 
 export type PaymentMode = 'cash' | 'upi' | 'bank_transfer' | 'cheque' | 'petty_cash';
 
@@ -759,5 +760,71 @@ export async function getStaffLedgerFromJournals(staffId: string) {
       ...line,
       running_balance: runningBalance,
     };
+  });
+}
+
+/**
+ * RECTIFICATION ENTRY
+ * 
+ * Creates an equal and opposite (reversal) journal entry to correct a wrong entry.
+ * For example, if an expense was wrongly recorded as an advance:
+ * - Original wrong entry: Dr Staff Advances, Cr Bank/Cash
+ * - Rectification (reversal): Dr Bank/Cash, Cr Staff Advances (exact opposite)
+ * 
+ * The rectification entry references the original entry for audit trail.
+ * Both entries remain in the ledger for complete transparency.
+ */
+export interface RectificationParams {
+  originalJournalEntryId: string;
+  staffId: string;
+  staffName: string;
+  reason: string;
+  createdBy: string;
+}
+
+export async function createRectificationEntry(params: RectificationParams): Promise<string> {
+  const { originalJournalEntryId, staffId, staffName, reason, createdBy } = params;
+
+  // Fetch the original journal entry and its lines
+  const { data: originalEntry, error: entryError } = await supabase
+    .from('journal_entries')
+    .select('*')
+    .eq('id', originalJournalEntryId)
+    .single();
+
+  if (entryError || !originalEntry) {
+    throw new Error('Original journal entry not found');
+  }
+
+  const { data: originalLines, error: linesError } = await supabase
+    .from('journal_lines')
+    .select('*, account:account_id(code)')
+    .eq('journal_entry_id', originalJournalEntryId);
+
+  if (linesError || !originalLines || originalLines.length === 0) {
+    throw new Error('Original journal lines not found');
+  }
+
+  // Create reversed lines (swap debit and credit)
+  const reversedLines: JournalLine[] = originalLines.map(line => ({
+    accountCode: (line.account as any)?.code || '',
+    debit: Number(line.credit),   // Swap: original credit becomes debit
+    credit: Number(line.debit),   // Swap: original debit becomes credit
+    staffId: line.staff_id || undefined,
+    description: `[RECTIFICATION] ${line.description || ''}`,
+  }));
+
+  // Validate balance
+  validateBalance(reversedLines);
+
+  return createJournalEntry({
+    transactionType: 'rectification',
+    staffId,
+    description: `Rectification: ${reason} (reversal of ${originalEntry.reference_no})`,
+    referenceId: originalJournalEntryId,
+    referenceType: 'rectification',
+    createdBy,
+    lines: reversedLines,
+    isImmutable: true,
   });
 }
