@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { Button } from '@/components/ui/button';
@@ -193,7 +194,7 @@ export default function Payouts() {
       
       // Use selected paid_by or default to current user
       const paidByUserId = paidBy?.userId || user.id;
-      const paidByUserName = paidBy?.userName || null;
+      const paidByUserName = paidBy?.userName || getUserDisplayName(user, staffData);
 
       // ========================================
       // DOUBLE-ENTRY ACCOUNTING: PAYOUT ENTRIES

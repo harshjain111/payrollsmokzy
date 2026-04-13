@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { getUserDisplayName } from '@/lib/get-user-display-name';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -494,7 +495,7 @@ export default function Settlements() {
       // - Debit: Staff Payable (clear liability)
       // - Credit: Bank/Cash (money out)
       if (calculation.netPayable > 0) {
-        const approverName = staffData?.full_name || user.user_metadata?.full_name || user.email || 'Unknown';
+        const approverName = getUserDisplayName(user, staffData);
         const { error: payoutRequestError } = await supabase
           .from('payment_requests')
           .insert({
