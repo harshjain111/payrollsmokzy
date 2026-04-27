@@ -10,6 +10,7 @@ import { Amount } from '@/components/ui/amount';
 import { ActionTile } from './ActionTile';
 import { QuickActionsCard, QuickAction } from './QuickActionsCard';
 import { useDashboardStats } from '@/hooks/useDashboardStats';
+import { AttendanceWidget } from '@/components/attendance/AttendanceWidget';
 import {
   FileText,
   CreditCard,
@@ -118,6 +119,9 @@ export function AccountantDashboard() {
           </Link>
         </div>
       </PageHeader>
+
+      {/* Attendance widget */}
+      <AttendanceWidget />
 
       {/* Summary Stats - Non-salary metrics only */}
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">

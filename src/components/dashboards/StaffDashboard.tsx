@@ -6,6 +6,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useStaffBalance } from '@/hooks/useStaffBalance';
 import { LanguageToggle } from '@/components/staff/LanguageToggle';
 import { QuickAdvanceForm } from '@/components/staff/QuickAdvanceForm';
+import { AttendanceWidget } from '@/components/attendance/AttendanceWidget';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -200,6 +201,9 @@ export function StaffDashboard() {
       </div>
 
       <div className="p-4 space-y-4 pb-8">
+        {/* Attendance widget */}
+        <AttendanceWidget />
+
         {/* Summary Cards */}
         <div className="grid grid-cols-2 gap-3">
           {/* Salary Card - Hidden by default */}

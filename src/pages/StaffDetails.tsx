@@ -21,6 +21,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { ArrowLeft, Edit, Trash2, Phone, Mail, Building2, Briefcase, Calendar, User, Loader2 } from 'lucide-react';
+import { StaffAttendanceSection } from '@/components/attendance/StaffAttendanceSection';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import type { Staff, AppRole } from '@/types/database';
@@ -342,6 +343,9 @@ export default function StaffDetails() {
             </CardContent>
           </Card>
         )}
+
+        {/* Attendance records */}
+        <StaffAttendanceSection staffId={staff.id} />
       </div>
     </div>
   );
