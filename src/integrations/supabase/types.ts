@@ -58,6 +58,116 @@ export type Database = {
           },
         ]
       }
+      attendance_breaks: {
+        Row: {
+          created_at: string
+          duration_minutes: number | null
+          end_at: string | null
+          id: string
+          session_id: string
+          start_at: string
+        }
+        Insert: {
+          created_at?: string
+          duration_minutes?: number | null
+          end_at?: string | null
+          id?: string
+          session_id: string
+          start_at?: string
+        }
+        Update: {
+          created_at?: string
+          duration_minutes?: number | null
+          end_at?: string | null
+          id?: string
+          session_id?: string
+          start_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_breaks_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "attendance_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_sessions: {
+        Row: {
+          check_in_accuracy: number | null
+          check_in_address: string | null
+          check_in_at: string
+          check_in_lat: number | null
+          check_in_lng: number | null
+          check_in_photo_url: string
+          check_out_accuracy: number | null
+          check_out_address: string | null
+          check_out_at: string | null
+          check_out_lat: number | null
+          check_out_lng: number | null
+          check_out_photo_url: string | null
+          created_at: string
+          id: string
+          late_checkout: boolean
+          staff_id: string | null
+          status: string
+          total_break_minutes: number
+          updated_at: string
+          user_id: string
+          work_date: string
+          worked_minutes: number | null
+        }
+        Insert: {
+          check_in_accuracy?: number | null
+          check_in_address?: string | null
+          check_in_at?: string
+          check_in_lat?: number | null
+          check_in_lng?: number | null
+          check_in_photo_url: string
+          check_out_accuracy?: number | null
+          check_out_address?: string | null
+          check_out_at?: string | null
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          check_out_photo_url?: string | null
+          created_at?: string
+          id?: string
+          late_checkout?: boolean
+          staff_id?: string | null
+          status?: string
+          total_break_minutes?: number
+          updated_at?: string
+          user_id: string
+          work_date: string
+          worked_minutes?: number | null
+        }
+        Update: {
+          check_in_accuracy?: number | null
+          check_in_address?: string | null
+          check_in_at?: string
+          check_in_lat?: number | null
+          check_in_lng?: number | null
+          check_in_photo_url?: string
+          check_out_accuracy?: number | null
+          check_out_address?: string | null
+          check_out_at?: string | null
+          check_out_lat?: number | null
+          check_out_lng?: number | null
+          check_out_photo_url?: string | null
+          created_at?: string
+          id?: string
+          late_checkout?: boolean
+          staff_id?: string | null
+          status?: string
+          total_break_minutes?: number
+          updated_at?: string
+          user_id?: string
+          work_date?: string
+          worked_minutes?: number | null
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string

@@ -1,90 +1,153 @@
 
-Issue summary (based on logs + your answers)
-- This is not a wrong-password/auth-rule issue.
-- The sign-in request is failing at browser fetch level (`TypeError: Failed to fetch`) before a normal API response is returned.
-- I confirmed the backend auth service is reachable from outside your browser session (health endpoint responds), so this points to a client/network path problem (browser/network/proxy/interceptor), not broken credentials.
-- You reported it affects published URLs and several projects, which strongly suggests an environment-level problem, not one project’s code.
+# Attendance Module Plan
 
-What is likely happening
-1. Browser-to-auth endpoint connection is being interrupted (network policy, DNS, antivirus web shield, proxy, extension, or ISP filtering).
-2. In preview, the injected fetch wrapper can sometimes amplify this and surface generic “Failed to fetch.”
-3. Existing stale auth tokens can worsen the experience (loading loops / repeated refresh attempts), but they are likely secondary here since the failure is multi-project.
+A self-contained attendance feature for **Staff (executives)** and **Accountant** users. They check in / take breaks / check out from their dashboard. Each action mandatorily captures a live photo and GPS location. The Owner and Admin get a full Attendance page plus a per-staff tab to review everything.
 
-Rectification plan (priority order)
+---
 
-Phase 1 — Immediate recovery steps (no code changes)
-1. Full site-data reset for affected domains
-   - Clear cookies/local storage/site data for:
-     - `*.lovable.app` (published apps)
-     - `*.lovableproject.com` (preview)
-     - backend auth domain used by your projects
-2. Network isolation test
-   - Test from:
-     - different network (mobile hotspot),
-     - different browser profile,
-     - different device.
-   - If one combination works, root cause is local network/security tooling.
-3. Disable blockers/security interception
-   - Temporarily disable VPN, ad/privacy blockers, Brave shields, antivirus “HTTPS scanning,” corporate proxy.
-4. DNS reset
-   - Flush DNS and retry (or switch DNS to 1.1.1.1 / 8.8.8.8 temporarily).
-5. If still failing everywhere
-   - Treat as incident: collect exact timestamp, browser, region, and one failing URL for escalation.
+## 1. Work-day / session model
 
-Phase 2 — Hardening changes I will implement after your approval
-1. Auth bootstrap fail-safe in `src/contexts/AuthContext.tsx`
-   - Add a strict initialization timeout (e.g., 8–10s) so app never remains in indefinite loading.
-   - On timeout/network failure, force local session cleanup and continue to login screen.
-2. Network-aware login handling in `src/pages/Auth.tsx`
-   - Detect `Failed to fetch` specifically and show actionable error:
-     - “Network connection to authentication service failed. Try another network / disable VPN / clear site data.”
-   - Keep invalid-credentials errors separate from connectivity errors.
-3. Optional lightweight connectivity probe on auth page
-   - Add “Check connection” action that pings auth health endpoint and reports pass/fail to user.
-4. Add defensive retry policy (single retry with short backoff) for transient network drop during sign-in.
+- A "work day" is defined by the **check-in date** (local time).
+  - Example: Check-in Mon 4:00 PM, check-out Tue 2:00 AM → counted as Monday's attendance.
+- Each user can have only **one open session** at a time.
+- A session contains: check-in, optional multiple breaks (start + end), and a check-out.
+- Total worked hours = (check-out − check-in) − sum of break durations.
 
-Phase 3 — Validation checklist
-1. Test matrix
-   - Preview + Published
-   - Chrome + Safari/Edge
-   - Normal + Incognito
-   - Wi-Fi + mobile hotspot
-2. Success criteria
-   - App reaches login page within timeout always.
-   - Connectivity failures show explicit message (not vague generic toast only).
-   - No infinite loading loops.
-3. Regression checks
-   - Valid login still redirects to `/dashboard`.
-   - Remember-me behavior preserved.
-   - No impact on role/permission loading after login.
+---
 
-Technical details (for engineering review)
-- Evidence:
-  - Console stack shows failure at `window.fetch` (in injected runtime) during auth password grant call.
-  - Network record shows request constructed correctly but ends as fetch failure (no API status payload).
-  - Auth logs do not show matching token-path entries for that attempt, supporting “request never fully reached auth backend.”
-- Scope indicators:
-  - Multi-project + published impact suggests environment path issue, not project-specific app logic.
-- Database/backend schema:
-  - No schema or policy changes required for this fix.
-  - This is client auth resilience + diagnostics hardening.
+## 2. Database schema (new migration)
 
-Proposed files to update (after approval)
-- `src/contexts/AuthContext.tsx` (init timeout + local recovery path)
-- `src/pages/Auth.tsx` (network-aware error UX + optional connection check UI)
+Two new tables, both with RLS.
 
-Operational guidance for your other affected sites
-- Apply the same auth hardening patch pattern across projects.
-- If all continue failing after network isolation, raise a single incident report with:
-  - failing URLs,
-  - timestamps (UTC),
-  - browser + OS,
-  - whether hotspot test succeeded.
+### `attendance_sessions`
+- `id` uuid pk
+- `user_id` uuid (auth user)
+- `staff_id` uuid (nullable — links to staff record if available)
+- `work_date` date (the check-in calendar date)
+- `check_in_at` timestamptz
+- `check_in_photo_url` text (storage path)
+- `check_in_lat` numeric, `check_in_lng` numeric, `check_in_accuracy` numeric, `check_in_address` text (nullable)
+- `check_out_at` timestamptz nullable
+- `check_out_photo_url` text nullable
+- `check_out_lat`, `check_out_lng`, `check_out_accuracy`, `check_out_address` nullable
+- `total_break_minutes` integer default 0 (denormalized for fast reporting)
+- `worked_minutes` integer nullable (computed on check-out)
+- `status` text: `active` | `on_break` | `completed`
+- `created_at`, `updated_at`
 
-<lov-actions>
-  <lov-open-history>View History</lov-open-history>
-  <lov-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</lov-link>
-  <lov-suggestion message="Test sign-in end-to-end on both preview and published URLs across two networks (Wi-Fi + hotspot) and report which combinations fail.">Verify end-to-end auth flow</lov-suggestion>
-  <lov-suggestion message="Implement auth bootstrap timeout and local session recovery in AuthContext so the app never gets stuck on loading.">Harden auth initialization</lov-suggestion>
-  <lov-suggestion message="Add a login connectivity checker that pings backend auth health and shows a clear diagnostic message when network access is blocked.">Add connectivity diagnostics</lov-suggestion>
-</lov-actions>
+Unique partial index: one `active`/`on_break` session per `user_id`.
+
+### `attendance_breaks`
+- `id` uuid pk
+- `session_id` uuid → `attendance_sessions.id`
+- `start_at` timestamptz
+- `end_at` timestamptz nullable
+- `duration_minutes` integer nullable
+- `created_at`
+
+### Storage
+- Reuse a new public-read but write-restricted bucket `attendance-photos` (or private bucket with signed URLs). Photos stored at `{user_id}/{session_id}/checkin.jpg` and `…/checkout.jpg`.
+
+### RLS
+- Staff/Accountant: can `SELECT`/`INSERT`/`UPDATE` only their own rows (`user_id = auth.uid()`).
+- Owner / Admin / CA: `SELECT` all.
+- Owner: full manage.
+- Storage bucket policies mirror the same logic.
+
+---
+
+## 3. Capture rules (per your choice)
+
+Mandatory — if camera or geolocation permission is denied / unavailable, the action is blocked with a clear error toast. The UI explains why permissions are required and offers a retry.
+
+Implementation:
+- Camera: `navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })` in a dialog, capture to canvas → JPEG blob, upload to storage.
+- Location: `navigator.geolocation.getCurrentPosition` with `enableHighAccuracy: true`, 15s timeout. Optional reverse-geocoding skipped (we just store lat/lng + a Google Maps link in the UI).
+
+---
+
+## 4. Dashboard widget (Staff + Accountant)
+
+A new `AttendanceWidget` component shown at the top of:
+- `StaffDashboard.tsx`
+- `AccountantDashboard.tsx` (visible regardless of accounting/personal mode toggle)
+
+Behaviour based on current session state:
+
+| State | UI |
+|---|---|
+| No active session | Big **Check In** button. Shows today's status if already completed. |
+| Active (working) | Live elapsed timer since check-in. Buttons: **Start Break**, **Check Out**. |
+| On break | Live break timer. Buttons: **End Break**, **Check Out** (ends break first). |
+| Completed today | Summary card: in/out times, total worked, total break, photos thumbnail. |
+
+Flows trigger a `CaptureDialog` for check-in / check-out that:
+1. Requests camera + geolocation in parallel.
+2. Shows live camera preview + a "Capture & Submit" button (disabled until both are ready).
+3. On submit: uploads photo, writes the row, closes the dialog, refreshes widget.
+
+Breaks do **not** require photo/location — just timestamped clicks.
+
+---
+
+## 5. Owner / Admin views (per your choice: Both)
+
+### New page: `/attendance` (sidebar entry "Attendance")
+- Filters: date range (default = today), staff/user, status.
+- Table columns: Staff, Work date, Check-in, Check-out, Total worked, Break time, Status.
+- Row click → drawer with both photos (clickable to enlarge), Google Maps links for both pin locations, break log, raw timestamps.
+- Summary cards: total people checked in today, currently on break, completed.
+
+Visible to: Owner, Admin, CA (read-only), Accountant (own records only — accountants see their own attendance via dashboard, not this admin page).
+
+### Per-staff tab: in `StaffDetails.tsx`
+- New "Attendance" tab listing that staff member's last 60 days of sessions with the same drawer for details.
+
+### Audit
+- Each check-in/out/break action writes to the existing `audit_log` automatically via the standard insert pattern (we'll add an explicit insert in the action handlers since not all tables have audit triggers).
+
+---
+
+## 6. Routing & navigation
+
+- Add `/attendance` route in `App.tsx` (protected).
+- Add sidebar nav entry "Attendance" visible to Owner, Admin, CA.
+- Add Attendance tab inside `StaffDetails.tsx`.
+
+---
+
+## 7. Files to create / change
+
+**New**
+- `supabase/migrations/<timestamp>_attendance_module.sql` — tables, indexes, RLS, storage bucket + policies.
+- `src/components/attendance/AttendanceWidget.tsx`
+- `src/components/attendance/CaptureDialog.tsx` (camera + geolocation capture)
+- `src/components/attendance/SessionDetailsDrawer.tsx`
+- `src/components/attendance/StaffAttendanceTab.tsx`
+- `src/hooks/useCurrentAttendanceSession.ts`
+- `src/lib/attendance.ts` (check-in/out/break handlers, photo upload, audit log)
+- `src/pages/Attendance.tsx`
+
+**Edit**
+- `src/components/dashboards/StaffDashboard.tsx` — mount widget at top.
+- `src/components/dashboards/AccountantDashboard.tsx` — mount widget at top.
+- `src/components/layout/AppLayout.tsx` (sidebar) — add "Attendance" link for Owner/Admin/CA.
+- `src/App.tsx` — register `/attendance` route.
+- `src/pages/StaffDetails.tsx` — add Attendance tab.
+
+---
+
+## 8. Edge cases handled
+
+- Forgotten check-out: if a session is `active`/`on_break` past 6 AM next day, the widget shows a banner "You forgot to check out from <date>" and lets the user complete it (still photo + location, but flagged `late_checkout = true` — small extra column).
+- Browser refresh mid-session: state is read fresh from DB via the hook, so timers resume correctly.
+- iOS Safari camera quirks: use `playsInline` + user-gesture-triggered `play()`.
+- HTTPS required for camera/geolocation — already true on lovable.app and the custom domain.
+
+---
+
+## Notes for the user
+
+- All photos and locations are stored permanently and are visible to Owner/Admin/CA.
+- Accountants will see the attendance widget on their dashboard regardless of whether they are in personal or accounting mode.
+- We can later add monthly summaries, late-arrival alerts, payroll integration, or geofencing — flag if you want any of these in the first version.
