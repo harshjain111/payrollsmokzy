@@ -57,6 +57,7 @@ import {
   ArrowUpRight,
   CalendarDays,
   Coins,
+  Clock,
 } from 'lucide-react';
 
 interface NavItem {
@@ -130,6 +131,7 @@ function getNavSections(
       {
         title: 'Reports',
         items: [
+          { title: 'Attendance', href: '/attendance', icon: Clock },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
           { title: 'Audit Log', href: '/audit-log', icon: History },
         ],
@@ -186,6 +188,7 @@ function getNavSections(
       {
         title: 'Reports',
         items: [
+          { title: 'Attendance', href: '/attendance', icon: Clock },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
         ],
       },
@@ -268,6 +271,7 @@ function getNavSections(
         items: [
           { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
           { title: 'Ledger', href: '/ledger', icon: FileText },
+          { title: 'Attendance', href: '/attendance', icon: Clock },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
           { title: 'Audit Log', href: '/audit-log', icon: History },
           { title: 'Settings', href: '/settings', icon: Settings },
