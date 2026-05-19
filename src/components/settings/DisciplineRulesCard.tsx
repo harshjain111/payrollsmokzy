@@ -313,6 +313,8 @@ export function DisciplineRulesCard() {
             Save rules
           </Button>
         </div>
+        </div>
+        </div>
       </CardContent>
     </Card>
   );
