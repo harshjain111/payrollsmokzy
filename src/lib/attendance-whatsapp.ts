@@ -130,6 +130,13 @@ export async function notifyCheckinWhatsapp(
     if (!scheduledIn) return;
 
     const scheduledIso = scheduledIsoFromTime(workDate, scheduledIn);
+
+    // Master switch off: send on-time greeting only, never a fine message
+    if (rules.penalties_enabled === false) {
+      await dispatch(staff, 'checkin', checkInIso, scheduledIso, 'on_time', 0);
+      return;
+    }
+
     const lateMin = Math.round(
       (new Date(checkInIso).getTime() - new Date(scheduledIso).getTime()) / 60000,
     );
