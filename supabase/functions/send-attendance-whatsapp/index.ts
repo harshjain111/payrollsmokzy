@@ -99,22 +99,26 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
       ];
       break;
     }
+    case 'checkout_reminder':
+      templateName = 'attendance_checkout_reminder';
+      parameters = [];
+      break;
+  }
+
+  // checkout_reminder template has NO body parameters — omit components entirely.
+  const template: Record<string, unknown> = {
+    name: templateName,
+    language: { code: 'en', policy: 'deterministic' },
+  };
+  if (p.slab !== 'checkout_reminder') {
+    template.components = [{ type: 'BODY', parameters }];
   }
 
   const body = {
     messaging_product: 'whatsapp',
     to,
     type: 'template',
-    template: {
-      name: templateName,
-      language: { code: 'en', policy: 'deterministic' },
-      components: [
-        {
-          type: 'BODY',
-          parameters,
-        },
-      ],
-    },
+    template,
   };
 
   return { templateName, body };
