@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 
 interface Row extends DisciplineLogRow {
   staff_name?: string;
+  staff_phone?: string | null;
 }
 
 export function PenaltiesPanel() {
@@ -65,20 +66,24 @@ export function PenaltiesPanel() {
       if (error) throw error;
       const logs = (data as DisciplineLogRow[]) ?? [];
       const staffIds = Array.from(new Set(logs.map((l) => l.staff_id)));
-      const nameMap: Record<string, string> = {};
+      const infoMap: Record<string, { name: string; phone: string | null }> = {};
       if (staffIds.length) {
         const { data: staff } = await supabase
           .from('staff')
-          .select('id, full_name')
+          .select('id, full_name, phone')
           .in('id', staffIds);
-        (staff ?? []).forEach((s: { id: string; full_name: string }) => {
-          nameMap[s.id] = s.full_name;
+        (staff ?? []).forEach((s: { id: string; full_name: string; phone: string | null }) => {
+          infoMap[s.id] = { name: s.full_name, phone: s.phone };
         });
       }
       setRows(
         logs
           .filter((l) => l.fine_amount > 0 || l.is_absent)
-          .map((l) => ({ ...l, staff_name: nameMap[l.staff_id] || 'Unknown' })),
+          .map((l) => ({
+            ...l,
+            staff_name: infoMap[l.staff_id]?.name || 'Unknown',
+            staff_phone: infoMap[l.staff_id]?.phone ?? null,
+          })),
       );
     } catch (e) {
       console.error('Penalties load failed', e);
@@ -176,7 +181,42 @@ export function PenaltiesPanel() {
         .update(payload as never)
         .eq('id', target.id);
       if (error) throw error;
-      toast.success(mode === 'cancel' ? 'Penalty cancelled' : 'Penalty restored');
+
+      if (mode === 'cancel') {
+        const phone = (target.staff_phone || '').replace(/^\+/, '');
+        if (phone) {
+          try {
+            const { data: waData, error: waErr } = await supabase.functions.invoke(
+              'send-attendance-whatsapp',
+              {
+                body: {
+                  staff_name: target.staff_name,
+                  staff_phone: phone,
+                  staff_id: target.staff_id,
+                  event_type: 'penalty_waived',
+                  actual_time: new Date().toISOString(),
+                  scheduled_time: new Date().toISOString(),
+                  slab: 'penalty_waived',
+                  deduction_amount: Number(target.fine_amount) || 0,
+                  penalty_date: target.work_date,
+                },
+              },
+            );
+            if (waErr || (waData && waData.success === false)) {
+              toast.error('Penalty waived but WhatsApp notification failed');
+            } else {
+              toast.success(`Penalty waived — WhatsApp notification sent to ${target.staff_name}`);
+            }
+          } catch (e) {
+            console.error('WhatsApp waiver notify failed', e);
+            toast.error('Penalty waived but WhatsApp notification failed');
+          }
+        } else {
+          toast.success('Penalty cancelled');
+        }
+      } else {
+        toast.success('Penalty restored');
+      }
       setTarget(null);
       await load();
     } catch (e) {
