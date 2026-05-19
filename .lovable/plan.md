@@ -1,61 +1,78 @@
-## Goals
-1. **Master penalty on/off switch** — Owner/Admin can turn the whole penalty system off so no fines/half-day/full-day deductions are computed and only on-time WhatsApp greetings go out.
-2. **Cancel a specific penalty** — Owner/Admin can soft-cancel any single system-charged penalty (with mandatory reason) so it stops contributing to the staff's settlement.
-3. Make the recently-added attendance settings (Discipline Rules, Attendance Coverage) usable by **both Admin and Owner**, not just Owner.
+## Goal
 
-## 1. Database migration
+Make attendance behave as **shift sessions** (anchored to the check-in date, not the calendar day), so night shifts that cross midnight work correctly. Stop falsely marking next-day "absent" when a shift covered it. Add a 10-hour WhatsApp checkout reminder and a 16-hour auto-close safety net.
 
-`discipline_rules`
-- Add `penalties_enabled boolean NOT NULL DEFAULT true`.
+---
 
-`attendance_discipline_log`
-- Add `is_cancelled boolean NOT NULL DEFAULT false`
-- Add `cancelled_by uuid`, `cancelled_by_name text`, `cancelled_at timestamptz`, `cancellation_reason text`
+## Part 1 — Session-based attendance (data + UI)
 
-RLS additions:
-- `discipline_rules`: add policy "Admins manage discipline rules" (`has_role(auth.uid(),'admin')`) for ALL.
-- `attendance_discipline_log`: add policy "Admins manage discipline log" for ALL (owner policy already exists).
-- `staff`: allow Admin to update `attendance_tracked`. Add an ALL-columns Admin UPDATE policy plus a BEFORE UPDATE trigger that raises if a non-owner changes any column other than `attendance_tracked` / `updated_at`. Keeps salary safe.
+Good news: the data model already anchors a session to the check-in date (`work_date = localDateString()` at check-in) and worked minutes are already `checkout - checkin - breaks`. So the data layer is correct — this is mostly a **UI display fix**.
 
-## 2. Backend logic (`src/lib/discipline.ts`)
+Changes:
+- In all attendance list/table views (`MyAttendanceLogs.tsx`, `StaffAttendanceSection.tsx`, `SessionDetailsDrawer.tsx`, `PenaltiesPanel.tsx` where relevant):
+  - Show check-in as `4:00 PM, 19 May`
+  - Show check-out as `2:00 AM, 20 May` whenever the calendar date of check-out differs from `work_date`
+  - Continue showing `worked_minutes` formatted via `formatMinutes` ("10h 0m")
+  - Status badge unchanged (present/late/half-day/absent)
+- No DB schema change required for Part 1.
 
-`computeAndLogDiscipline()`
-- Read `penalties_enabled`. If `false`, do NOT compute slabs — write/upsert a log row with `fine_amount = 0`, `is_absent = false`, blank reason. Return slab `on_time` so check-in still triggers an on-time WhatsApp greeting.
+## Part 2 — Session-aware absent detection
 
-`getMonthlyDisciplineFine()`
-- Treat `is_cancelled = true` rows as `fine_amount = 0` in the sum (still return them in `logs` for UI display).
+Update `supabase/functions/check-absent-staff/index.ts` so a staff member is **not** marked absent today if any of the following is true:
+1. They have an approved leave for today.
+2. They have an `attendance_sessions` row with `work_date = today` (already handled).
+3. They have an **open** session (status `active`/`on_break`) whose `check_in_at` is in the last 24h (covers night shift still in progress).
+4. They have a session with `work_date = yesterday` whose `check_out_at` is on or after today's IST midnight (yesterday's shift extended into today and covered the morning).
+5. They have no shift assignment at all (can't determine "scheduled" → skip silently, as today).
 
-`src/lib/attendance-whatsapp.ts`
-- Before slab calculation, read `penalties_enabled`. If false: on check-in send `on_time` template only; on check-out send nothing. Never send `late_level_1/2`, `half_day`, `full_day`.
+Club staff are already excluded via `attendance_tracked = false`.
 
-No salary-settlement code changes needed — `system_deduction_days` already derives from the (now adjusted) sum.
+The cron job created earlier stays as-is (23:59 IST).
 
-## 3. UI
+## Part 3 — 10-hour checkout reminder
 
-### DisciplineRulesCard
-- Replace `if (!isOwner) return null` with `if (!isOwner && !isAdmin) return null`.
-- Add a prominent **Switch at the top**: "Apply penalties for late / early / absent" bound to `rules.penalties_enabled`.
-- When OFF: dim the rest of the card and show a banner "Penalties are disabled — no fines or half/full-day deductions will be applied. Only on-time WhatsApp greetings will be sent."
-- Include `penalties_enabled` in the save payload.
+**Schema (migration):**
+- Add column `overtime_reminder_sent boolean not null default false` to `attendance_sessions`.
 
-### AttendanceCoverageCard
-- Replace owner-only guards with `isOwner || isAdmin`.
+**Edge Function `check-overtime-reminder` (new):**
+- Query `attendance_sessions` where `status in ('active','on_break')`, `check_out_at is null`, `overtime_reminder_sent = false`, and `check_in_at <= now() - 10h`.
+- Join staff to get `full_name`, `phone`. Skip rows with no phone.
+- For each, invoke `send-attendance-whatsapp` with `slab: 'checkout_reminder'`, `event_type: 'checkout_reminder'`, `deduction_amount: 0`, `actual_time: now ISO`, `scheduled_time: now ISO` (unused by template).
+- On WhatsApp success, set `overtime_reminder_sent = true` for that session (idempotent so re-runs don't spam).
 
-### MyDisciplineTab (staff view)
-- For `is_cancelled` rows: strike-through the amount, show green "Cancelled" badge with tooltip (reason + who cancelled + when).
+**`send-attendance-whatsapp` update:**
+- Extend `Slab` union and `event_type` union with `'checkout_reminder'`.
+- New branch builds payload **with no `components` array** — template `attendance_checkout_reminder`, language en/deterministic, no parameters. Exactly the JSON the user specified.
 
-### Owner/Admin penalty management (new)
-- Add a "Penalties" panel inside `StaffAttendanceSection` (or a tab on the Attendance page) listing discipline_log rows for the selected staff/date range.
-- Each non-cancelled row with `fine_amount > 0` or `is_absent = true` shows a **"Cancel penalty"** button (visible only if `isOwner || isAdmin`).
-- Clicking opens a confirm dialog with mandatory reason textarea.
-- On confirm: update row with `is_cancelled=true`, `cancelled_by=auth.uid()`, `cancelled_by_name`, `cancelled_at=now()`, `cancellation_reason`.
-- Already-cancelled rows show a small **"Restore"** action (owner/admin) that clears the cancellation fields.
-- Re-fetch and toast on success.
+**Cron (via supabase--insert, not migration):**
+- Enable `pg_cron` + `pg_net` if not already.
+- Schedule `check-overtime-reminder` to run every 30 minutes, calling the function URL with `Authorization: Bearer <service role key>` and `apikey` headers.
 
-## 4. Memory updates
+## Part 4 — Auto-close stale sessions (16h)
 
-- `mem://features/penalty-system` — Master on/off switch (Owner+Admin) plus per-day cancel/restore with mandatory reason. Cancelled rows contribute ₹0 to settlement; remain visible with audit info.
+Extend the same `check-overtime-reminder` function (single cron, two responsibilities) **or** add a sibling block in `check-absent-staff`. Plan: keep it inside `check-overtime-reminder` so it runs every 30 min.
 
-## Out of scope
-- Editing fine amounts manually (only full cancel/restore).
-- Retroactively changing already-settled months: cancellation is allowed on the row, but the settled `system_deduction_days` snapshot is immutable; the change only affects future settlements.
+- Find open sessions where `check_in_at <= now() - 16h`.
+- Look up the staff's scheduled shift duration from `staff_shift_assignments` + `shifts` (in/out time, accounting for cross-midnight where out ≤ in → +24h). Fallback: 10h if no assignment.
+- Set `check_out_at = check_in_at + shift_duration`, compute `worked_minutes = (check_out_at - check_in_at) - total_break_minutes`, `status = 'completed'`, and a new flag `auto_closed = true`.
+
+**Schema (same migration):**
+- Add column `auto_closed boolean not null default false` to `attendance_sessions`.
+- Display a small "Auto-closed" badge in the session detail drawer and admin list (UI tweak).
+
+We will NOT trigger discipline/WhatsApp checkout messages on auto-close (avoid spurious penalties); just close the row so absent detection isn't confused going forward.
+
+## Testing scenario
+
+1. Tester checks in at 16:00 IST today.
+2. Run `check-absent-staff` manually tomorrow → tester is **not** marked absent (open session from yesterday covers it).
+3. At 02:30 IST (10.5h after check-in), cron fires `check-overtime-reminder` → WhatsApp `attendance_checkout_reminder` sent, `overtime_reminder_sent = true`. Next run at 03:00 does **not** resend.
+4. If tester still hasn't checked out by 08:00 IST (16h), auto-close sets `check_out_at = check_in_at + 10h`, `auto_closed = true`.
+
+## Technical summary
+
+- **Migration**: add `overtime_reminder_sent boolean default false`, `auto_closed boolean default false` to `attendance_sessions`.
+- **Edge Functions**: edit `send-attendance-whatsapp` (new slab branch with no parameters), edit `check-absent-staff` (open/yesterday-session exclusion), create `check-overtime-reminder` (reminder + auto-close).
+- **Cron**: insert a `cron.schedule('check-overtime-reminder', '*/30 * * * *', ...)` via the insert tool (contains project URL + service key).
+- **UI**: cross-midnight date display in attendance views, "Auto-closed" badge.
+- **No client business-logic changes** — `src/lib/attendance.ts` already anchors `work_date` to check-in date and computes worked time correctly across midnight.
