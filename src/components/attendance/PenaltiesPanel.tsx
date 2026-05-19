@@ -258,9 +258,34 @@ export function PenaltiesPanel() {
   return (
     <Card className="rounded-2xl border-0 shadow-card">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-primary" />
-          <CardTitle>Manage Penalties</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-primary" />
+            <CardTitle>Manage Penalties</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={absentToday > 0 ? 'destructive' : 'secondary'}
+              className="gap-1"
+            >
+              <UserX className="h-3.5 w-3.5" />
+              {absentToday} absent today
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={runAbsentCheck}
+              disabled={runningAbsentCheck}
+              className="gap-1"
+            >
+              {runningAbsentCheck ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PlayCircle className="h-3.5 w-3.5" />
+              )}
+              Run Absent Check Now
+            </Button>
+          </div>
         </div>
         <CardDescription>
           Cancel any system-charged penalty for a staff member. Cancelled penalties won't be
