@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+
 import { StatCard } from '@/components/ui/stat-card';
 import {
   Select,
@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
 import {
   Tooltip,
   TooltipContent,
@@ -112,7 +112,7 @@ export default function Attendance() {
   const [to, setTo] = useState(todayStr);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState<string>('all');
-  const [tab, setTab] = useState('daily');
+  
 
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
@@ -338,46 +338,34 @@ export default function Attendance() {
   };
 
   const handleExportPDF = () => {
-    if (tab === 'daily') {
-      const doc = exportToPDF({
-        title: 'Attendance Report — Daily Detail',
-        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
-        headers: ['Emp ID', 'Name', 'Dept', 'Date', 'Day', 'First', 'Last', 'Work', 'Break', 'Status'],
-        data: dailyRows.map(({ staff: st, cell }) => [
-          st.employee_id,
-          st.full_name,
-          st.department ?? '',
-          format(parseISO(cell.date), 'dd-MM-yy'),
-          format(parseISO(cell.date), 'EEE'),
-          fmtTime(cell.firstIn),
-          fmtTime(cell.lastOut),
-          formatMinutes(cell.worked),
-          formatMinutes(cell.brk),
-          cell.status + (cell.late ? '*' : ''),
-        ]),
-        dateRange: { from: parseISO(from), to: parseISO(to) },
-      });
-      downloadPDF(doc, 'attendance_daily');
-    } else {
-      const doc = exportToPDF({
-        title: 'Attendance Report — Date Matrix',
-        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
-        headers: ['Emp ID', 'Name', ...dates.map((d) => format(parseISO(d), 'dd-MM'))],
-        data: filteredStaff.map((st) => [
-          st.employee_id,
-          st.full_name,
-          ...dates.map((d) => {
-            const c = grid[st.id]?.[d];
-            if (!c) return '-';
-            if (c.status === 'Leave') return 'L';
-            if (c.status === 'Absent') return 'A';
-            return c.status;
-          }),
-        ]),
-        dateRange: { from: parseISO(from), to: parseISO(to) },
-      });
-      downloadPDF(doc, 'attendance_matrix');
-    }
+    const doc = exportToPDF({
+      title: 'Attendance Report — Daily Punch Detail',
+      subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
+      headers: [
+        'Emp ID',
+        'Name',
+        'Department',
+        'Designation',
+        ...dates.map((d) => format(parseISO(d), 'dd-MM')),
+      ],
+      data: filteredStaff.map((st) => [
+        st.employee_id,
+        st.full_name,
+        st.department ?? '',
+        st.designation ?? '',
+        ...dates.map((d) => {
+          const c = grid[st.id]?.[d];
+          if (!c) return '-';
+          if (c.status === 'Leave') return 'L';
+          if (c.status === 'Absent') return 'A';
+          const parts = [fmtTime(c.firstIn)];
+          if (c.lastOut) parts.push(fmtTime(c.lastOut));
+          return parts.join(' / ');
+        }),
+      ]),
+      dateRange: { from: parseISO(from), to: parseISO(to) },
+    });
+    downloadPDF(doc, 'attendance_report');
     toast.success('PDF exported');
   };
 
@@ -494,194 +482,16 @@ export default function Attendance() {
               {statusBadge('Leave')} <span className="text-muted-foreground self-center">Approved leave</span>
             </div>
 
-            <Tabs value={tab} onValueChange={setTab}>
-              <TabsList>
-                <TabsTrigger value="daily">Daily Detail</TabsTrigger>
-                <TabsTrigger value="matrix">Date Matrix</TabsTrigger>
-              </TabsList>
-
-              {/* Daily Detail */}
-              <TabsContent value="daily" className="mt-4">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-                  </div>
-                ) : dailyRows.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground">No records found.</div>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border">
-                    <Table>
-                      <TableHeader className="bg-muted/50">
-                        <TableRow>
-                          <TableHead>Employee ID</TableHead>
-                          <TableHead>Employee Name</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Designation</TableHead>
-                          <TableHead>Date</TableHead>
-                          <TableHead>Day</TableHead>
-                          <TableHead>First Punch</TableHead>
-                          <TableHead>Last Punch</TableHead>
-                          <TableHead>Total Working Hours</TableHead>
-                          <TableHead>Total Break Hours</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dailyRows.slice(0, 500).map(({ staff: st, cell }) => (
-                          <TableRow
-                            key={`${st.id}-${cell.date}`}
-                            className={cell.sessions.length > 0 ? 'cursor-pointer hover:bg-muted/40' : ''}
-                            onClick={() => {
-                              if (cell.sessions[0]) {
-                                setSelected(cell.sessions[0]);
-                                setDrawerOpen(true);
-                              }
-                            }}
-                          >
-                            <TableCell className="font-medium">{st.employee_id}</TableCell>
-                            <TableCell>{st.full_name}</TableCell>
-                            <TableCell>{st.department ?? '—'}</TableCell>
-                            <TableCell>{st.designation ?? '—'}</TableCell>
-                            <TableCell>{format(parseISO(cell.date), 'dd-MM-yyyy')}</TableCell>
-                            <TableCell>{format(parseISO(cell.date), 'EEEE')}</TableCell>
-                            <TableCell>{fmtTime(cell.firstIn)}</TableCell>
-                            <TableCell>{fmtTime(cell.lastOut)}</TableCell>
-                            <TableCell>{cell.worked > 0 ? formatMinutes(cell.worked) : '—'}</TableCell>
-                            <TableCell>{cell.brk > 0 ? formatMinutes(cell.brk) : '—'}</TableCell>
-                            <TableCell>{statusBadge(cell.status, cell.late)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                    {dailyRows.length > 500 && (
-                      <div className="p-3 text-center text-xs text-muted-foreground">
-                        Showing first 500 of {dailyRows.length} rows. Narrow your filters or export
-                        for the full list.
-                      </div>
-                    )}
-                  </div>
-                )}
-              </TabsContent>
-
-              {/* Date Matrix */}
-              <TabsContent value="matrix" className="mt-4">
-                {loading ? (
-                  <div className="flex items-center justify-center py-12 text-muted-foreground">
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-                  </div>
-                ) : filteredStaff.length === 0 || dates.length === 0 ? (
-                  <div className="py-12 text-center text-muted-foreground">No records found.</div>
-                ) : (
-                  <div className="overflow-x-auto rounded-lg border max-h-[70vh]">
-                    <Table>
-                      <TableHeader className="bg-muted/50 sticky top-0 z-10">
-                        <TableRow>
-                          <TableHead className="sticky left-0 bg-muted/50 z-20 min-w-[100px]">
-                            Emp ID
-                          </TableHead>
-                          <TableHead className="sticky left-[100px] bg-muted/50 z-20 min-w-[180px]">
-                            Employee Name
-                          </TableHead>
-                          <TableHead className="min-w-[140px]">Department</TableHead>
-                          <TableHead className="min-w-[140px]">Designation</TableHead>
-                          {dates.map((d) => (
-                            <TableHead key={d} className="text-center min-w-[110px]">
-                              <div>{format(parseISO(d), 'dd-MM-yyyy')}</div>
-                              <div className="text-xs font-normal text-muted-foreground">
-                                {format(parseISO(d), 'EEE')}
-                              </div>
-                            </TableHead>
-                          ))}
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredStaff.map((st) => (
-                          <TableRow key={st.id}>
-                            <TableCell className="sticky left-0 bg-background z-10 font-medium">
-                              {st.employee_id}
-                            </TableCell>
-                            <TableCell className="sticky left-[100px] bg-background z-10">
-                              {st.full_name}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {st.department ?? '—'}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {st.designation ?? '—'}
-                            </TableCell>
-                            {dates.map((d) => {
-                              const c = grid[st.id]?.[d];
-                              if (!c) return <TableCell key={d}>—</TableCell>;
-                              const cellBg =
-                                c.status === 'Absent'
-                                  ? 'bg-rose-50'
-                                  : c.status === 'Leave'
-                                    ? 'bg-violet-50'
-                                    : c.status === 'FD'
-                                      ? 'bg-emerald-50'
-                                      : c.status === 'HD'
-                                        ? 'bg-amber-50'
-                                        : 'bg-blue-50';
-                              return (
-                                <TableCell key={d} className={`text-center text-xs ${cellBg}`}>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <button
-                                        type="button"
-                                        className="w-full flex flex-col items-center gap-0.5"
-                                        onClick={() => {
-                                          if (c.sessions[0]) {
-                                            setSelected(c.sessions[0]);
-                                            setDrawerOpen(true);
-                                          }
-                                        }}
-                                      >
-                                        {c.status === 'Absent' ? (
-                                          <span className="font-medium text-rose-700">A</span>
-                                        ) : c.status === 'Leave' ? (
-                                          <span className="font-medium text-violet-700">L</span>
-                                        ) : (
-                                          <>
-                                            <span className="font-medium">{fmtTime(c.firstIn)}</span>
-                                            {c.lastOut && (
-                                              <span className="text-muted-foreground">
-                                                {fmtTime(c.lastOut)}
-                                              </span>
-                                            )}
-                                          </>
-                                        )}
-                                        {c.late && (
-                                          <AlertTriangle className="h-3 w-3 text-amber-600" />
-                                        )}
-                                      </button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <div className="text-xs">
-                                        <div>
-                                          <span className="font-semibold">{c.status}</span>
-                                          {c.late && ' • Late'}
-                                        </div>
-                                        {c.worked > 0 && (
-                                          <div>Worked: {formatMinutes(c.worked)}</div>
-                                        )}
-                                        {c.brk > 0 && <div>Break: {formatMinutes(c.brk)}</div>}
-                                        {c.sessions.length > 1 && (
-                                          <div>{c.sessions.length} sessions</div>
-                                        )}
-                                      </div>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TableCell>
-                              );
-                            })}
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            <AttendanceMatrix
+              loading={loading}
+              staff={filteredStaff}
+              dates={dates}
+              grid={grid}
+              onSelectSession={(s) => {
+                setSelected(s);
+                setDrawerOpen(true);
+              }}
+            />
           </CardContent>
         </Card>
 
@@ -694,5 +504,202 @@ export default function Attendance() {
         />
       </div>
     </TooltipProvider>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Matrix view (employees × dates) — image-1 layout, paginated 10 / page
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MatrixProps {
+  loading: boolean;
+  staff: StaffRow[];
+  dates: string[];
+  grid: Record<string, Record<string, DayCell>>;
+  onSelectSession: (s: AttendanceSession) => void;
+}
+
+function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: MatrixProps) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(staff.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visible = staff.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [totalPages, page]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+      </div>
+    );
+  }
+  if (staff.length === 0 || dates.length === 0) {
+    return <div className="py-12 text-center text-muted-foreground">No records found.</div>;
+  }
+
+  const start = (safePage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(safePage * PAGE_SIZE, staff.length);
+
+  return (
+    <div className="space-y-3 min-w-0">
+      <div className="w-full overflow-x-auto rounded-lg border">
+        <Table className="w-max">
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="min-w-[90px]">Employee ID</TableHead>
+              <TableHead className="min-w-[160px]">Employee Name</TableHead>
+              <TableHead className="min-w-[140px]">Department</TableHead>
+              <TableHead className="min-w-[140px]">Designation</TableHead>
+              {dates.map((d) => (
+                <TableHead key={d} className="text-center min-w-[110px] whitespace-nowrap">
+                  <div className="font-semibold">{format(parseISO(d), 'dd-MM-yyyy')}</div>
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {format(parseISO(d), 'EEEE')}
+                  </div>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visible.map((st) => (
+              <TableRow key={st.id} className="align-top">
+                <TableCell className="font-medium whitespace-nowrap">{st.employee_id}</TableCell>
+                <TableCell className="whitespace-nowrap">{st.full_name}</TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {st.department ?? '—'}
+                </TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {st.designation ?? '—'}
+                </TableCell>
+                {dates.map((d) => {
+                  const c = grid[st.id]?.[d];
+                  if (!c) {
+                    return (
+                      <TableCell key={d} className="text-center text-muted-foreground">
+                        —
+                      </TableCell>
+                    );
+                  }
+                  const cellBg =
+                    c.status === 'Absent'
+                      ? 'bg-rose-50/60'
+                      : c.status === 'Leave'
+                        ? 'bg-violet-50/60'
+                        : c.status === 'FD'
+                          ? 'bg-emerald-50/60'
+                          : c.status === 'HD'
+                            ? 'bg-amber-50/60'
+                            : c.sessions.length > 0
+                              ? 'bg-amber-50/40'
+                              : '';
+                  const clickable = c.sessions.length > 0;
+                  return (
+                    <TableCell key={d} className={`text-center text-xs ${cellBg}`}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            disabled={!clickable}
+                            onClick={() => clickable && onSelectSession(c.sessions[0])}
+                            className="w-full inline-flex flex-col items-center justify-center gap-0.5 disabled:cursor-default"
+                          >
+                            {c.status === 'Absent' ? (
+                              <span className="font-semibold text-rose-700">A</span>
+                            ) : c.status === 'Leave' ? (
+                              <span className="font-semibold text-violet-700">L</span>
+                            ) : (
+                              <>
+                                <span className="font-medium underline decoration-dotted underline-offset-2">
+                                  {fmtTime(c.firstIn)}
+                                </span>
+                                {c.lastOut && (
+                                  <span className="text-muted-foreground underline decoration-dotted underline-offset-2">
+                                    {fmtTime(c.lastOut)}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {c.late && (
+                              <AlertTriangle className="h-3 w-3 text-amber-600 mt-0.5" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            <div className="font-semibold">
+                              {c.status}
+                              {c.late && ' • Late'}
+                            </div>
+                            {c.worked > 0 && <div>Worked: {formatMinutes(c.worked)}</div>}
+                            {c.brk > 0 && <div>Break: {formatMinutes(c.brk)}</div>}
+                            {c.sessions.length > 1 && (
+                              <div>{c.sessions.length} sessions</div>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="text-sm text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{start}</span> to{' '}
+          <span className="font-medium text-foreground">{end}</span> of{' '}
+          <span className="font-medium text-foreground">{staff.length}</span> Employees
+        </div>
+        <Pagination className="m-0 w-auto">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((p) => Math.max(1, p - 1));
+                }}
+                aria-disabled={safePage === 1}
+                className={safePage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+              .map((p) => (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    isActive={p === safePage}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage(p);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((p) => Math.min(totalPages, p + 1));
+                }}
+                aria-disabled={safePage === totalPages}
+                className={
+                  safePage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
   );
 }
