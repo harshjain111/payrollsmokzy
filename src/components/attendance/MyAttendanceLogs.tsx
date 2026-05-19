@@ -178,9 +178,9 @@ export function MyAttendanceLogs() {
                             {format(new Date(s.work_date), 'EEEE')}
                           </div>
                         </TableCell>
-                        <TableCell>{format(new Date(s.check_in_at), 'hh:mm a')}</TableCell>
+                        <TableCell>{formatSessionTime(s.check_in_at, s.work_date)}</TableCell>
                         <TableCell>
-                          {s.check_out_at ? format(new Date(s.check_out_at), 'hh:mm a') : '—'}
+                          {s.check_out_at ? formatSessionTime(s.check_out_at, s.work_date) : '—'}
                         </TableCell>
                         <TableCell className="font-medium">{formatMinutes(s.worked_minutes)}</TableCell>
                         <TableCell>{formatMinutes(s.total_break_minutes)}</TableCell>
