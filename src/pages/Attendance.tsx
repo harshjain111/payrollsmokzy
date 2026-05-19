@@ -338,46 +338,34 @@ export default function Attendance() {
   };
 
   const handleExportPDF = () => {
-    if (tab === 'daily') {
-      const doc = exportToPDF({
-        title: 'Attendance Report — Daily Detail',
-        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
-        headers: ['Emp ID', 'Name', 'Dept', 'Date', 'Day', 'First', 'Last', 'Work', 'Break', 'Status'],
-        data: dailyRows.map(({ staff: st, cell }) => [
-          st.employee_id,
-          st.full_name,
-          st.department ?? '',
-          format(parseISO(cell.date), 'dd-MM-yy'),
-          format(parseISO(cell.date), 'EEE'),
-          fmtTime(cell.firstIn),
-          fmtTime(cell.lastOut),
-          formatMinutes(cell.worked),
-          formatMinutes(cell.brk),
-          cell.status + (cell.late ? '*' : ''),
-        ]),
-        dateRange: { from: parseISO(from), to: parseISO(to) },
-      });
-      downloadPDF(doc, 'attendance_daily');
-    } else {
-      const doc = exportToPDF({
-        title: 'Attendance Report — Date Matrix',
-        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
-        headers: ['Emp ID', 'Name', ...dates.map((d) => format(parseISO(d), 'dd-MM'))],
-        data: filteredStaff.map((st) => [
-          st.employee_id,
-          st.full_name,
-          ...dates.map((d) => {
-            const c = grid[st.id]?.[d];
-            if (!c) return '-';
-            if (c.status === 'Leave') return 'L';
-            if (c.status === 'Absent') return 'A';
-            return c.status;
-          }),
-        ]),
-        dateRange: { from: parseISO(from), to: parseISO(to) },
-      });
-      downloadPDF(doc, 'attendance_matrix');
-    }
+    const doc = exportToPDF({
+      title: 'Attendance Report — Daily Punch Detail',
+      subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
+      headers: [
+        'Emp ID',
+        'Name',
+        'Department',
+        'Designation',
+        ...dates.map((d) => format(parseISO(d), 'dd-MM')),
+      ],
+      data: filteredStaff.map((st) => [
+        st.employee_id,
+        st.full_name,
+        st.department ?? '',
+        st.designation ?? '',
+        ...dates.map((d) => {
+          const c = grid[st.id]?.[d];
+          if (!c) return '-';
+          if (c.status === 'Leave') return 'L';
+          if (c.status === 'Absent') return 'A';
+          const parts = [fmtTime(c.firstIn)];
+          if (c.lastOut) parts.push(fmtTime(c.lastOut));
+          return parts.join(' / ');
+        }),
+      ]),
+      dateRange: { from: parseISO(from), to: parseISO(to) },
+    });
+    downloadPDF(doc, 'attendance_report');
     toast.success('PDF exported');
   };
 
