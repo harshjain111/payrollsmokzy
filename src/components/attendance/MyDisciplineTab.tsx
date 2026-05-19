@@ -36,10 +36,15 @@ export function MyDisciplineTab() {
 
   const totals = useMemo(() => {
     return {
-      fine: rows.reduce((s, r) => s + Number(r.fine_amount || 0), 0),
-      late: rows.filter((r) => r.late_in_minutes > 0).length,
-      early: rows.filter((r) => r.early_out_minutes > 0).length,
-      onTime: rows.filter((r) => r.fine_amount === 0 && !r.is_absent).length,
+      fine: rows.reduce(
+        (s, r) => s + (r.is_cancelled ? 0 : Number(r.fine_amount || 0)),
+        0,
+      ),
+      late: rows.filter((r) => r.late_in_minutes > 0 && !r.is_cancelled).length,
+      early: rows.filter((r) => r.early_out_minutes > 0 && !r.is_cancelled).length,
+      onTime: rows.filter(
+        (r) => (r.fine_amount === 0 || r.is_cancelled) && !r.is_absent,
+      ).length,
     };
   }, [rows]);
 
@@ -104,12 +109,23 @@ export function MyDisciplineTab() {
                         {format(new Date(r.work_date), 'dd MMM yyyy')}
                       </p>
                       {r.fine_amount > 0 ? (
-                        <Badge variant="destructive" className="text-[10px]">
+                        <Badge
+                          variant={r.is_cancelled ? 'secondary' : 'destructive'}
+                          className={`text-[10px] ${r.is_cancelled ? 'line-through' : ''}`}
+                        >
                           ₹{Number(r.fine_amount).toFixed(0)}
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="text-[10px] gap-1">
                           <CheckCircle2 className="h-3 w-3" /> On time
+                        </Badge>
+                      )}
+                      {r.is_cancelled && (
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] bg-emerald-500/15 text-emerald-700"
+                        >
+                          Cancelled
                         </Badge>
                       )}
                       {r.is_absent && (
@@ -124,6 +140,11 @@ export function MyDisciplineTab() {
                     </p>
                     {r.fine_reason && (
                       <p className="text-xs mt-0.5">{r.fine_reason}</p>
+                    )}
+                    {r.is_cancelled && r.cancellation_reason && (
+                      <p className="text-[11px] mt-0.5 text-emerald-600">
+                        Waived: {r.cancellation_reason}
+                      </p>
                     )}
                   </div>
                 </div>

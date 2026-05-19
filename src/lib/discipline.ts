@@ -18,6 +18,7 @@ export interface DisciplineRules {
   early_out_full_day_after_min: number;
   absent_no_checkin_deduction: string; // 'full_day' | 'half_day' | numeric string
   absent_no_checkout_deduction: string;
+  penalties_enabled: boolean;
 }
 
 export interface DisciplineLogRow {
@@ -34,6 +35,11 @@ export interface DisciplineLogRow {
   is_absent: boolean;
   absent_reason: string | null;
   computed_at: string;
+  is_cancelled?: boolean;
+  cancelled_by?: string | null;
+  cancelled_by_name?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
 }
 
 export interface Shift {
@@ -182,6 +188,12 @@ export async function computeAndLogDiscipline(
 ): Promise<ComputeResult | null> {
   const rules = await fetchDisciplineRules();
   if (!rules) return null;
+
+  // Master penalty switch: if disabled, do not compute any fines
+  if (rules.penalties_enabled === false) {
+    return null;
+  }
+
   const assignment = await fetchStaffAssignment(input.staffId);
   if (!assignment) return null;
 
@@ -347,7 +359,11 @@ export async function getMonthlyDisciplineFine(
     return { totalFine: 0, logs: [] };
   }
   const logs = (data as DisciplineLogRow[]) ?? [];
-  const total = logs.reduce((s, r) => s + Number(r.fine_amount || 0), 0);
+  // Cancelled rows contribute 0 to the total
+  const total = logs.reduce(
+    (s, r) => s + (r.is_cancelled ? 0 : Number(r.fine_amount || 0)),
+    0,
+  );
   return { totalFine: Math.round(total * 100) / 100, logs };
 }
 

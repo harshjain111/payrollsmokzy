@@ -16,15 +16,16 @@ interface Row {
 }
 
 export function AttendanceCoverageCard() {
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
+  const canManage = isOwner || isAdmin;
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    if (!isOwner) return;
+    if (!canManage) return;
     load();
-  }, [isOwner]);
+  }, [canManage]);
 
   const load = async () => {
     setLoading(true);
@@ -56,7 +57,7 @@ export function AttendanceCoverageCard() {
     }
   };
 
-  if (!isOwner) return null;
+  if (!canManage) return null;
 
   const filtered = rows.filter((r) =>
     r.full_name.toLowerCase().includes(search.toLowerCase()),

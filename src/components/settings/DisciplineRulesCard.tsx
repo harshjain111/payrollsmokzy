@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Trash2, Plus, Shield, Loader2, Save } from 'lucide-react';
+import { Trash2, Plus, Shield, Loader2, Save, PowerOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { DisciplineRules, Slab, fetchDisciplineRules } from '@/lib/discipline';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 function SlabEditor({
   title,
@@ -77,10 +79,12 @@ function SlabEditor({
 }
 
 export function DisciplineRulesCard() {
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
+  const canManage = isOwner || isAdmin;
   const [rules, setRules] = useState<DisciplineRules | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingMaster, setTogglingMaster] = useState(false);
 
   useEffect(() => {
     fetchDisciplineRules().then((r) => {
@@ -89,7 +93,7 @@ export function DisciplineRulesCard() {
     });
   }, []);
 
-  if (!isOwner) return null;
+  if (!canManage) return null;
   if (loading) {
     return (
       <Card className="md:col-span-2">
@@ -117,6 +121,7 @@ export function DisciplineRulesCard() {
           early_out_full_day_after_min: rules.early_out_full_day_after_min,
           absent_no_checkin_deduction: rules.absent_no_checkin_deduction,
           absent_no_checkout_deduction: rules.absent_no_checkout_deduction,
+          penalties_enabled: rules.penalties_enabled,
         } as never)
         .eq('id', rules.id);
       if (error) throw error;
@@ -125,6 +130,29 @@ export function DisciplineRulesCard() {
       toast.error(e instanceof Error ? e.message : 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleMaster = async (value: boolean) => {
+    setTogglingMaster(true);
+    const prev = rules.penalties_enabled;
+    setRules({ ...rules, penalties_enabled: value });
+    try {
+      const { error } = await supabase
+        .from('discipline_rules' as never)
+        .update({ penalties_enabled: value } as never)
+        .eq('id', rules.id);
+      if (error) throw error;
+      toast.success(
+        value
+          ? 'Penalty system enabled — fines will be applied'
+          : 'Penalty system disabled — no fines will be applied',
+      );
+    } catch (e) {
+      setRules({ ...rules, penalties_enabled: prev });
+      toast.error(e instanceof Error ? e.message : 'Failed to update');
+    } finally {
+      setTogglingMaster(false);
     }
   };
 
@@ -143,6 +171,43 @@ export function DisciplineRulesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Master on/off switch */}
+        <div
+          className={cn(
+            'flex items-start justify-between gap-4 rounded-lg border p-4',
+            rules.penalties_enabled
+              ? 'bg-emerald-500/5 border-emerald-500/30'
+              : 'bg-amber-500/5 border-amber-500/40',
+          )}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {!rules.penalties_enabled && (
+                <PowerOff className="h-4 w-4 text-amber-600" />
+              )}
+              <p className="font-semibold text-sm">
+                Apply penalties for late / early / absent
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rules.penalties_enabled
+                ? 'Fines, half-day and full-day deductions are being applied automatically.'
+                : 'Penalties are OFF. No fines or half/full-day deductions will be applied. Only on-time WhatsApp greetings are sent — no late / half-day / full-day messages.'}
+            </p>
+          </div>
+          <Switch
+            checked={rules.penalties_enabled}
+            disabled={togglingMaster}
+            onCheckedChange={toggleMaster}
+          />
+        </div>
+
+        <div
+          className={cn(
+            'space-y-6 transition-opacity',
+            !rules.penalties_enabled && 'opacity-50 pointer-events-none',
+          )}
+        >
         {/* Late-in */}
         <div className="space-y-3">
           <h4 className="font-semibold text-sm">Late check-in</h4>
@@ -247,6 +312,7 @@ export function DisciplineRulesCard() {
             )}
             Save rules
           </Button>
+        </div>
         </div>
       </CardContent>
     </Card>

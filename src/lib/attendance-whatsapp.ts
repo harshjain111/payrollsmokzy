@@ -130,6 +130,13 @@ export async function notifyCheckinWhatsapp(
     if (!scheduledIn) return;
 
     const scheduledIso = scheduledIsoFromTime(workDate, scheduledIn);
+
+    // Master switch off: send on-time greeting only, never a fine message
+    if (rules.penalties_enabled === false) {
+      await dispatch(staff, 'checkin', checkInIso, scheduledIso, 'on_time', 0);
+      return;
+    }
+
     const lateMin = Math.round(
       (new Date(checkInIso).getTime() - new Date(scheduledIso).getTime()) / 60000,
     );
@@ -167,6 +174,10 @@ export async function notifyCheckoutWhatsapp(
     if (!staff || staff.attendance_tracked === false) return;
     const rules = await fetchDisciplineRules();
     if (!rules) return;
+
+    // Master switch off: never send any check-out fine message
+    if (rules.penalties_enabled === false) return;
+
     const { scheduledIn, scheduledOut } = await getScheduledTimes(staffId);
     if (!scheduledOut) return;
 

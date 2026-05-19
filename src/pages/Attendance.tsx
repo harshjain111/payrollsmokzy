@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/ui/stat-card';
 import { AttendanceSession, formatMinutes } from '@/lib/attendance';
 import { SessionDetailsDrawer } from '@/components/attendance/SessionDetailsDrawer';
+import { PenaltiesPanel } from '@/components/attendance/PenaltiesPanel';
 import { format } from 'date-fns';
 import { CalendarClock, Coffee, CheckCircle2, Users, Loader2 } from 'lucide-react';
 
@@ -251,6 +252,8 @@ export default function Attendance() {
           )}
         </CardContent>
       </Card>
+
+      <PenaltiesPanel />
 
       <SessionDetailsDrawer
         open={drawerOpen}
