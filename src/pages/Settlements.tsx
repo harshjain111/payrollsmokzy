@@ -791,6 +791,15 @@ export default function Settlements() {
                     -<Amount value={calculation.leaveDeduction} />
                   </span>
                 </div>
+
+                {calculation.disciplineFine > 0 && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-muted-foreground">Discipline Fine</span>
+                    <span className="text-destructive font-medium">
+                      -<Amount value={calculation.disciplineFine} />
+                    </span>
+                  </div>
+                )}
                 
                 <Separator />
                 
