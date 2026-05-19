@@ -417,8 +417,8 @@ export default function Attendance() {
           />
         </div>
 
-        <Card className="rounded-2xl border-0 shadow-card">
-          <CardContent className="p-4 md:p-6 space-y-4">
+        <Card className="max-w-full min-w-0 overflow-hidden rounded-2xl border-0 shadow-card">
+          <CardContent className="min-w-0 p-4 md:p-6 space-y-4">
             {/* Filter bar */}
             <div className="flex flex-wrap items-end gap-3">
               <div>
@@ -547,8 +547,8 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
 
   return (
     <div className="space-y-3 min-w-0">
-      <div className="w-full overflow-x-auto rounded-lg border">
-        <Table className="w-max">
+      <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border bg-card">
+        <Table className="min-w-max table-fixed">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableHead className="min-w-[90px]">Employee ID</TableHead>
@@ -556,7 +556,7 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
               <TableHead className="min-w-[140px]">Department</TableHead>
               <TableHead className="min-w-[140px]">Designation</TableHead>
               {dates.map((d) => (
-                <TableHead key={d} className="text-center min-w-[110px] whitespace-nowrap">
+                <TableHead key={d} className="w-[110px] min-w-[110px] text-center whitespace-nowrap">
                   <div className="font-semibold">{format(parseISO(d), 'dd-MM-yyyy')}</div>
                   <div className="text-xs font-normal text-muted-foreground">
                     {format(parseISO(d), 'EEEE')}
@@ -580,7 +580,7 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
                   const c = grid[st.id]?.[d];
                   if (!c) {
                     return (
-                      <TableCell key={d} className="text-center text-muted-foreground">
+                      <TableCell key={d} className="w-[110px] min-w-[110px] text-center text-muted-foreground">
                         —
                       </TableCell>
                     );
@@ -599,7 +599,7 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
                               : '';
                   const clickable = c.sessions.length > 0;
                   return (
-                    <TableCell key={d} className={`text-center text-xs ${cellBg}`}>
+                    <TableCell key={d} className={`w-[110px] min-w-[110px] text-center text-xs ${cellBg}`}>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <button
