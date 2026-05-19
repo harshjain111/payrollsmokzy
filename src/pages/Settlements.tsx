@@ -485,6 +485,7 @@ export default function Settlements() {
           deduction_adjustment_reason: calculation.deductionAdjustmentReason || null,
           deduction_adjusted_by: calculation.finalDeductionDays !== calculation.systemDeductionDays ? user.id : null,
           deduction_adjusted_at: calculation.finalDeductionDays !== calculation.systemDeductionDays ? new Date().toISOString() : null,
+          discipline_fine: calculation.disciplineFine,
           created_by: user.id,
         })
         .select()
