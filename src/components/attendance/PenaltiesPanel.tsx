@@ -47,6 +47,8 @@ export function PenaltiesPanel() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [unscheduledStaff, setUnscheduledStaff] = useState<string[]>([]);
+  const [absentToday, setAbsentToday] = useState(0);
+  const [runningAbsentCheck, setRunningAbsentCheck] = useState(false);
 
   const [target, setTarget] = useState<Row | null>(null);
   const [reason, setReason] = useState('');
