@@ -139,6 +139,12 @@ Deno.serve(async (req) => {
     });
     const leaveSet = new Set((leaves ?? []).map((l: { staff_id: string }) => l.staff_id));
     const sessionSet = new Set((sessions ?? []).map((s: { staff_id: string }) => s.staff_id));
+    const openSessionSet = new Set(
+      (openSessions ?? []).map((s: { staff_id: string }) => s.staff_id),
+    );
+    const yesterdaySessionSet = new Set(
+      (ySessions ?? []).map((s: { staff_id: string }) => s.staff_id),
+    );
     const logMap = new Map<string, string>(
       (logs ?? []).map((l: { id: string; staff_id: string }) => [l.staff_id, l.id]),
     );
@@ -152,11 +158,18 @@ Deno.serve(async (req) => {
       phone: string | null;
       monthly_salary: number;
     }>) {
-      // Skip: on leave, or already has a session, or no shift assignment
+      // Session-aware skip rules:
+      //  1) on approved leave today
+      //  2) already has a session anchored to today
+      //  3) has an open session from any day (still on shift)
+      //  4) yesterday's session extended past today's IST midnight (night shift covered today)
+      //  5) no shift assignment (can't determine "scheduled")
       if (leaveSet.has(s.id)) continue;
       if (sessionSet.has(s.id)) continue;
+      if (openSessionSet.has(s.id)) continue;
+      if (yesterdaySessionSet.has(s.id)) continue;
       const a = assignMap.get(s.id);
-      if (!a) continue; // no scheduled shift => can't determine "absent"
+      if (!a) continue;
       const scheduledIn = a.override_check_in || (a.shift_id ? shiftMap.get(a.shift_id) : null);
       if (!scheduledIn) continue;
 
