@@ -548,13 +548,13 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
   return (
     <div className="space-y-3 min-w-0">
       <div className="max-w-full overflow-x-auto overscroll-x-contain rounded-lg border bg-card">
-        <Table className="min-w-max table-fixed">
+        <Table className="min-w-max table-auto">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="min-w-[90px]">Employee ID</TableHead>
-              <TableHead className="min-w-[160px]">Employee Name</TableHead>
-              <TableHead className="min-w-[140px]">Department</TableHead>
-              <TableHead className="min-w-[140px]">Designation</TableHead>
+              <TableHead className="w-[150px] min-w-[150px] whitespace-nowrap">Employee ID</TableHead>
+              <TableHead className="w-[180px] min-w-[180px] whitespace-nowrap">Employee Name</TableHead>
+              <TableHead className="w-[150px] min-w-[150px] whitespace-nowrap">Department</TableHead>
+              <TableHead className="w-[160px] min-w-[160px] whitespace-nowrap">Designation</TableHead>
               {dates.map((d) => (
                 <TableHead key={d} className="w-[110px] min-w-[110px] text-center whitespace-nowrap">
                   <div className="font-semibold">{format(parseISO(d), 'dd-MM-yyyy')}</div>
@@ -568,12 +568,16 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
           <TableBody>
             {visible.map((st) => (
               <TableRow key={st.id} className="align-top">
-                <TableCell className="font-medium whitespace-nowrap">{st.employee_id}</TableCell>
-                <TableCell className="whitespace-nowrap">{st.full_name}</TableCell>
-                <TableCell className="text-muted-foreground whitespace-nowrap">
+                <TableCell className="w-[150px] min-w-[150px] whitespace-nowrap font-medium">
+                  {st.employee_id}
+                </TableCell>
+                <TableCell className="w-[180px] min-w-[180px] whitespace-nowrap">
+                  {st.full_name}
+                </TableCell>
+                <TableCell className="w-[150px] min-w-[150px] whitespace-nowrap text-muted-foreground">
                   {st.department ?? '—'}
                 </TableCell>
-                <TableCell className="text-muted-foreground whitespace-nowrap">
+                <TableCell className="w-[160px] min-w-[160px] whitespace-nowrap text-muted-foreground">
                   {st.designation ?? '—'}
                 </TableCell>
                 {dates.map((d) => {
