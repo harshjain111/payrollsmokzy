@@ -424,7 +424,7 @@ export default function Attendance() {
             value={stats.absentToday}
             subtitle="No check-in"
             icon={Users}
-            color="red"
+            color="pink"
           />
         </div>
 
