@@ -202,6 +202,34 @@ export function PenaltiesPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {unscheduledStaff.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-200">
+                  {unscheduledStaff.length} tracked staff have no shift assigned — penalties and
+                  WhatsApp messages are being SKIPPED for them.
+                </p>
+                <p className="text-xs text-amber-800/90 dark:text-amber-200/80">
+                  Without a scheduled check-in / check-out time, the system can't tell if anyone
+                  is late, so no fine is logged and no message is sent. Assign a shift to fix.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Missing: {unscheduledStaff.slice(0, 6).join(', ')}
+                  {unscheduledStaff.length > 6 ? ` +${unscheduledStaff.length - 6} more` : ''}
+                </p>
+                <Link
+                  to="/shifts"
+                  className="inline-block text-xs font-medium text-primary hover:underline mt-1"
+                >
+                  Go to Shifts →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <Label className="text-xs text-muted-foreground">From</Label>
