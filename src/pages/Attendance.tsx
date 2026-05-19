@@ -506,3 +506,200 @@ export default function Attendance() {
     </TooltipProvider>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Matrix view (employees × dates) — image-1 layout, paginated 10 / page
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface MatrixProps {
+  loading: boolean;
+  staff: StaffRow[];
+  dates: string[];
+  grid: Record<string, Record<string, DayCell>>;
+  onSelectSession: (s: AttendanceSession) => void;
+}
+
+function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: MatrixProps) {
+  const PAGE_SIZE = 10;
+  const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(staff.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const visible = staff.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  useEffect(() => {
+    if (page > totalPages) setPage(1);
+  }, [totalPages, page]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+      </div>
+    );
+  }
+  if (staff.length === 0 || dates.length === 0) {
+    return <div className="py-12 text-center text-muted-foreground">No records found.</div>;
+  }
+
+  const start = (safePage - 1) * PAGE_SIZE + 1;
+  const end = Math.min(safePage * PAGE_SIZE, staff.length);
+
+  return (
+    <div className="space-y-3 min-w-0">
+      <div className="w-full overflow-x-auto rounded-lg border">
+        <Table className="w-max">
+          <TableHeader>
+            <TableRow className="bg-muted/40 hover:bg-muted/40">
+              <TableHead className="min-w-[90px]">Employee ID</TableHead>
+              <TableHead className="min-w-[160px]">Employee Name</TableHead>
+              <TableHead className="min-w-[140px]">Department</TableHead>
+              <TableHead className="min-w-[140px]">Designation</TableHead>
+              {dates.map((d) => (
+                <TableHead key={d} className="text-center min-w-[110px] whitespace-nowrap">
+                  <div className="font-semibold">{format(parseISO(d), 'dd-MM-yyyy')}</div>
+                  <div className="text-xs font-normal text-muted-foreground">
+                    {format(parseISO(d), 'EEEE')}
+                  </div>
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {visible.map((st) => (
+              <TableRow key={st.id} className="align-top">
+                <TableCell className="font-medium whitespace-nowrap">{st.employee_id}</TableCell>
+                <TableCell className="whitespace-nowrap">{st.full_name}</TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {st.department ?? '—'}
+                </TableCell>
+                <TableCell className="text-muted-foreground whitespace-nowrap">
+                  {st.designation ?? '—'}
+                </TableCell>
+                {dates.map((d) => {
+                  const c = grid[st.id]?.[d];
+                  if (!c) {
+                    return (
+                      <TableCell key={d} className="text-center text-muted-foreground">
+                        —
+                      </TableCell>
+                    );
+                  }
+                  const cellBg =
+                    c.status === 'Absent'
+                      ? 'bg-rose-50/60'
+                      : c.status === 'Leave'
+                        ? 'bg-violet-50/60'
+                        : c.status === 'FD'
+                          ? 'bg-emerald-50/60'
+                          : c.status === 'HD'
+                            ? 'bg-amber-50/60'
+                            : c.sessions.length > 0
+                              ? 'bg-amber-50/40'
+                              : '';
+                  const clickable = c.sessions.length > 0;
+                  return (
+                    <TableCell key={d} className={`text-center text-xs ${cellBg}`}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            disabled={!clickable}
+                            onClick={() => clickable && onSelectSession(c.sessions[0])}
+                            className="w-full inline-flex flex-col items-center justify-center gap-0.5 disabled:cursor-default"
+                          >
+                            {c.status === 'Absent' ? (
+                              <span className="font-semibold text-rose-700">A</span>
+                            ) : c.status === 'Leave' ? (
+                              <span className="font-semibold text-violet-700">L</span>
+                            ) : (
+                              <>
+                                <span className="font-medium underline decoration-dotted underline-offset-2">
+                                  {fmtTime(c.firstIn)}
+                                </span>
+                                {c.lastOut && (
+                                  <span className="text-muted-foreground underline decoration-dotted underline-offset-2">
+                                    {fmtTime(c.lastOut)}
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {c.late && (
+                              <AlertTriangle className="h-3 w-3 text-amber-600 mt-0.5" />
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <div className="text-xs">
+                            <div className="font-semibold">
+                              {c.status}
+                              {c.late && ' • Late'}
+                            </div>
+                            {c.worked > 0 && <div>Worked: {formatMinutes(c.worked)}</div>}
+                            {c.brk > 0 && <div>Break: {formatMinutes(c.brk)}</div>}
+                            {c.sessions.length > 1 && (
+                              <div>{c.sessions.length} sessions</div>
+                            )}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+        <div className="text-sm text-muted-foreground">
+          Showing <span className="font-medium text-foreground">{start}</span> to{' '}
+          <span className="font-medium text-foreground">{end}</span> of{' '}
+          <span className="font-medium text-foreground">{staff.length}</span> Employees
+        </div>
+        <Pagination className="m-0 w-auto">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((p) => Math.max(1, p - 1));
+                }}
+                aria-disabled={safePage === 1}
+                className={safePage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+              />
+            </PaginationItem>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
+              .map((p) => (
+                <PaginationItem key={p}>
+                  <PaginationLink
+                    isActive={p === safePage}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setPage(p);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {p}
+                  </PaginationLink>
+                </PaginationItem>
+              ))}
+            <PaginationItem>
+              <PaginationNext
+                onClick={(e) => {
+                  e.preventDefault();
+                  setPage((p) => Math.min(totalPages, p + 1));
+                }}
+                aria-disabled={safePage === totalPages}
+                className={
+                  safePage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'
+                }
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    </div>
+  );
+}
