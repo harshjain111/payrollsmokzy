@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { Trash2, Plus, Shield, Loader2, Save } from 'lucide-react';
+import { Trash2, Plus, Shield, Loader2, Save, PowerOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { DisciplineRules, Slab, fetchDisciplineRules } from '@/lib/discipline';
 import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
 function SlabEditor({
   title,
