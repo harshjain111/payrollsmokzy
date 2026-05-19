@@ -241,6 +241,35 @@ export async function checkOut(
     .select('*')
     .single();
   if (error) throw error;
+
+  // Compute discipline fine (best-effort; non-blocking on failure)
+  if (session.staff_id) {
+    try {
+      const { data: staffRow } = await supabase
+        .from('staff')
+        .select('id, monthly_salary, attendance_tracked')
+        .eq('id', session.staff_id)
+        .maybeSingle();
+      if (staffRow && (staffRow as { attendance_tracked?: boolean }).attendance_tracked !== false) {
+        const monthlySalary = Number((staffRow as { monthly_salary?: number }).monthly_salary || 0);
+        const wd = new Date(session.work_date + 'T00:00:00');
+        const daysInMonth = new Date(wd.getFullYear(), wd.getMonth() + 1, 0).getDate();
+        await computeAndLogDiscipline({
+          staffId: session.staff_id,
+          userId,
+          sessionId: session.id,
+          workDate: session.work_date,
+          checkInIso: session.check_in_at,
+          checkOutIso: checkOutAt.toISOString(),
+          monthlySalary,
+          daysInMonth,
+        });
+      }
+    } catch (e) {
+      console.error('Discipline compute failed', e);
+    }
+  }
+
   return updated as AttendanceSession;
 }
 
