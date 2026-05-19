@@ -96,12 +96,17 @@ export type Database = {
       attendance_discipline_log: {
         Row: {
           absent_reason: string | null
+          cancellation_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cancelled_by_name: string | null
           computed_at: string
           early_out_minutes: number
           fine_amount: number
           fine_reason: string | null
           id: string
           is_absent: boolean
+          is_cancelled: boolean
           late_in_minutes: number
           scheduled_check_in: string | null
           scheduled_check_out: string | null
@@ -111,12 +116,17 @@ export type Database = {
         }
         Insert: {
           absent_reason?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_by_name?: string | null
           computed_at?: string
           early_out_minutes?: number
           fine_amount?: number
           fine_reason?: string | null
           id?: string
           is_absent?: boolean
+          is_cancelled?: boolean
           late_in_minutes?: number
           scheduled_check_in?: string | null
           scheduled_check_out?: string | null
@@ -126,12 +136,17 @@ export type Database = {
         }
         Update: {
           absent_reason?: string | null
+          cancellation_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_by_name?: string | null
           computed_at?: string
           early_out_minutes?: number
           fine_amount?: number
           fine_reason?: string | null
           id?: string
           is_absent?: boolean
+          is_cancelled?: boolean
           late_in_minutes?: number
           scheduled_check_in?: string | null
           scheduled_check_out?: string | null
@@ -319,6 +334,7 @@ export type Database = {
           late_in_full_day_after_min: number
           late_in_half_day_after_min: number
           late_in_slabs: Json
+          penalties_enabled: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -334,6 +350,7 @@ export type Database = {
           late_in_full_day_after_min?: number
           late_in_half_day_after_min?: number
           late_in_slabs?: Json
+          penalties_enabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -349,6 +366,7 @@ export type Database = {
           late_in_full_day_after_min?: number
           late_in_half_day_after_min?: number
           late_in_slabs?: Json
+          penalties_enabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
