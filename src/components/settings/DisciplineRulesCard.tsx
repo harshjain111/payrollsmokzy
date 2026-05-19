@@ -79,10 +79,12 @@ function SlabEditor({
 }
 
 export function DisciplineRulesCard() {
-  const { isOwner } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
+  const canManage = isOwner || isAdmin;
   const [rules, setRules] = useState<DisciplineRules | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [togglingMaster, setTogglingMaster] = useState(false);
 
   useEffect(() => {
     fetchDisciplineRules().then((r) => {
@@ -91,7 +93,7 @@ export function DisciplineRulesCard() {
     });
   }, []);
 
-  if (!isOwner) return null;
+  if (!canManage) return null;
   if (loading) {
     return (
       <Card className="md:col-span-2">
@@ -119,6 +121,7 @@ export function DisciplineRulesCard() {
           early_out_full_day_after_min: rules.early_out_full_day_after_min,
           absent_no_checkin_deduction: rules.absent_no_checkin_deduction,
           absent_no_checkout_deduction: rules.absent_no_checkout_deduction,
+          penalties_enabled: rules.penalties_enabled,
         } as never)
         .eq('id', rules.id);
       if (error) throw error;
@@ -127,6 +130,29 @@ export function DisciplineRulesCard() {
       toast.error(e instanceof Error ? e.message : 'Failed to save');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleMaster = async (value: boolean) => {
+    setTogglingMaster(true);
+    const prev = rules.penalties_enabled;
+    setRules({ ...rules, penalties_enabled: value });
+    try {
+      const { error } = await supabase
+        .from('discipline_rules' as never)
+        .update({ penalties_enabled: value } as never)
+        .eq('id', rules.id);
+      if (error) throw error;
+      toast.success(
+        value
+          ? 'Penalty system enabled — fines will be applied'
+          : 'Penalty system disabled — no fines will be applied',
+      );
+    } catch (e) {
+      setRules({ ...rules, penalties_enabled: prev });
+      toast.error(e instanceof Error ? e.message : 'Failed to update');
+    } finally {
+      setTogglingMaster(false);
     }
   };
 
