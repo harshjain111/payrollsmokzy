@@ -119,16 +119,19 @@ Deno.serve(async (req) => {
     );
   }
 
-  const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
-  const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')?.trim();
+  // Wabanow reseller credentials
+  // WHATSAPP_ACCESS_TOKEN = Wabanow API key (sent as 'key' header)
+  // WHATSAPP_PHONE_NUMBER_ID = Wabanow wabaNumber (sent as 'wabaNumber' header)
+  const apiKey = Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
+  const wabaNumber = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')?.trim();
 
   console.log(
     'Token check:',
-    accessToken ? accessToken.substring(0, 10) + '...' + accessToken.slice(-5) : 'MISSING',
+    apiKey ? apiKey.substring(0, 10) + '...' + apiKey.slice(-5) : 'MISSING',
   );
-  console.log('Phone number ID:', phoneNumberId ?? 'MISSING');
+  console.log('wabaNumber:', wabaNumber ?? 'MISSING');
 
-  if (!accessToken || !phoneNumberId) {
+  if (!apiKey || !wabaNumber) {
     return new Response(
       JSON.stringify({ success: false, error: 'WhatsApp credentials not configured' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -142,23 +145,38 @@ Deno.serve(async (req) => {
   let errorMessage: string | null = null;
 
   try {
-    const res = await fetch(
-      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(waBody),
+    const res = await fetch('https://api.wabanow.com/wrapper/waba/message', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'key': apiKey,
+        'wabaNumber': wabaNumber,
       },
-    );
-    const data = await res.json();
-    if (!res.ok) {
-      errorMessage = data?.error?.message || `Meta API error ${res.status}`;
-      console.error('Meta API rejected:', JSON.stringify(data));
+      body: JSON.stringify(waBody),
+    });
+    const text = await res.text();
+    let data: Record<string, unknown> = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = { raw: text };
+    }
+
+    const msgId =
+      (data as { messages?: Array<{ id?: string }> })?.messages?.[0]?.id ??
+      (data as { id?: string })?.id ??
+      null;
+    const looksEmpty = !text || text.trim().length === 0;
+
+    if (!res.ok || looksEmpty || (!msgId && !(data as { success?: boolean })?.success)) {
+      errorMessage =
+        (data as { error?: { message?: string } })?.error?.message ||
+        (looksEmpty
+          ? `Wabanow returned empty body (HTTP ${res.status}) — template/language likely rejected`
+          : `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`);
+      console.error('Wabanow rejected:', errorMessage);
     } else {
-      metaMessageId = data?.messages?.[0]?.id ?? null;
+      metaMessageId = msgId;
       success = true;
     }
   } catch (e) {
