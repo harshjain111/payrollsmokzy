@@ -58,6 +58,7 @@ import {
   CalendarDays,
   Coins,
   Clock,
+  MessageSquare,
 } from 'lucide-react';
 
 interface NavItem {
