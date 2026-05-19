@@ -1275,6 +1275,48 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_notification_log: {
+        Row: {
+          deduction_amount: number
+          error_message: string | null
+          event_type: string
+          id: string
+          meta_message_id: string | null
+          sent_at: string
+          slab: string
+          staff_id: string | null
+          staff_phone: string
+          success: boolean
+          template_name: string
+        }
+        Insert: {
+          deduction_amount?: number
+          error_message?: string | null
+          event_type: string
+          id?: string
+          meta_message_id?: string | null
+          sent_at?: string
+          slab: string
+          staff_id?: string | null
+          staff_phone: string
+          success?: boolean
+          template_name: string
+        }
+        Update: {
+          deduction_amount?: number
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          meta_message_id?: string | null
+          sent_at?: string
+          slab?: string
+          staff_id?: string | null
+          staff_phone?: string
+          success?: boolean
+          template_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       staff_public: {
