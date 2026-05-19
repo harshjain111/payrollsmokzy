@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '@/components/ui/pagination';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+
 import {
   Tooltip,
   TooltipContent,
@@ -483,34 +483,16 @@ export default function Attendance() {
               {statusBadge('Leave')} <span className="text-muted-foreground self-center">Approved leave</span>
             </div>
 
-            <Tabs defaultValue="daily" className="w-full min-w-0">
-              <TabsList>
-                <TabsTrigger value="daily">Daily Detail</TabsTrigger>
-                <TabsTrigger value="matrix">Date Matrix</TabsTrigger>
-              </TabsList>
-              <TabsContent value="daily" className="mt-4">
-                <DailyDetailView
-                  loading={loading}
-                  rows={dailyRows}
-                  onSelectSession={(s) => {
-                    setSelected(s);
-                    setDrawerOpen(true);
-                  }}
-                />
-              </TabsContent>
-              <TabsContent value="matrix" className="mt-4">
-                <AttendanceMatrix
-                  loading={loading}
-                  staff={filteredStaff}
-                  dates={dates}
-                  grid={grid}
-                  onSelectSession={(s) => {
-                    setSelected(s);
-                    setDrawerOpen(true);
-                  }}
-                />
-              </TabsContent>
-            </Tabs>
+            <AttendanceMatrix
+              loading={loading}
+              staff={filteredStaff}
+              dates={dates}
+              grid={grid}
+              onSelectSession={(s) => {
+                setSelected(s);
+                setDrawerOpen(true);
+              }}
+            />
           </CardContent>
         </Card>
 
@@ -675,152 +657,6 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
           Showing <span className="font-medium text-foreground">{start}</span> to{' '}
           <span className="font-medium text-foreground">{end}</span> of{' '}
           <span className="font-medium text-foreground">{staff.length}</span> Employees
-        </div>
-        <Pagination className="m-0 w-auto">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPage((p) => Math.max(1, p - 1));
-                }}
-                aria-disabled={safePage === 1}
-                className={safePage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
-              />
-            </PaginationItem>
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 2)
-              .map((p) => (
-                <PaginationItem key={p}>
-                  <PaginationLink
-                    isActive={p === safePage}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPage(p);
-                    }}
-                    className="cursor-pointer"
-                  >
-                    {p}
-                  </PaginationLink>
-                </PaginationItem>
-              ))}
-            <PaginationItem>
-              <PaginationNext
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPage((p) => Math.min(totalPages, p + 1));
-                }}
-                aria-disabled={safePage === totalPages}
-                className={
-                  safePage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'
-                }
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Daily Detail view — one row per (staff × date), paginated 15 / page
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface DailyDetailProps {
-  loading: boolean;
-  rows: Array<{ staff: StaffRow; cell: DayCell }>;
-  onSelectSession: (s: AttendanceSession) => void;
-}
-
-function DailyDetailView({ loading, rows, onSelectSession }: DailyDetailProps) {
-  const PAGE_SIZE = 15;
-  const [page, setPage] = useState(1);
-  const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
-  const safePage = Math.min(page, totalPages);
-  const visible = rows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  useEffect(() => {
-    if (page > totalPages) setPage(1);
-  }, [totalPages, page]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12 text-muted-foreground">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
-      </div>
-    );
-  }
-  if (rows.length === 0) {
-    return <div className="py-12 text-center text-muted-foreground">No records found.</div>;
-  }
-
-  const start = (safePage - 1) * PAGE_SIZE + 1;
-  const end = Math.min(safePage * PAGE_SIZE, rows.length);
-
-  return (
-    <div className="space-y-3 min-w-0">
-      <div className="w-full overflow-x-auto rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="min-w-[110px]">Employee ID</TableHead>
-              <TableHead className="min-w-[160px]">Name</TableHead>
-              <TableHead className="min-w-[120px]">Department</TableHead>
-              <TableHead className="min-w-[110px]">Date</TableHead>
-              <TableHead className="min-w-[90px]">Day</TableHead>
-              <TableHead className="text-center min-w-[100px]">First Punch</TableHead>
-              <TableHead className="text-center min-w-[100px]">Last Punch</TableHead>
-              <TableHead className="text-center min-w-[90px]">Worked</TableHead>
-              <TableHead className="text-center min-w-[80px]">Break</TableHead>
-              <TableHead className="text-center min-w-[90px]">Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {visible.map(({ staff: st, cell }, i) => {
-              const clickable = cell.sessions.length > 0;
-              return (
-                <TableRow
-                  key={`${st.id}-${cell.date}-${i}`}
-                  className={clickable ? 'cursor-pointer hover:bg-muted/30' : ''}
-                  onClick={() => clickable && onSelectSession(cell.sessions[0])}
-                >
-                  <TableCell className="font-medium whitespace-nowrap">{st.employee_id}</TableCell>
-                  <TableCell className="whitespace-nowrap">{st.full_name}</TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {st.department ?? '—'}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    {format(parseISO(cell.date), 'dd-MM-yyyy')}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground whitespace-nowrap">
-                    {format(parseISO(cell.date), 'EEE')}
-                  </TableCell>
-                  <TableCell className="text-center whitespace-nowrap">
-                    {fmtTime(cell.firstIn)}
-                  </TableCell>
-                  <TableCell className="text-center whitespace-nowrap">
-                    {fmtTime(cell.lastOut)}
-                  </TableCell>
-                  <TableCell className="text-center whitespace-nowrap">
-                    {cell.worked > 0 ? formatMinutes(cell.worked) : '—'}
-                  </TableCell>
-                  <TableCell className="text-center whitespace-nowrap text-muted-foreground">
-                    {cell.brk > 0 ? formatMinutes(cell.brk) : '—'}
-                  </TableCell>
-                  <TableCell className="text-center">{statusBadge(cell.status, cell.late)}</TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-        <div className="text-sm text-muted-foreground">
-          Showing <span className="font-medium text-foreground">{start}</span> to{' '}
-          <span className="font-medium text-foreground">{end}</span> of{' '}
-          <span className="font-medium text-foreground">{rows.length}</span> records
         </div>
         <Pagination className="m-0 w-auto">
           <PaginationContent>
