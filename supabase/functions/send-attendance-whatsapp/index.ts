@@ -6,17 +6,18 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-type Slab = 'on_time' | 'level_1' | 'level_2' | 'half_day' | 'full_day';
+type Slab = 'on_time' | 'level_1' | 'level_2' | 'half_day' | 'full_day' | 'absent' | 'penalty_waived';
 
 interface Payload {
   staff_name: string;
   staff_phone: string;
   staff_id?: string | null;
-  event_type: 'checkin' | 'checkout';
+  event_type: 'checkin' | 'checkout' | 'absent' | 'penalty_waived';
   actual_time: string;
   scheduled_time: string;
   slab: Slab;
   deduction_amount: number;
+  penalty_date?: string;
 }
 
 function formatIST(iso: string): string {
