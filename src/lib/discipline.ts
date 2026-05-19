@@ -188,6 +188,12 @@ export async function computeAndLogDiscipline(
 ): Promise<ComputeResult | null> {
   const rules = await fetchDisciplineRules();
   if (!rules) return null;
+
+  // Master penalty switch: if disabled, do not compute any fines
+  if (rules.penalties_enabled === false) {
+    return null;
+  }
+
   const assignment = await fetchStaffAssignment(input.staffId);
   if (!assignment) return null;
 
