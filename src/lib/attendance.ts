@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { computeAndLogDiscipline } from '@/lib/discipline';
 
 export type AttendanceStatus = 'active' | 'on_break' | 'completed';
 
