@@ -359,7 +359,11 @@ export async function getMonthlyDisciplineFine(
     return { totalFine: 0, logs: [] };
   }
   const logs = (data as DisciplineLogRow[]) ?? [];
-  const total = logs.reduce((s, r) => s + Number(r.fine_amount || 0), 0);
+  // Cancelled rows contribute 0 to the total
+  const total = logs.reduce(
+    (s, r) => s + (r.is_cancelled ? 0 : Number(r.fine_amount || 0)),
+    0,
+  );
   return { totalFine: Math.round(total * 100) / 100, logs };
 }
 
