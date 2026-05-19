@@ -380,13 +380,13 @@ export default function Attendance() {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6">
+      <div className="space-y-6 min-w-0 max-w-full overflow-x-hidden">
         <PageHeader
           title="Attendance"
           description="Analytical attendance report with daily detail and date-matrix views."
         />
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0">
           <StatCard
             title="Checked In Today"
             value={stats.checkedIn}
