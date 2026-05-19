@@ -11,7 +11,7 @@ type Slab = 'on_time' | 'level_1' | 'level_2' | 'half_day' | 'full_day';
 interface Payload {
   staff_name: string;
   staff_phone: string;
-  staff_id?: string;
+  staff_id?: string | null;
   event_type: 'checkin' | 'checkout';
   actual_time: string;
   scheduled_time: string;
@@ -19,78 +19,70 @@ interface Payload {
   deduction_amount: number;
 }
 
-function formatIndianTime(iso: string): string {
-  try {
-    return new Intl.DateTimeFormat('en-IN', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-      timeZone: 'Asia/Kolkata',
-    }).format(new Date(iso));
-  } catch {
-    return iso;
-  }
+function formatIST(iso: string): string {
+  return new Date(iso).toLocaleString('en-IN', {
+    timeZone: 'Asia/Kolkata',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
 }
 
-function buildTemplate(p: Payload): { name: string; params: string[] } {
-  const time = formatIndianTime(p.actual_time);
+function stripPlus(phone: string): string {
+  return phone.startsWith('+') ? phone.slice(1) : phone;
+}
+
+function buildPayload(p: Payload): { templateName: string; body: Record<string, unknown> } {
+  const to = stripPlus(p.staff_phone);
+  const timeStr = formatIST(p.actual_time);
   const amt = `₹${p.deduction_amount}`;
+
+  let templateName = '';
+  let parameters: Array<{ type: 'text'; text: string }> = [];
+
   switch (p.slab) {
     case 'on_time':
-      return { name: 'attendance_on_time', params: [p.staff_name, time] };
+      templateName = 'attendance_on_time';
+      parameters = [
+        { type: 'text', text: p.staff_name },
+        { type: 'text', text: timeStr },
+      ];
+      break;
     case 'level_1':
-      return { name: 'attendance_late_level_1', params: [p.staff_name, time, amt] };
+      templateName = 'attendance_late_level_1';
+      parameters = [
+        { type: 'text', text: p.staff_name },
+        { type: 'text', text: timeStr },
+        { type: 'text', text: amt },
+      ];
+      break;
     case 'level_2':
-      return { name: 'attendance_late_level_2', params: [p.staff_name, time, amt] };
+      templateName = 'attendance_late_level_2';
+      parameters = [
+        { type: 'text', text: p.staff_name },
+        { type: 'text', text: timeStr },
+        { type: 'text', text: amt },
+      ];
+      break;
     case 'half_day':
-      return { name: 'attendance_half_day', params: [p.staff_name, amt] };
+      templateName = 'attendance_half_day';
+      parameters = [
+        { type: 'text', text: p.staff_name },
+        { type: 'text', text: amt },
+      ];
+      break;
     case 'full_day':
-      return { name: 'attendance_full_day', params: [p.staff_name, amt] };
-  }
-}
-
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
-  );
-
-  let body: Payload;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(JSON.stringify({ success: false, error: 'Invalid JSON' }), {
-      status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      templateName = 'attendance_full_day';
+      parameters = [
+        { type: 'text', text: p.staff_name },
+        { type: 'text', text: amt },
+      ];
+      break;
   }
 
-  const required = ['staff_name', 'staff_phone', 'event_type', 'actual_time', 'scheduled_time', 'slab'];
-  for (const k of required) {
-    if (!(k in body) || (body as Record<string, unknown>)[k] == null) {
-      return new Response(JSON.stringify({ success: false, error: `Missing field: ${k}` }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-  }
-
-  const token = Deno.env.get('WHATSAPP_ACCESS_TOKEN');
-  const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID');
-  if (!token || !phoneNumberId) {
-    return new Response(JSON.stringify({ success: false, error: 'WhatsApp credentials not configured' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  const { name: templateName, params } = buildTemplate(body);
-
-  const waBody = {
+  const body = {
     messaging_product: 'whatsapp',
-    to: body.staff_phone,
+    to,
     type: 'template',
     template: {
       name: templateName,
@@ -98,44 +90,90 @@ Deno.serve(async (req) => {
       components: [
         {
           type: 'BODY',
-          parameters: params.map((text) => ({ type: 'text', text })),
+          parameters,
         },
       ],
     },
   };
+
+  return { templateName, body };
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  );
+
+  let payload: Payload;
+  try {
+    payload = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ success: false, error: 'Invalid JSON' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const accessToken = Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
+  const phoneNumberId = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')?.trim();
+
+  console.log(
+    'Token check:',
+    accessToken ? accessToken.substring(0, 10) + '...' + accessToken.slice(-5) : 'MISSING',
+  );
+  console.log('Phone number ID:', phoneNumberId ?? 'MISSING');
+
+  if (!accessToken || !phoneNumberId) {
+    return new Response(
+      JSON.stringify({ success: false, error: 'WhatsApp credentials not configured' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
+
+  const { templateName, body: waBody } = buildPayload(payload);
 
   let success = false;
   let metaMessageId: string | null = null;
   let errorMessage: string | null = null;
 
   try {
-    const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
+    const res = await fetch(
+      `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(waBody),
       },
-      body: JSON.stringify(waBody),
-    });
+    );
     const data = await res.json();
     if (!res.ok) {
       errorMessage = data?.error?.message || `Meta API error ${res.status}`;
+      console.error('Meta API rejected:', JSON.stringify(data));
     } else {
       metaMessageId = data?.messages?.[0]?.id ?? null;
       success = true;
     }
   } catch (e) {
     errorMessage = e instanceof Error ? e.message : 'Unknown error';
+    console.error('Fetch error:', errorMessage);
   }
 
   try {
     await supabase.from('whatsapp_notification_log').insert({
-      staff_id: body.staff_id ?? null,
-      staff_phone: body.staff_phone,
-      event_type: body.event_type,
-      slab: body.slab,
+      staff_id: payload.staff_id ?? null,
+      staff_phone: stripPlus(payload.staff_phone),
+      event_type: payload.event_type,
+      slab: payload.slab,
       template_name: templateName,
-      deduction_amount: body.deduction_amount ?? 0,
+      deduction_amount: payload.deduction_amount ?? 0,
       success,
       error_message: errorMessage,
       meta_message_id: metaMessageId,
@@ -145,13 +183,13 @@ Deno.serve(async (req) => {
   }
 
   if (success) {
-    return new Response(JSON.stringify({ success: true, message_id: metaMessageId }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ success: true, message_id: metaMessageId }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
-  return new Response(JSON.stringify({ success: false, error: errorMessage }), {
-    status: 502,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
+  return new Response(
+    JSON.stringify({ success: false, error: errorMessage }),
+    { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+  );
 });
