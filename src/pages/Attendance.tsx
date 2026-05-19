@@ -15,97 +15,371 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { StatCard } from '@/components/ui/stat-card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { AttendanceSession, formatMinutes } from '@/lib/attendance';
 import { SessionDetailsDrawer } from '@/components/attendance/SessionDetailsDrawer';
 import { PenaltiesPanel } from '@/components/attendance/PenaltiesPanel';
-import { format } from 'date-fns';
-import { CalendarClock, Coffee, CheckCircle2, Users, Loader2 } from 'lucide-react';
+import { format, eachDayOfInterval, startOfMonth, parseISO } from 'date-fns';
+import {
+  CalendarClock,
+  Coffee,
+  CheckCircle2,
+  Users,
+  Loader2,
+  FileSpreadsheet,
+  FileText,
+  AlertTriangle,
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { exportToPDF, downloadPDF } from '@/lib/pdf-export';
+import { toast } from 'sonner';
 
-interface Row extends AttendanceSession {
-  staff_name?: string;
+interface StaffRow {
+  id: string;
+  user_id: string | null;
+  employee_id: string;
+  full_name: string;
+  department: string | null;
+  designation: string | null;
+}
+
+type Status = 'FD' | 'HD' | 'P' | 'Absent' | 'Leave';
+
+interface DayCell {
+  date: string;
+  sessions: AttendanceSession[];
+  firstIn: string | null;
+  lastOut: string | null;
+  worked: number;
+  brk: number;
+  status: Status;
+  onLeave: boolean;
+  late: boolean;
+}
+
+const FD_THRESHOLD = 8 * 60; // 8h
+const HD_THRESHOLD = 4 * 60; // 4h
+
+function deriveStatus(worked: number, hasSession: boolean, onLeave: boolean): Status {
+  if (onLeave) return 'Leave';
+  if (!hasSession) return 'Absent';
+  if (worked >= FD_THRESHOLD) return 'FD';
+  if (worked >= HD_THRESHOLD) return 'HD';
+  return 'P';
+}
+
+function statusBadge(status: Status, late?: boolean) {
+  const colors: Record<Status, string> = {
+    FD: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    HD: 'bg-amber-100 text-amber-800 border-amber-200',
+    P: 'bg-blue-100 text-blue-800 border-blue-200',
+    Absent: 'bg-rose-100 text-rose-800 border-rose-200',
+    Leave: 'bg-violet-100 text-violet-800 border-violet-200',
+  };
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs font-medium ${colors[status]}`}>
+      {status}
+      {late && <AlertTriangle className="h-3 w-3 text-amber-600" />}
+    </span>
+  );
+}
+
+function fmtTime(iso: string | null): string {
+  if (!iso) return '—';
+  return format(new Date(iso), 'hh:mm a');
 }
 
 export default function Attendance() {
   const { isOwner, isAdmin, isCA } = useAuth();
   const canView = isOwner || isAdmin || isCA;
 
-  const today = format(new Date(), 'yyyy-MM-dd');
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+  const [from, setFrom] = useState(monthStart);
+  const [to, setTo] = useState(todayStr);
   const [search, setSearch] = useState('');
-  const [rows, setRows] = useState<Row[]>([]);
+  const [department, setDepartment] = useState<string>('all');
+  const [tab, setTab] = useState('daily');
+
+  const [staff, setStaff] = useState<StaffRow[]>([]);
+  const [sessions, setSessions] = useState<AttendanceSession[]>([]);
+  const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set()); // `${staffId}|${date}`
   const [loading, setLoading] = useState(true);
+
   const [selected, setSelected] = useState<AttendanceSession | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (!canView) return;
-    fetchRows();
+    fetchAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
-  const fetchRows = async () => {
+  const fetchAll = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('attendance_sessions' as never)
-        .select('*')
-        .gte('work_date', from)
-        .lte('work_date', to)
-        .order('check_in_at', { ascending: false });
-      if (error) throw error;
-      const sessions = (data as AttendanceSession[]) ?? [];
-
-      // Fetch staff names
-      const staffIds = Array.from(new Set(sessions.map((s) => s.staff_id).filter(Boolean))) as string[];
-      const userIds = Array.from(new Set(sessions.map((s) => s.user_id))) as string[];
-      let nameMap: Record<string, string> = {};
-      if (staffIds.length || userIds.length) {
-        const { data: staff } = await supabase
+      const [staffRes, sessRes, leaveRes] = await Promise.all([
+        supabase
           .from('staff')
-          .select('id, user_id, full_name')
-          .or(
-            [
-              staffIds.length ? `id.in.(${staffIds.join(',')})` : '',
-              userIds.length ? `user_id.in.(${userIds.join(',')})` : '',
-            ]
-              .filter(Boolean)
-              .join(','),
-          );
-        (staff ?? []).forEach((s: { id: string; user_id: string | null; full_name: string }) => {
-          nameMap[s.id] = s.full_name;
-          if (s.user_id) nameMap[s.user_id] = s.full_name;
-        });
-      }
+          .select('id, user_id, employee_id, full_name, department, designation, is_active, attendance_tracked')
+          .eq('is_active', true)
+          .eq('attendance_tracked', true)
+          .order('employee_id', { ascending: false }),
+        supabase
+          .from('attendance_sessions' as never)
+          .select('*')
+          .gte('work_date', from)
+          .lte('work_date', to)
+          .order('check_in_at', { ascending: true }),
+        supabase
+          .from('leave_records')
+          .select('staff_id, leave_date, status')
+          .eq('status', 'approved')
+          .gte('leave_date', from)
+          .lte('leave_date', to),
+      ]);
 
-      setRows(
-        sessions.map((s) => ({
-          ...s,
-          staff_name: nameMap[s.staff_id ?? ''] || nameMap[s.user_id] || 'Unknown',
-        })),
+      if (staffRes.error) throw staffRes.error;
+      if (sessRes.error) throw sessRes.error;
+      if (leaveRes.error) throw leaveRes.error;
+
+      setStaff((staffRes.data as StaffRow[]) ?? []);
+      setSessions((sessRes.data as AttendanceSession[]) ?? []);
+      const set = new Set<string>();
+      (leaveRes.data ?? []).forEach((l: { staff_id: string; leave_date: string }) =>
+        set.add(`${l.staff_id}|${l.leave_date}`),
       );
+      setLeaveDates(set);
     } catch (e) {
       console.error('Attendance fetch error', e);
+      toast.error('Failed to load attendance');
     } finally {
       setLoading(false);
     }
   };
 
-  const filtered = useMemo(() => {
-    if (!search.trim()) return rows;
-    const q = search.toLowerCase();
-    return rows.filter((r) => (r.staff_name ?? '').toLowerCase().includes(q));
-  }, [rows, search]);
+  const departments = useMemo(() => {
+    const ds = new Set<string>();
+    staff.forEach((s) => s.department && ds.add(s.department));
+    return Array.from(ds).sort();
+  }, [staff]);
+
+  const filteredStaff = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return staff.filter((s) => {
+      if (department !== 'all' && s.department !== department) return false;
+      if (!q) return true;
+      return (
+        s.full_name.toLowerCase().includes(q) ||
+        s.employee_id.toLowerCase().includes(q)
+      );
+    });
+  }, [staff, department, search]);
+
+  const dates = useMemo(() => {
+    try {
+      return eachDayOfInterval({ start: parseISO(from), end: parseISO(to) }).map((d) =>
+        format(d, 'yyyy-MM-dd'),
+      );
+    } catch {
+      return [];
+    }
+  }, [from, to]);
+
+  // Build staff×date map of aggregated DayCell
+  const grid = useMemo(() => {
+    const sessByStaff: Record<string, Record<string, AttendanceSession[]>> = {};
+    sessions.forEach((s) => {
+      const key = s.staff_id ?? s.user_id;
+      if (!key) return;
+      sessByStaff[key] ??= {};
+      sessByStaff[key][s.work_date] ??= [];
+      sessByStaff[key][s.work_date].push(s);
+    });
+
+    const out: Record<string, Record<string, DayCell>> = {};
+    filteredStaff.forEach((st) => {
+      out[st.id] = {};
+      dates.forEach((d) => {
+        const sList =
+          sessByStaff[st.id]?.[d] ??
+          (st.user_id ? sessByStaff[st.user_id]?.[d] : undefined) ??
+          [];
+        const sorted = [...sList].sort(
+          (a, b) => new Date(a.check_in_at).getTime() - new Date(b.check_in_at).getTime(),
+        );
+        const worked = sorted.reduce((sum, s) => sum + (s.worked_minutes || 0), 0);
+        const brk = sorted.reduce((sum, s) => sum + (s.total_break_minutes || 0), 0);
+        const onLeave = leaveDates.has(`${st.id}|${d}`);
+        const firstIn = sorted[0]?.check_in_at ?? null;
+        const lastOut = [...sorted].reverse().find((s) => s.check_out_at)?.check_out_at ?? null;
+        const late = sorted.some((s) => s.late_checkout);
+        out[st.id][d] = {
+          date: d,
+          sessions: sorted,
+          firstIn,
+          lastOut,
+          worked,
+          brk,
+          status: deriveStatus(worked, sorted.length > 0, onLeave),
+          onLeave,
+          late,
+        };
+      });
+    });
+    return out;
+  }, [filteredStaff, dates, sessions, leaveDates]);
+
+  // Flatten for daily detail view: one row per (staff × date)
+  const dailyRows = useMemo(() => {
+    const rows: Array<{ staff: StaffRow; cell: DayCell }> = [];
+    filteredStaff.forEach((st) => {
+      dates.forEach((d) => {
+        const cell = grid[st.id]?.[d];
+        if (cell) rows.push({ staff: st, cell });
+      });
+    });
+    // Sort: latest date first, then employee id desc
+    return rows.sort((a, b) => {
+      if (a.cell.date !== b.cell.date) return a.cell.date < b.cell.date ? 1 : -1;
+      return a.staff.employee_id < b.staff.employee_id ? 1 : -1;
+    });
+  }, [filteredStaff, dates, grid]);
 
   const stats = useMemo(() => {
-    const todayRows = rows.filter((r) => r.work_date === today);
+    const todayRows = sessions.filter((r) => r.work_date === todayStr);
     return {
       checkedIn: todayRows.filter((r) => r.status === 'active').length,
       onBreak: todayRows.filter((r) => r.status === 'on_break').length,
       completed: todayRows.filter((r) => r.status === 'completed').length,
-      total: todayRows.length,
+      absentToday: filteredStaff.filter((st) => {
+        const c = grid[st.id]?.[todayStr];
+        return c && c.status === 'Absent';
+      }).length,
     };
-  }, [rows, today]);
+  }, [sessions, filteredStaff, grid, todayStr]);
+
+  const periodLabel = `${format(parseISO(from), 'dd MMM yyyy')} – ${format(parseISO(to), 'dd MMM yyyy')}`;
+
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // Daily Detail sheet
+    const detailHeaders = [
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Designation',
+      'Date',
+      'Day',
+      'First Punch',
+      'Last Punch',
+      'Total Working Hours',
+      'Total Break Hours',
+      'Status',
+    ];
+    const detailData = dailyRows.map(({ staff: st, cell }) => [
+      st.employee_id,
+      st.full_name,
+      st.department ?? '',
+      st.designation ?? '',
+      format(parseISO(cell.date), 'dd-MM-yyyy'),
+      format(parseISO(cell.date), 'EEEE'),
+      fmtTime(cell.firstIn),
+      fmtTime(cell.lastOut),
+      formatMinutes(cell.worked),
+      formatMinutes(cell.brk),
+      cell.status + (cell.late ? ' (Late)' : ''),
+    ]);
+    const ws1 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailData]);
+    XLSX.utils.book_append_sheet(wb, ws1, 'Daily Detail');
+
+    // Matrix sheet
+    const matrixHeaders = [
+      'Employee ID',
+      'Employee Name',
+      'Department',
+      'Designation',
+      ...dates.map((d) => format(parseISO(d), 'dd-MM-yyyy')),
+    ];
+    const matrixData = filteredStaff.map((st) => [
+      st.employee_id,
+      st.full_name,
+      st.department ?? '',
+      st.designation ?? '',
+      ...dates.map((d) => {
+        const c = grid[st.id]?.[d];
+        if (!c) return '-';
+        if (c.status === 'Leave') return 'Leave';
+        if (c.status === 'Absent') return 'A';
+        const parts = [fmtTime(c.firstIn)];
+        if (c.lastOut) parts.push(fmtTime(c.lastOut));
+        return parts.join(' / ');
+      }),
+    ]);
+    const ws2 = XLSX.utils.aoa_to_sheet([matrixHeaders, ...matrixData]);
+    XLSX.utils.book_append_sheet(wb, ws2, 'Date Matrix');
+
+    XLSX.writeFile(wb, `Attendance_${from}_to_${to}.xlsx`);
+    toast.success('Excel exported');
+  };
+
+  const handleExportPDF = () => {
+    if (tab === 'daily') {
+      const doc = exportToPDF({
+        title: 'Attendance Report — Daily Detail',
+        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
+        headers: ['Emp ID', 'Name', 'Dept', 'Date', 'Day', 'First', 'Last', 'Work', 'Break', 'Status'],
+        data: dailyRows.map(({ staff: st, cell }) => [
+          st.employee_id,
+          st.full_name,
+          st.department ?? '',
+          format(parseISO(cell.date), 'dd-MM-yy'),
+          format(parseISO(cell.date), 'EEE'),
+          fmtTime(cell.firstIn),
+          fmtTime(cell.lastOut),
+          formatMinutes(cell.worked),
+          formatMinutes(cell.brk),
+          cell.status + (cell.late ? '*' : ''),
+        ]),
+        dateRange: { from: parseISO(from), to: parseISO(to) },
+      });
+      downloadPDF(doc, 'attendance_daily');
+    } else {
+      const doc = exportToPDF({
+        title: 'Attendance Report — Date Matrix',
+        subtitle: department !== 'all' ? `Department: ${department}` : 'All Departments',
+        headers: ['Emp ID', 'Name', ...dates.map((d) => format(parseISO(d), 'dd-MM'))],
+        data: filteredStaff.map((st) => [
+          st.employee_id,
+          st.full_name,
+          ...dates.map((d) => {
+            const c = grid[st.id]?.[d];
+            if (!c) return '-';
+            if (c.status === 'Leave') return 'L';
+            if (c.status === 'Absent') return 'A';
+            return c.status;
+          }),
+        ]),
+        dateRange: { from: parseISO(from), to: parseISO(to) },
+      });
+      downloadPDF(doc, 'attendance_matrix');
+    }
+    toast.success('PDF exported');
+  };
 
   if (!canView) {
     return (
@@ -116,150 +390,309 @@ export default function Attendance() {
   }
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Attendance"
-        description="Live check-in / check-out records with photos and locations."
-      />
+    <TooltipProvider>
+      <div className="space-y-6">
+        <PageHeader
+          title="Attendance"
+          description="Analytical attendance report with daily detail and date-matrix views."
+        />
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          title="Checked In Today"
-          value={stats.checkedIn}
-          subtitle="Currently on shift"
-          icon={CalendarClock}
-          color="green"
-        />
-        <StatCard
-          title="On Break"
-          value={stats.onBreak}
-          subtitle="Right now"
-          icon={Coffee}
-          color="orange"
-        />
-        <StatCard
-          title="Completed Today"
-          value={stats.completed}
-          subtitle="Shifts finished"
-          icon={CheckCircle2}
-          color="blue"
-        />
-        <StatCard
-          title="Total Sessions Today"
-          value={stats.total}
-          subtitle="Across all staff"
-          icon={Users}
-          color="purple"
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard
+            title="Checked In Today"
+            value={stats.checkedIn}
+            subtitle="Currently on shift"
+            icon={CalendarClock}
+            color="green"
+          />
+          <StatCard
+            title="On Break"
+            value={stats.onBreak}
+            subtitle="Right now"
+            icon={Coffee}
+            color="orange"
+          />
+          <StatCard
+            title="Completed Today"
+            value={stats.completed}
+            subtitle="Shifts finished"
+            icon={CheckCircle2}
+            color="blue"
+          />
+          <StatCard
+            title="Absent Today"
+            value={stats.absentToday}
+            subtitle="No check-in"
+            icon={Users}
+            color="pink"
+          />
+        </div>
+
+        <Card className="rounded-2xl border-0 shadow-card">
+          <CardContent className="p-4 md:p-6 space-y-4">
+            {/* Filter bar */}
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">From</label>
+                <Input
+                  type="date"
+                  value={from}
+                  onChange={(e) => setFrom(e.target.value)}
+                  className="w-[160px]"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground">To</label>
+                <Input
+                  type="date"
+                  value={to}
+                  onChange={(e) => setTo(e.target.value)}
+                  className="w-[160px]"
+                />
+              </div>
+              <div className="w-[200px]">
+                <label className="text-xs text-muted-foreground">Department</label>
+                <Select value={department} onValueChange={setDepartment}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <label className="text-xs text-muted-foreground">Search</label>
+                <Input
+                  placeholder="Name or Employee ID…"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
+              <Button variant="outline" onClick={fetchAll}>
+                Refresh
+              </Button>
+              <Button variant="outline" onClick={handleExportExcel} className="gap-2">
+                <FileSpreadsheet className="h-4 w-4" /> Export Excel
+              </Button>
+              <Button variant="outline" onClick={handleExportPDF} className="gap-2">
+                <FileText className="h-4 w-4" /> Export PDF
+              </Button>
+            </div>
+
+            {/* Legend */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              {statusBadge('FD')} <span className="text-muted-foreground self-center">Full Day (≥8h)</span>
+              {statusBadge('HD')} <span className="text-muted-foreground self-center">Half Day (≥4h)</span>
+              {statusBadge('P')} <span className="text-muted-foreground self-center">Present (&lt;4h)</span>
+              {statusBadge('Absent')} <span className="text-muted-foreground self-center">No check-in</span>
+              {statusBadge('Leave')} <span className="text-muted-foreground self-center">Approved leave</span>
+            </div>
+
+            <Tabs value={tab} onValueChange={setTab}>
+              <TabsList>
+                <TabsTrigger value="daily">Daily Detail</TabsTrigger>
+                <TabsTrigger value="matrix">Date Matrix</TabsTrigger>
+              </TabsList>
+
+              {/* Daily Detail */}
+              <TabsContent value="daily" className="mt-4">
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                  </div>
+                ) : dailyRows.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">No records found.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border">
+                    <Table>
+                      <TableHeader className="bg-muted/50">
+                        <TableRow>
+                          <TableHead>Employee ID</TableHead>
+                          <TableHead>Employee Name</TableHead>
+                          <TableHead>Department</TableHead>
+                          <TableHead>Designation</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Day</TableHead>
+                          <TableHead>First Punch</TableHead>
+                          <TableHead>Last Punch</TableHead>
+                          <TableHead>Total Working Hours</TableHead>
+                          <TableHead>Total Break Hours</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {dailyRows.slice(0, 500).map(({ staff: st, cell }) => (
+                          <TableRow
+                            key={`${st.id}-${cell.date}`}
+                            className={cell.sessions.length > 0 ? 'cursor-pointer hover:bg-muted/40' : ''}
+                            onClick={() => {
+                              if (cell.sessions[0]) {
+                                setSelected(cell.sessions[0]);
+                                setDrawerOpen(true);
+                              }
+                            }}
+                          >
+                            <TableCell className="font-medium">{st.employee_id}</TableCell>
+                            <TableCell>{st.full_name}</TableCell>
+                            <TableCell>{st.department ?? '—'}</TableCell>
+                            <TableCell>{st.designation ?? '—'}</TableCell>
+                            <TableCell>{format(parseISO(cell.date), 'dd-MM-yyyy')}</TableCell>
+                            <TableCell>{format(parseISO(cell.date), 'EEEE')}</TableCell>
+                            <TableCell>{fmtTime(cell.firstIn)}</TableCell>
+                            <TableCell>{fmtTime(cell.lastOut)}</TableCell>
+                            <TableCell>{cell.worked > 0 ? formatMinutes(cell.worked) : '—'}</TableCell>
+                            <TableCell>{cell.brk > 0 ? formatMinutes(cell.brk) : '—'}</TableCell>
+                            <TableCell>{statusBadge(cell.status, cell.late)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {dailyRows.length > 500 && (
+                      <div className="p-3 text-center text-xs text-muted-foreground">
+                        Showing first 500 of {dailyRows.length} rows. Narrow your filters or export
+                        for the full list.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </TabsContent>
+
+              {/* Date Matrix */}
+              <TabsContent value="matrix" className="mt-4">
+                {loading ? (
+                  <div className="flex items-center justify-center py-12 text-muted-foreground">
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                  </div>
+                ) : filteredStaff.length === 0 || dates.length === 0 ? (
+                  <div className="py-12 text-center text-muted-foreground">No records found.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border max-h-[70vh]">
+                    <Table>
+                      <TableHeader className="bg-muted/50 sticky top-0 z-10">
+                        <TableRow>
+                          <TableHead className="sticky left-0 bg-muted/50 z-20 min-w-[100px]">
+                            Emp ID
+                          </TableHead>
+                          <TableHead className="sticky left-[100px] bg-muted/50 z-20 min-w-[180px]">
+                            Employee Name
+                          </TableHead>
+                          <TableHead className="min-w-[140px]">Department</TableHead>
+                          <TableHead className="min-w-[140px]">Designation</TableHead>
+                          {dates.map((d) => (
+                            <TableHead key={d} className="text-center min-w-[110px]">
+                              <div>{format(parseISO(d), 'dd-MM-yyyy')}</div>
+                              <div className="text-xs font-normal text-muted-foreground">
+                                {format(parseISO(d), 'EEE')}
+                              </div>
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredStaff.map((st) => (
+                          <TableRow key={st.id}>
+                            <TableCell className="sticky left-0 bg-background z-10 font-medium">
+                              {st.employee_id}
+                            </TableCell>
+                            <TableCell className="sticky left-[100px] bg-background z-10">
+                              {st.full_name}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {st.department ?? '—'}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {st.designation ?? '—'}
+                            </TableCell>
+                            {dates.map((d) => {
+                              const c = grid[st.id]?.[d];
+                              if (!c) return <TableCell key={d}>—</TableCell>;
+                              const cellBg =
+                                c.status === 'Absent'
+                                  ? 'bg-rose-50'
+                                  : c.status === 'Leave'
+                                    ? 'bg-violet-50'
+                                    : c.status === 'FD'
+                                      ? 'bg-emerald-50'
+                                      : c.status === 'HD'
+                                        ? 'bg-amber-50'
+                                        : 'bg-blue-50';
+                              return (
+                                <TableCell key={d} className={`text-center text-xs ${cellBg}`}>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="w-full flex flex-col items-center gap-0.5"
+                                        onClick={() => {
+                                          if (c.sessions[0]) {
+                                            setSelected(c.sessions[0]);
+                                            setDrawerOpen(true);
+                                          }
+                                        }}
+                                      >
+                                        {c.status === 'Absent' ? (
+                                          <span className="font-medium text-rose-700">A</span>
+                                        ) : c.status === 'Leave' ? (
+                                          <span className="font-medium text-violet-700">L</span>
+                                        ) : (
+                                          <>
+                                            <span className="font-medium">{fmtTime(c.firstIn)}</span>
+                                            {c.lastOut && (
+                                              <span className="text-muted-foreground">
+                                                {fmtTime(c.lastOut)}
+                                              </span>
+                                            )}
+                                          </>
+                                        )}
+                                        {c.late && (
+                                          <AlertTriangle className="h-3 w-3 text-amber-600" />
+                                        )}
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <div className="text-xs">
+                                        <div>
+                                          <span className="font-semibold">{c.status}</span>
+                                          {c.late && ' • Late'}
+                                        </div>
+                                        {c.worked > 0 && (
+                                          <div>Worked: {formatMinutes(c.worked)}</div>
+                                        )}
+                                        {c.brk > 0 && <div>Break: {formatMinutes(c.brk)}</div>}
+                                        {c.sessions.length > 1 && (
+                                          <div>{c.sessions.length} sessions</div>
+                                        )}
+                                      </div>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TableCell>
+                              );
+                            })}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+
+        <PenaltiesPanel />
+
+        <SessionDetailsDrawer
+          open={drawerOpen}
+          onOpenChange={setDrawerOpen}
+          session={selected}
         />
       </div>
-
-      <Card className="rounded-2xl border-0 shadow-card">
-        <CardContent className="p-4 md:p-6 space-y-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div>
-              <label className="text-xs text-muted-foreground">From</label>
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-                className="w-[160px]"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground">To</label>
-              <Input
-                type="date"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-                className="w-[160px]"
-              />
-            </div>
-            <div className="flex-1 min-w-[200px]">
-              <label className="text-xs text-muted-foreground">Search staff</label>
-              <Input
-                placeholder="Name…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button variant="outline" onClick={fetchRows}>
-              Refresh
-            </Button>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-12 text-muted-foreground">
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Loading…
-            </div>
-          ) : filtered.length === 0 ? (
-            <div className="py-12 text-center text-muted-foreground">No sessions found.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Staff</TableHead>
-                    <TableHead>Work date</TableHead>
-                    <TableHead>Check-in</TableHead>
-                    <TableHead>Check-out</TableHead>
-                    <TableHead>Worked</TableHead>
-                    <TableHead>Break</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.map((r) => (
-                    <TableRow
-                      key={r.id}
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setSelected(r);
-                        setDrawerOpen(true);
-                      }}
-                    >
-                      <TableCell className="font-medium">{r.staff_name}</TableCell>
-                      <TableCell>{format(new Date(r.work_date), 'dd MMM yyyy')}</TableCell>
-                      <TableCell>{format(new Date(r.check_in_at), 'hh:mm a')}</TableCell>
-                      <TableCell>
-                        {r.check_out_at ? format(new Date(r.check_out_at), 'hh:mm a') : '—'}
-                      </TableCell>
-                      <TableCell>{formatMinutes(r.worked_minutes)}</TableCell>
-                      <TableCell>{formatMinutes(r.total_break_minutes)}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            r.status === 'completed'
-                              ? 'secondary'
-                              : r.status === 'on_break'
-                              ? 'outline'
-                              : 'default'
-                          }
-                        >
-                          {r.status}
-                        </Badge>
-                        {r.late_checkout && (
-                          <Badge variant="destructive" className="ml-1">
-                            late
-                          </Badge>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <PenaltiesPanel />
-
-      <SessionDetailsDrawer
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        session={selected}
-      />
-    </div>
+    </TooltipProvider>
   );
 }
