@@ -409,6 +409,12 @@ export default function Settings() {
           </CardContent>
         </Card>
 
+        {/* Attendance Coverage (Owner) */}
+        <AttendanceCoverageCard />
+
+        {/* Discipline Rules (Owner) */}
+        <DisciplineRulesCard />
+
         {/* Clear Transaction Data - Owner Only */}
         <ClearTransactionDataCard />
 
@@ -417,12 +423,6 @@ export default function Settings() {
 
         {/* Clubs Management */}
         <ManageClubsCard />
-
-        {/* Attendance Coverage (Owner) */}
-        <AttendanceCoverageCard />
-
-        {/* Discipline Rules (Owner) */}
-        <DisciplineRulesCard />
       </div>
     </div>
   );
