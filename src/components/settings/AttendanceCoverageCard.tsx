@@ -57,7 +57,7 @@ export function AttendanceCoverageCard() {
     }
   };
 
-  if (!isOwner) return null;
+  if (!canManage) return null;
 
   const filtered = rows.filter((r) =>
     r.full_name.toLowerCase().includes(search.toLowerCase()),
