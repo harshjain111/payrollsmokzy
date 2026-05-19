@@ -222,6 +222,7 @@ Deno.serve(async (req) => {
               scheduled_time: schedIso,
               slab: 'absent',
               deduction_amount: fine,
+              penalty_date: workDate,
             },
           },
         );
