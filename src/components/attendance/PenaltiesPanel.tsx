@@ -66,20 +66,24 @@ export function PenaltiesPanel() {
       if (error) throw error;
       const logs = (data as DisciplineLogRow[]) ?? [];
       const staffIds = Array.from(new Set(logs.map((l) => l.staff_id)));
-      const nameMap: Record<string, string> = {};
+      const infoMap: Record<string, { name: string; phone: string | null }> = {};
       if (staffIds.length) {
         const { data: staff } = await supabase
           .from('staff')
-          .select('id, full_name')
+          .select('id, full_name, phone')
           .in('id', staffIds);
-        (staff ?? []).forEach((s: { id: string; full_name: string }) => {
-          nameMap[s.id] = s.full_name;
+        (staff ?? []).forEach((s: { id: string; full_name: string; phone: string | null }) => {
+          infoMap[s.id] = { name: s.full_name, phone: s.phone };
         });
       }
       setRows(
         logs
           .filter((l) => l.fine_amount > 0 || l.is_absent)
-          .map((l) => ({ ...l, staff_name: nameMap[l.staff_id] || 'Unknown' })),
+          .map((l) => ({
+            ...l,
+            staff_name: infoMap[l.staff_id]?.name || 'Unknown',
+            staff_phone: infoMap[l.staff_id]?.phone ?? null,
+          })),
       );
     } catch (e) {
       console.error('Penalties load failed', e);
