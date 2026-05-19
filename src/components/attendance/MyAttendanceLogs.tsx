@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AttendanceSession, formatMinutes } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarClock, Loader2, AlertTriangle } from 'lucide-react';
