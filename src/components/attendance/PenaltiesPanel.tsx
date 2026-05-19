@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 
 interface Row extends DisciplineLogRow {
   staff_name?: string;
+  staff_phone?: string | null;
 }
 
 export function PenaltiesPanel() {
