@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AttendanceSession, formatMinutes } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
 import { format } from 'date-fns';
 import { CalendarClock, Loader2 } from 'lucide-react';
