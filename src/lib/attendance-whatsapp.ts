@@ -174,6 +174,10 @@ export async function notifyCheckoutWhatsapp(
     if (!staff || staff.attendance_tracked === false) return;
     const rules = await fetchDisciplineRules();
     if (!rules) return;
+
+    // Master switch off: never send any check-out fine message
+    if (rules.penalties_enabled === false) return;
+
     const { scheduledIn, scheduledOut } = await getScheduledTimes(staffId);
     if (!scheduledOut) return;
 
