@@ -25,7 +25,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { format } from 'date-fns';
-import { Ban, Loader2, RotateCcw, ShieldAlert } from 'lucide-react';
+import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface Row extends DisciplineLogRow {
@@ -44,6 +45,7 @@ export function PenaltiesPanel() {
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unscheduledStaff, setUnscheduledStaff] = useState<string[]>([]);
 
   const [target, setTarget] = useState<Row | null>(null);
   const [reason, setReason] = useState('');
@@ -90,6 +92,41 @@ export function PenaltiesPanel() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
+
+  // Coverage check: tracked + active staff with no shift assignment.
+  // Without an assignment, the system has no scheduled in/out time → it
+  // cannot decide if a check-in is late, so NO fine is logged and NO
+  // WhatsApp message is sent. This is the silent-failure mode that caused
+  // today's penalties to be skipped despite rules being enabled.
+  useEffect(() => {
+    if (!canManage) return;
+    (async () => {
+      try {
+        const { data: staff } = await supabase
+          .from('staff')
+          .select('id, full_name')
+          .eq('is_active', true)
+          .eq('attendance_tracked', true);
+        const list = (staff ?? []) as { id: string; full_name: string }[];
+        if (list.length === 0) {
+          setUnscheduledStaff([]);
+          return;
+        }
+        const { data: assigns } = await supabase
+          .from('staff_shift_assignments' as never)
+          .select('staff_id')
+          .in('staff_id', list.map((s) => s.id));
+        const assigned = new Set(
+          ((assigns as { staff_id: string }[]) ?? []).map((a) => a.staff_id),
+        );
+        setUnscheduledStaff(
+          list.filter((s) => !assigned.has(s.id)).map((s) => s.full_name),
+        );
+      } catch (e) {
+        console.error('Coverage check failed', e);
+      }
+    })();
+  }, [canManage]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -165,6 +202,34 @@ export function PenaltiesPanel() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {unscheduledStaff.length > 0 && (
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-600 shrink-0" />
+              <div className="space-y-1">
+                <p className="font-semibold text-amber-900 dark:text-amber-200">
+                  {unscheduledStaff.length} tracked staff have no shift assigned — penalties and
+                  WhatsApp messages are being SKIPPED for them.
+                </p>
+                <p className="text-xs text-amber-800/90 dark:text-amber-200/80">
+                  Without a scheduled check-in / check-out time, the system can't tell if anyone
+                  is late, so no fine is logged and no message is sent. Assign a shift to fix.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Missing: {unscheduledStaff.slice(0, 6).join(', ')}
+                  {unscheduledStaff.length > 6 ? ` +${unscheduledStaff.length - 6} more` : ''}
+                </p>
+                <Link
+                  to="/shifts"
+                  className="inline-block text-xs font-medium text-primary hover:underline mt-1"
+                >
+                  Go to Shifts →
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <Label className="text-xs text-muted-foreground">From</Label>
