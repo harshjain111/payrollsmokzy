@@ -253,7 +253,19 @@ export default function Settlements() {
 
       // Use finalDeductionDays from leave records (with owner override)
       const leaveDeduction = dailySalary * finalDeductionDays;
-      const grossSalary = Math.max(0, proRataSalary - leaveDeduction);
+
+      // Discipline fine for the month (skipped for untracked staff: returns 0)
+      let disciplineFine = 0;
+      if (currentStaff && (currentStaff as Staff & { attendance_tracked?: boolean }).attendance_tracked !== false) {
+        const { totalFine } = await getMonthlyDisciplineFine(
+          selectedStaffId,
+          selectedMonth,
+          monthlySalary,
+        );
+        disciplineFine = totalFine;
+      }
+
+      const grossSalary = Math.max(0, proRataSalary - leaveDeduction - disciplineFine);
       const advancesOutstanding = Number(advanceData) || 0;
       
       // Don't auto-set advance adjustment — let admin enter it manually (default 0)
@@ -283,6 +295,7 @@ export default function Settlements() {
         finalDeductionDays,
         deductionAdjustmentReason,
         leaveDeduction,
+        disciplineFine,
         grossSalary,
         advancesOutstanding,
         advanceToAdjust: currentAdj,
