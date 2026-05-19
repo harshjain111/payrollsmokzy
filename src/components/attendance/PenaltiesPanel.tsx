@@ -93,6 +93,41 @@ export function PenaltiesPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [from, to]);
 
+  // Coverage check: tracked + active staff with no shift assignment.
+  // Without an assignment, the system has no scheduled in/out time → it
+  // cannot decide if a check-in is late, so NO fine is logged and NO
+  // WhatsApp message is sent. This is the silent-failure mode that caused
+  // today's penalties to be skipped despite rules being enabled.
+  useEffect(() => {
+    if (!canManage) return;
+    (async () => {
+      try {
+        const { data: staff } = await supabase
+          .from('staff')
+          .select('id, full_name')
+          .eq('is_active', true)
+          .eq('attendance_tracked', true);
+        const list = (staff ?? []) as { id: string; full_name: string }[];
+        if (list.length === 0) {
+          setUnscheduledStaff([]);
+          return;
+        }
+        const { data: assigns } = await supabase
+          .from('staff_shift_assignments' as never)
+          .select('staff_id')
+          .in('staff_id', list.map((s) => s.id));
+        const assigned = new Set(
+          ((assigns as { staff_id: string }[]) ?? []).map((a) => a.staff_id),
+        );
+        setUnscheduledStaff(
+          list.filter((s) => !assigned.has(s.id)).map((s) => s.full_name),
+        );
+      } catch (e) {
+        console.error('Coverage check failed', e);
+      }
+    })();
+  }, [canManage]);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
