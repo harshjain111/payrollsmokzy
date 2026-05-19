@@ -483,34 +483,16 @@ export default function Attendance() {
               {statusBadge('Leave')} <span className="text-muted-foreground self-center">Approved leave</span>
             </div>
 
-            <Tabs defaultValue="daily" className="w-full min-w-0">
-              <TabsList>
-                <TabsTrigger value="daily">Daily Detail</TabsTrigger>
-                <TabsTrigger value="matrix">Date Matrix</TabsTrigger>
-              </TabsList>
-              <TabsContent value="daily" className="mt-4">
-                <DailyDetailView
-                  loading={loading}
-                  rows={dailyRows}
-                  onSelectSession={(s) => {
-                    setSelected(s);
-                    setDrawerOpen(true);
-                  }}
-                />
-              </TabsContent>
-              <TabsContent value="matrix" className="mt-4">
-                <AttendanceMatrix
-                  loading={loading}
-                  staff={filteredStaff}
-                  dates={dates}
-                  grid={grid}
-                  onSelectSession={(s) => {
-                    setSelected(s);
-                    setDrawerOpen(true);
-                  }}
-                />
-              </TabsContent>
-            </Tabs>
+            <AttendanceMatrix
+              loading={loading}
+              staff={filteredStaff}
+              dates={dates}
+              grid={grid}
+              onSelectSession={(s) => {
+                setSelected(s);
+                setDrawerOpen(true);
+              }}
+            />
           </CardContent>
         </Card>
 
