@@ -114,6 +114,10 @@ export function AttendanceWidget() {
     }
   };
 
+  // If staff is not tracked in attendance, hide the widget entirely
+  const tracked = (staffData as unknown as { attendance_tracked?: boolean })?.attendance_tracked !== false;
+  if (!tracked) return null;
+
   if (isLoading) {
     return (
       <Card className="rounded-2xl shadow-card border-0">

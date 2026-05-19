@@ -46,6 +46,8 @@ import { format } from 'date-fns';
 import { ClearTransactionDataCard } from '@/components/settings/ClearTransactionDataCard';
 import { ManageCategoriesCard } from '@/components/settings/ManageCategoriesCard';
 import { ManageClubsCard } from '@/components/settings/ManageClubsCard';
+import { DisciplineRulesCard } from '@/components/settings/DisciplineRulesCard';
+import { AttendanceCoverageCard } from '@/components/settings/AttendanceCoverageCard';
 
 export default function Settings() {
   const { user, userRole, signOut, staffData } = useAuth();
@@ -415,6 +417,12 @@ export default function Settings() {
 
         {/* Clubs Management */}
         <ManageClubsCard />
+
+        {/* Attendance Coverage (Owner) */}
+        <AttendanceCoverageCard />
+
+        {/* Discipline Rules (Owner) */}
+        <DisciplineRulesCard />
       </div>
     </div>
   );
