@@ -36,7 +36,7 @@ export function AttendanceCoverageCard() {
     if (error) {
       toast.error('Failed to load staff');
     } else {
-      setRows((data as Row[]) ?? []);
+      setRows((data as unknown as Row[]) ?? []);
     }
     setLoading(false);
   };
