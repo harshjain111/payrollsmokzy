@@ -25,6 +25,8 @@ export interface AttendanceSession {
   late_checkout: boolean;
   created_at: string;
   updated_at: string;
+  overtime_reminder_sent?: boolean;
+  auto_closed?: boolean;
 }
 
 export interface AttendanceBreak {
@@ -296,6 +298,21 @@ export function formatMinutes(min: number | null | undefined): string {
   const m = min % 60;
   if (h === 0) return `${m}m`;
   return `${h}h ${m}m`;
+}
+
+/**
+ * Formats a session timestamp, appending the date suffix (e.g. ", 20 May") when
+ * the timestamp falls on a different calendar day than the session's work_date.
+ * Used so night-shift checkouts after midnight read as "2:00 AM, 20 May".
+ */
+export function formatSessionTime(iso: string | null | undefined, workDate: string): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
+  if (ymd === workDate) return timeStr;
+  const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  return `${timeStr}, ${dateStr}`;
 }
 
 export function googleMapsLink(lat: number | null, lng: number | null): string | null {

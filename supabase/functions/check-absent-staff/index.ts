@@ -79,8 +79,19 @@ Deno.serve(async (req) => {
 
     const staffIds = staffList.map((s) => s.id);
 
+    // Yesterday in IST
+    const wdDate = new Date(workDate + 'T00:00:00Z');
+    const yesterdayDate = new Date(wdDate);
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const yesterday = yesterdayDate.toISOString().slice(0, 10);
+
+    // Today's IST midnight (in UTC) — used to detect yesterday's sessions that
+    // closed today (night shift covered today's morning).
+    const todayIstMidnightUtc = new Date(workDate + 'T00:00:00Z');
+    todayIstMidnightUtc.setUTCMinutes(todayIstMidnightUtc.getUTCMinutes() - (5 * 60 + 30));
+
     // Pull all needed lookups in bulk
-    const [{ data: assigns }, { data: shifts }, { data: leaves }, { data: sessions }, { data: logs }] =
+    const [{ data: assigns }, { data: shifts }, { data: leaves }, { data: sessions }, { data: openSessions }, { data: ySessions }, { data: logs }] =
       await Promise.all([
         supabase
           .from('staff_shift_assignments')
@@ -98,6 +109,20 @@ Deno.serve(async (req) => {
           .select('staff_id')
           .eq('work_date', workDate)
           .in('staff_id', staffIds),
+        // Open sessions (any work_date) that are still active — covers night shift in progress
+        supabase
+          .from('attendance_sessions')
+          .select('staff_id, check_in_at')
+          .in('status', ['active', 'on_break'])
+          .is('check_out_at', null)
+          .in('staff_id', staffIds),
+        // Yesterday's sessions whose checkout is on/after today's IST midnight
+        supabase
+          .from('attendance_sessions')
+          .select('staff_id, check_out_at')
+          .eq('work_date', yesterday)
+          .gte('check_out_at', todayIstMidnightUtc.toISOString())
+          .in('staff_id', staffIds),
         supabase
           .from('attendance_discipline_log')
           .select('id, staff_id')
@@ -114,6 +139,12 @@ Deno.serve(async (req) => {
     });
     const leaveSet = new Set((leaves ?? []).map((l: { staff_id: string }) => l.staff_id));
     const sessionSet = new Set((sessions ?? []).map((s: { staff_id: string }) => s.staff_id));
+    const openSessionSet = new Set(
+      (openSessions ?? []).map((s: { staff_id: string }) => s.staff_id),
+    );
+    const yesterdaySessionSet = new Set(
+      (ySessions ?? []).map((s: { staff_id: string }) => s.staff_id),
+    );
     const logMap = new Map<string, string>(
       (logs ?? []).map((l: { id: string; staff_id: string }) => [l.staff_id, l.id]),
     );
@@ -127,11 +158,18 @@ Deno.serve(async (req) => {
       phone: string | null;
       monthly_salary: number;
     }>) {
-      // Skip: on leave, or already has a session, or no shift assignment
+      // Session-aware skip rules:
+      //  1) on approved leave today
+      //  2) already has a session anchored to today
+      //  3) has an open session from any day (still on shift)
+      //  4) yesterday's session extended past today's IST midnight (night shift covered today)
+      //  5) no shift assignment (can't determine "scheduled")
       if (leaveSet.has(s.id)) continue;
       if (sessionSet.has(s.id)) continue;
+      if (openSessionSet.has(s.id)) continue;
+      if (yesterdaySessionSet.has(s.id)) continue;
       const a = assignMap.get(s.id);
-      if (!a) continue; // no scheduled shift => can't determine "absent"
+      if (!a) continue;
       const scheduledIn = a.override_check_in || (a.shift_id ? shiftMap.get(a.shift_id) : null);
       if (!scheduledIn) continue;
 

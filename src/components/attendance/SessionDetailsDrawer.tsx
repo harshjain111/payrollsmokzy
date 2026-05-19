@@ -12,6 +12,7 @@ import {
   AttendanceBreak,
   AttendanceSession,
   formatMinutes,
+  formatSessionTime,
   getSessionBreaks,
   getSignedPhotoUrl,
   googleMapsLink,
@@ -77,6 +78,11 @@ export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
                 Late check-out
               </Badge>
             )}
+            {session.auto_closed && (
+              <Badge variant="outline" className="ml-2">
+                Auto-closed
+              </Badge>
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -92,14 +98,14 @@ export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
               <div>
                 <p className="text-xs text-muted-foreground">Check-in</p>
                 <p className="font-medium">
-                  {format(new Date(session.check_in_at), 'hh:mm a')}
+                  {formatSessionTime(session.check_in_at, session.work_date)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Check-out</p>
                 <p className="font-medium">
                   {session.check_out_at
-                    ? format(new Date(session.check_out_at), 'hh:mm a')
+                    ? formatSessionTime(session.check_out_at, session.work_date)
                     : '—'}
                 </p>
               </div>

@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AttendanceSession, formatMinutes } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
 import { format } from 'date-fns';
 import { CalendarClock, Loader2 } from 'lucide-react';
@@ -79,8 +79,8 @@ export function StaffAttendanceSection({ staffId }: Props) {
                     {format(new Date(s.work_date), 'EEE, dd MMM yyyy')}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {format(new Date(s.check_in_at), 'hh:mm a')} –{' '}
-                    {s.check_out_at ? format(new Date(s.check_out_at), 'hh:mm a') : 'ongoing'}
+                    {formatSessionTime(s.check_in_at, s.work_date)} –{' '}
+                    {s.check_out_at ? formatSessionTime(s.check_out_at, s.work_date) : 'ongoing'}
                     {' · '}
                     Worked: {formatMinutes(s.worked_minutes)}
                     {s.total_break_minutes > 0 && ` · Break: ${formatMinutes(s.total_break_minutes)}`}

@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AttendanceSession, formatMinutes } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarClock, Loader2, AlertTriangle } from 'lucide-react';
@@ -129,8 +129,8 @@ export function MyAttendanceLogs() {
                     <div>
                       <p className="font-medium">{format(new Date(s.work_date), 'EEE, dd MMM')}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(s.check_in_at), 'hh:mm a')} –{' '}
-                        {s.check_out_at ? format(new Date(s.check_out_at), 'hh:mm a') : 'ongoing'}
+                        {formatSessionTime(s.check_in_at, s.work_date)} –{' '}
+                        {s.check_out_at ? formatSessionTime(s.check_out_at, s.work_date) : 'ongoing'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Worked {formatMinutes(s.worked_minutes)}
@@ -178,9 +178,9 @@ export function MyAttendanceLogs() {
                             {format(new Date(s.work_date), 'EEEE')}
                           </div>
                         </TableCell>
-                        <TableCell>{format(new Date(s.check_in_at), 'hh:mm a')}</TableCell>
+                        <TableCell>{formatSessionTime(s.check_in_at, s.work_date)}</TableCell>
                         <TableCell>
-                          {s.check_out_at ? format(new Date(s.check_out_at), 'hh:mm a') : '—'}
+                          {s.check_out_at ? formatSessionTime(s.check_out_at, s.work_date) : '—'}
                         </TableCell>
                         <TableCell className="font-medium">{formatMinutes(s.worked_minutes)}</TableCell>
                         <TableCell>{formatMinutes(s.total_break_minutes)}</TableCell>
@@ -192,6 +192,11 @@ export function MyAttendanceLogs() {
                             {s.late_checkout && (
                               <Badge variant="destructive" className="text-[10px]">
                                 Late
+                              </Badge>
+                            )}
+                            {s.auto_closed && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Auto-closed
                               </Badge>
                             )}
                           </div>

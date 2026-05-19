@@ -158,6 +158,7 @@ export type Database = {
       }
       attendance_sessions: {
         Row: {
+          auto_closed: boolean
           check_in_accuracy: number | null
           check_in_address: string | null
           check_in_at: string
@@ -173,6 +174,7 @@ export type Database = {
           created_at: string
           id: string
           late_checkout: boolean
+          overtime_reminder_sent: boolean
           staff_id: string | null
           status: string
           total_break_minutes: number
@@ -182,6 +184,7 @@ export type Database = {
           worked_minutes: number | null
         }
         Insert: {
+          auto_closed?: boolean
           check_in_accuracy?: number | null
           check_in_address?: string | null
           check_in_at?: string
@@ -197,6 +200,7 @@ export type Database = {
           created_at?: string
           id?: string
           late_checkout?: boolean
+          overtime_reminder_sent?: boolean
           staff_id?: string | null
           status?: string
           total_break_minutes?: number
@@ -206,6 +210,7 @@ export type Database = {
           worked_minutes?: number | null
         }
         Update: {
+          auto_closed?: boolean
           check_in_accuracy?: number | null
           check_in_address?: string | null
           check_in_at?: string
@@ -221,6 +226,7 @@ export type Database = {
           created_at?: string
           id?: string
           late_checkout?: boolean
+          overtime_reminder_sent?: boolean
           staff_id?: string | null
           status?: string
           total_break_minutes?: number
