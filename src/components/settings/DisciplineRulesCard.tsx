@@ -171,6 +171,43 @@ export function DisciplineRulesCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Master on/off switch */}
+        <div
+          className={cn(
+            'flex items-start justify-between gap-4 rounded-lg border p-4',
+            rules.penalties_enabled
+              ? 'bg-emerald-500/5 border-emerald-500/30'
+              : 'bg-amber-500/5 border-amber-500/40',
+          )}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              {!rules.penalties_enabled && (
+                <PowerOff className="h-4 w-4 text-amber-600" />
+              )}
+              <p className="font-semibold text-sm">
+                Apply penalties for late / early / absent
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {rules.penalties_enabled
+                ? 'Fines, half-day and full-day deductions are being applied automatically.'
+                : 'Penalties are OFF. No fines or half/full-day deductions will be applied. Only on-time WhatsApp greetings are sent — no late / half-day / full-day messages.'}
+            </p>
+          </div>
+          <Switch
+            checked={rules.penalties_enabled}
+            disabled={togglingMaster}
+            onCheckedChange={toggleMaster}
+          />
+        </div>
+
+        <div
+          className={cn(
+            'space-y-6 transition-opacity',
+            !rules.penalties_enabled && 'opacity-50 pointer-events-none',
+          )}
+        >
         {/* Late-in */}
         <div className="space-y-3">
           <h4 className="font-semibold text-sm">Late check-in</h4>
