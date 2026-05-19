@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { computeAndLogDiscipline } from '@/lib/discipline';
+import { notifyCheckinWhatsapp, notifyCheckoutWhatsapp } from '@/lib/attendance-whatsapp';
 
 export type AttendanceStatus = 'active' | 'on_break' | 'completed';
 
@@ -130,8 +131,13 @@ export async function checkIn(
     .select('*')
     .single();
   if (updErr) throw updErr;
-  return updated as AttendanceSession;
+  const result = updated as AttendanceSession;
+  if (result.staff_id) {
+    notifyCheckinWhatsapp(result.staff_id, result.check_in_at, result.work_date);
+  }
+  return result;
 }
+
 
 export async function startBreak(sessionId: string): Promise<void> {
   const { error: insErr } = await supabase
@@ -268,6 +274,10 @@ export async function checkOut(
     } catch (e) {
       console.error('Discipline compute failed', e);
     }
+  }
+
+  if (session.staff_id) {
+    notifyCheckoutWhatsapp(session.staff_id, checkOutAt.toISOString(), session.work_date);
   }
 
   return updated as AttendanceSession;
