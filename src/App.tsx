@@ -33,6 +33,7 @@ import LeaveRecords from "./pages/LeaveRecords";
 import PettyCash from "./pages/PettyCash";
 import Attendance from "./pages/Attendance";
 import MyAttendance from "./pages/MyAttendance";
+import Shifts from "./pages/Shifts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -104,6 +105,7 @@ function AppRoutes() {
       <Route path="/petty-cash" element={<ProtectedRoute><PettyCash /></ProtectedRoute>} />
       <Route path="/attendance" element={<ProtectedRoute><Attendance /></ProtectedRoute>} />
       <Route path="/my-attendance" element={<ProtectedRoute><MyAttendance /></ProtectedRoute>} />
+      <Route path="/shifts" element={<ProtectedRoute><Shifts /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Catch-all */}

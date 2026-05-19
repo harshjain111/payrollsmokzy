@@ -93,6 +93,54 @@ export type Database = {
           },
         ]
       }
+      attendance_discipline_log: {
+        Row: {
+          absent_reason: string | null
+          computed_at: string
+          early_out_minutes: number
+          fine_amount: number
+          fine_reason: string | null
+          id: string
+          is_absent: boolean
+          late_in_minutes: number
+          scheduled_check_in: string | null
+          scheduled_check_out: string | null
+          session_id: string | null
+          staff_id: string
+          work_date: string
+        }
+        Insert: {
+          absent_reason?: string | null
+          computed_at?: string
+          early_out_minutes?: number
+          fine_amount?: number
+          fine_reason?: string | null
+          id?: string
+          is_absent?: boolean
+          late_in_minutes?: number
+          scheduled_check_in?: string | null
+          scheduled_check_out?: string | null
+          session_id?: string | null
+          staff_id: string
+          work_date: string
+        }
+        Update: {
+          absent_reason?: string | null
+          computed_at?: string
+          early_out_minutes?: number
+          fine_amount?: number
+          fine_reason?: string | null
+          id?: string
+          is_absent?: boolean
+          late_in_minutes?: number
+          scheduled_check_in?: string | null
+          scheduled_check_out?: string | null
+          session_id?: string | null
+          staff_id?: string
+          work_date?: string
+        }
+        Relationships: []
+      }
       attendance_sessions: {
         Row: {
           check_in_accuracy: number | null
@@ -255,6 +303,54 @@ export type Database = {
           is_active?: boolean
           name?: string
           sort_order?: number
+        }
+        Relationships: []
+      }
+      discipline_rules: {
+        Row: {
+          absent_no_checkin_deduction: string
+          absent_no_checkout_deduction: string
+          early_out_full_day_after_min: number
+          early_out_half_day_after_min: number
+          early_out_slabs: Json
+          grace_minutes_in: number
+          grace_minutes_out: number
+          id: string
+          late_in_full_day_after_min: number
+          late_in_half_day_after_min: number
+          late_in_slabs: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          absent_no_checkin_deduction?: string
+          absent_no_checkout_deduction?: string
+          early_out_full_day_after_min?: number
+          early_out_half_day_after_min?: number
+          early_out_slabs?: Json
+          grace_minutes_in?: number
+          grace_minutes_out?: number
+          id?: string
+          late_in_full_day_after_min?: number
+          late_in_half_day_after_min?: number
+          late_in_slabs?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          absent_no_checkin_deduction?: string
+          absent_no_checkout_deduction?: string
+          early_out_full_day_after_min?: number
+          early_out_half_day_after_min?: number
+          early_out_slabs?: Json
+          grace_minutes_in?: number
+          grace_minutes_out?: number
+          id?: string
+          late_in_full_day_after_min?: number
+          late_in_half_day_after_min?: number
+          late_in_slabs?: Json
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }
@@ -903,6 +999,7 @@ export type Database = {
           deduction_adjusted_at: string | null
           deduction_adjusted_by: string | null
           deduction_adjustment_reason: string | null
+          discipline_fine: number
           final_deduction_days: number | null
           id: string
           journal_entry_id: string | null
@@ -934,6 +1031,7 @@ export type Database = {
           deduction_adjusted_at?: string | null
           deduction_adjusted_by?: string | null
           deduction_adjustment_reason?: string | null
+          discipline_fine?: number
           final_deduction_days?: number | null
           id?: string
           journal_entry_id?: string | null
@@ -965,6 +1063,7 @@ export type Database = {
           deduction_adjusted_at?: string | null
           deduction_adjusted_by?: string | null
           deduction_adjustment_reason?: string | null
+          discipline_fine?: number
           final_deduction_days?: number | null
           id?: string
           journal_entry_id?: string | null
@@ -1024,8 +1123,42 @@ export type Database = {
           },
         ]
       }
+      shifts: {
+        Row: {
+          check_in_time: string
+          check_out_time: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          check_in_time: string
+          check_out_time: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          check_in_time?: string
+          check_out_time?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       staff: {
         Row: {
+          attendance_tracked: boolean
           created_at: string
           created_by: string | null
           date_of_joining: string
@@ -1042,6 +1175,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          attendance_tracked?: boolean
           created_at?: string
           created_by?: string | null
           date_of_joining?: string
@@ -1058,6 +1192,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          attendance_tracked?: boolean
           created_at?: string
           created_by?: string | null
           date_of_joining?: string
@@ -1074,6 +1209,47 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      staff_shift_assignments: {
+        Row: {
+          created_at: string
+          effective_from: string
+          id: string
+          override_check_in: string | null
+          override_check_out: string | null
+          shift_id: string | null
+          staff_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          id?: string
+          override_check_in?: string | null
+          override_check_out?: string | null
+          shift_id?: string | null
+          staff_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          id?: string
+          override_check_in?: string | null
+          override_check_out?: string | null
+          shift_id?: string | null
+          staff_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_shift_assignments_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {

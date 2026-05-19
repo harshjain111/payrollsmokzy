@@ -132,6 +132,7 @@ function getNavSections(
         title: 'Reports',
         items: [
           { title: 'Attendance', href: '/attendance', icon: Clock },
+          { title: 'Shifts', href: '/shifts', icon: Briefcase },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
           { title: 'Audit Log', href: '/audit-log', icon: History },
         ],
@@ -189,6 +190,7 @@ function getNavSections(
         title: 'Reports',
         items: [
           { title: 'Attendance', href: '/attendance', icon: Clock },
+          { title: 'Shifts', href: '/shifts', icon: Briefcase },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
         ],
       },
