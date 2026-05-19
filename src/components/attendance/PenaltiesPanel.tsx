@@ -135,6 +135,30 @@ export function PenaltiesPanel() {
     })();
   }, [canManage]);
 
+  // Absent-today count derived from current rows
+  useEffect(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    setAbsentToday(rows.filter((r) => r.is_absent && r.work_date === todayStr).length);
+  }, [rows]);
+
+  const runAbsentCheck = async () => {
+    setRunningAbsentCheck(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-absent-staff', { body: {} });
+      if (error) throw error;
+      const res = data as { total_absent?: number; notifications_sent?: number; failures?: number };
+      toast.success(
+        `Absent check complete — ${res?.total_absent ?? 0} marked absent, ${res?.notifications_sent ?? 0} WhatsApp sent${res?.failures ? `, ${res.failures} failed` : ''}`,
+      );
+      await load();
+    } catch (e) {
+      console.error('Absent check failed', e);
+      toast.error(e instanceof Error ? e.message : 'Absent check failed');
+    } finally {
+      setRunningAbsentCheck(false);
+    }
+  };
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
