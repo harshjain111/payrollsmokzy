@@ -78,6 +78,11 @@ export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
                 Late check-out
               </Badge>
             )}
+            {session.auto_closed && (
+              <Badge variant="outline" className="ml-2">
+                Auto-closed
+              </Badge>
+            )}
           </SheetDescription>
         </SheetHeader>
 
