@@ -314,7 +314,6 @@ export function DisciplineRulesCard() {
           </Button>
         </div>
         </div>
-        </div>
       </CardContent>
     </Card>
   );
