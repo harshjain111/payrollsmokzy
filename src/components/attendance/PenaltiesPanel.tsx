@@ -25,7 +25,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { format } from 'date-fns';
-import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle, UserX, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -47,6 +47,8 @@ export function PenaltiesPanel() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
   const [unscheduledStaff, setUnscheduledStaff] = useState<string[]>([]);
+  const [absentToday, setAbsentToday] = useState(0);
+  const [runningAbsentCheck, setRunningAbsentCheck] = useState(false);
 
   const [target, setTarget] = useState<Row | null>(null);
   const [reason, setReason] = useState('');
@@ -132,6 +134,30 @@ export function PenaltiesPanel() {
       }
     })();
   }, [canManage]);
+
+  // Absent-today count derived from current rows
+  useEffect(() => {
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    setAbsentToday(rows.filter((r) => r.is_absent && r.work_date === todayStr).length);
+  }, [rows]);
+
+  const runAbsentCheck = async () => {
+    setRunningAbsentCheck(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('check-absent-staff', { body: {} });
+      if (error) throw error;
+      const res = data as { total_absent?: number; notifications_sent?: number; failures?: number };
+      toast.success(
+        `Absent check complete — ${res?.total_absent ?? 0} marked absent, ${res?.notifications_sent ?? 0} WhatsApp sent${res?.failures ? `, ${res.failures} failed` : ''}`,
+      );
+      await load();
+    } catch (e) {
+      console.error('Absent check failed', e);
+      toast.error(e instanceof Error ? e.message : 'Absent check failed');
+    } finally {
+      setRunningAbsentCheck(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -232,9 +258,34 @@ export function PenaltiesPanel() {
   return (
     <Card className="rounded-2xl border-0 shadow-card">
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="h-5 w-5 text-primary" />
-          <CardTitle>Manage Penalties</CardTitle>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldAlert className="h-5 w-5 text-primary" />
+            <CardTitle>Manage Penalties</CardTitle>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={absentToday > 0 ? 'destructive' : 'secondary'}
+              className="gap-1"
+            >
+              <UserX className="h-3.5 w-3.5" />
+              {absentToday} absent today
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={runAbsentCheck}
+              disabled={runningAbsentCheck}
+              className="gap-1"
+            >
+              {runningAbsentCheck ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <PlayCircle className="h-3.5 w-3.5" />
+              )}
+              Run Absent Check Now
+            </Button>
+          </div>
         </div>
         <CardDescription>
           Cancel any system-charged penalty for a staff member. Cancelled penalties won't be
