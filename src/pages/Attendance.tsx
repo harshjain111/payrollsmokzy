@@ -253,6 +253,8 @@ export default function Attendance() {
         </CardContent>
       </Card>
 
+      <PenaltiesPanel />
+
       <SessionDetailsDrawer
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
