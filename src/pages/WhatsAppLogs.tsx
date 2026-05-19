@@ -176,7 +176,6 @@ export default function WhatsAppLogs() {
       <PageHeader
         title="WhatsApp Notifications"
         description="Track every attendance WhatsApp message sent to staff."
-        icon={MessageSquare}
       />
 
       {/* Stats */}
