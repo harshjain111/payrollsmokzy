@@ -36,10 +36,15 @@ export function MyDisciplineTab() {
 
   const totals = useMemo(() => {
     return {
-      fine: rows.reduce((s, r) => s + Number(r.fine_amount || 0), 0),
-      late: rows.filter((r) => r.late_in_minutes > 0).length,
-      early: rows.filter((r) => r.early_out_minutes > 0).length,
-      onTime: rows.filter((r) => r.fine_amount === 0 && !r.is_absent).length,
+      fine: rows.reduce(
+        (s, r) => s + (r.is_cancelled ? 0 : Number(r.fine_amount || 0)),
+        0,
+      ),
+      late: rows.filter((r) => r.late_in_minutes > 0 && !r.is_cancelled).length,
+      early: rows.filter((r) => r.early_out_minutes > 0 && !r.is_cancelled).length,
+      onTime: rows.filter(
+        (r) => (r.fine_amount === 0 || r.is_cancelled) && !r.is_absent,
+      ).length,
     };
   }, [rows]);
 
