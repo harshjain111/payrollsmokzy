@@ -27,6 +27,7 @@ import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentCo
 import { AdvanceAdjustmentInput } from '@/components/settlements/AdvanceAdjustmentInput';
 import { LeaveDeductionSection } from '@/components/settlements/LeaveDeductionSection';
 import { createSalarySettlementEntry } from '@/lib/journal-entries';
+import { getMonthlyDisciplineFine } from '@/lib/discipline';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
@@ -36,6 +37,7 @@ interface SettlementCalculation {
    finalDeductionDays: number;
    deductionAdjustmentReason?: string;
   leaveDeduction: number;
+  disciplineFine: number;
   grossSalary: number;
   advancesOutstanding: number;
   advanceToAdjust: number;
@@ -251,7 +253,19 @@ export default function Settlements() {
 
       // Use finalDeductionDays from leave records (with owner override)
       const leaveDeduction = dailySalary * finalDeductionDays;
-      const grossSalary = Math.max(0, proRataSalary - leaveDeduction);
+
+      // Discipline fine for the month (skipped for untracked staff: returns 0)
+      let disciplineFine = 0;
+      if (currentStaff && (currentStaff as Staff & { attendance_tracked?: boolean }).attendance_tracked !== false) {
+        const { totalFine } = await getMonthlyDisciplineFine(
+          selectedStaffId,
+          selectedMonth,
+          monthlySalary,
+        );
+        disciplineFine = totalFine;
+      }
+
+      const grossSalary = Math.max(0, proRataSalary - leaveDeduction - disciplineFine);
       const advancesOutstanding = Number(advanceData) || 0;
       
       // Don't auto-set advance adjustment — let admin enter it manually (default 0)
@@ -281,6 +295,7 @@ export default function Settlements() {
         finalDeductionDays,
         deductionAdjustmentReason,
         leaveDeduction,
+        disciplineFine,
         grossSalary,
         advancesOutstanding,
         advanceToAdjust: currentAdj,
@@ -470,6 +485,7 @@ export default function Settlements() {
           deduction_adjustment_reason: calculation.deductionAdjustmentReason || null,
           deduction_adjusted_by: calculation.finalDeductionDays !== calculation.systemDeductionDays ? user.id : null,
           deduction_adjusted_at: calculation.finalDeductionDays !== calculation.systemDeductionDays ? new Date().toISOString() : null,
+          discipline_fine: calculation.disciplineFine,
           created_by: user.id,
         })
         .select()
@@ -775,6 +791,15 @@ export default function Settlements() {
                     -<Amount value={calculation.leaveDeduction} />
                   </span>
                 </div>
+
+                {calculation.disciplineFine > 0 && (
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-muted-foreground">Discipline Fine</span>
+                    <span className="text-destructive font-medium">
+                      -<Amount value={calculation.disciplineFine} />
+                    </span>
+                  </div>
+                )}
                 
                 <Separator />
                 
