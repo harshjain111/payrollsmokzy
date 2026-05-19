@@ -194,6 +194,11 @@ export function MyAttendanceLogs() {
                                 Late
                               </Badge>
                             )}
+                            {s.auto_closed && (
+                              <Badge variant="outline" className="text-[10px]">
+                                Auto-closed
+                              </Badge>
+                            )}
                           </div>
                         </TableCell>
                       </TableRow>
