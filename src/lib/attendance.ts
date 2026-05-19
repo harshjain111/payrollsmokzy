@@ -25,6 +25,8 @@ export interface AttendanceSession {
   late_checkout: boolean;
   created_at: string;
   updated_at: string;
+  overtime_reminder_sent?: boolean;
+  auto_closed?: boolean;
 }
 
 export interface AttendanceBreak {
