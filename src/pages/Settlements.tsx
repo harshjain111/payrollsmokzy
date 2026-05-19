@@ -27,6 +27,7 @@ import { ZeroPaymentConfirmDialog } from '@/components/settlements/ZeroPaymentCo
 import { AdvanceAdjustmentInput } from '@/components/settlements/AdvanceAdjustmentInput';
 import { LeaveDeductionSection } from '@/components/settlements/LeaveDeductionSection';
 import { createSalarySettlementEntry } from '@/lib/journal-entries';
+import { getMonthlyDisciplineFine } from '@/lib/discipline';
 import type { Staff, PaymentMode } from '@/types/database';
 
 interface SettlementCalculation {
@@ -36,6 +37,7 @@ interface SettlementCalculation {
    finalDeductionDays: number;
    deductionAdjustmentReason?: string;
   leaveDeduction: number;
+  disciplineFine: number;
   grossSalary: number;
   advancesOutstanding: number;
   advanceToAdjust: number;
