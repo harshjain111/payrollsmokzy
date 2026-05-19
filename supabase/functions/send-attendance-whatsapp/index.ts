@@ -79,6 +79,26 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
         { type: 'text', text: timeStr },
       ];
       break;
+    case 'absent':
+      templateName = 'attendance_absent';
+      parameters = [{ type: 'text', text: amt }];
+      break;
+    case 'penalty_waived': {
+      templateName = 'attendance_penalty_waived';
+      const dateStr = p.penalty_date
+        ? new Date(p.penalty_date).toLocaleDateString('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric',
+          })
+        : '';
+      parameters = [
+        { type: 'text', text: amt },
+        { type: 'text', text: dateStr },
+      ];
+      break;
+    }
   }
 
   const body = {
