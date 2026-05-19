@@ -112,7 +112,7 @@ export default function Attendance() {
   const [to, setTo] = useState(todayStr);
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState<string>('all');
-  const [tab, setTab] = useState('daily');
+  
 
   const [staff, setStaff] = useState<StaffRow[]>([]);
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
