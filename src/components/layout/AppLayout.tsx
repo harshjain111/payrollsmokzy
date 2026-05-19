@@ -636,11 +636,11 @@ function AppHeader() {
 export function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SidebarProvider defaultOpen={true}>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden">
         <AppSidebar />
-        <SidebarInset className="flex flex-col flex-1">
+        <SidebarInset className="flex min-w-0 flex-col flex-1 overflow-x-hidden">
           <AppHeader />
-          <main className="flex-1 p-4 sm:p-6 animate-fade-in">
+          <main className="flex-1 min-w-0 overflow-x-hidden p-4 sm:p-6 animate-fade-in">
             {children}
           </main>
         </SidebarInset>
