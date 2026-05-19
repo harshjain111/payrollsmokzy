@@ -79,8 +79,19 @@ Deno.serve(async (req) => {
 
     const staffIds = staffList.map((s) => s.id);
 
+    // Yesterday in IST
+    const wdDate = new Date(workDate + 'T00:00:00Z');
+    const yesterdayDate = new Date(wdDate);
+    yesterdayDate.setUTCDate(yesterdayDate.getUTCDate() - 1);
+    const yesterday = yesterdayDate.toISOString().slice(0, 10);
+
+    // Today's IST midnight (in UTC) — used to detect yesterday's sessions that
+    // closed today (night shift covered today's morning).
+    const todayIstMidnightUtc = new Date(workDate + 'T00:00:00Z');
+    todayIstMidnightUtc.setUTCMinutes(todayIstMidnightUtc.getUTCMinutes() - (5 * 60 + 30));
+
     // Pull all needed lookups in bulk
-    const [{ data: assigns }, { data: shifts }, { data: leaves }, { data: sessions }, { data: logs }] =
+    const [{ data: assigns }, { data: shifts }, { data: leaves }, { data: sessions }, { data: openSessions }, { data: ySessions }, { data: logs }] =
       await Promise.all([
         supabase
           .from('staff_shift_assignments')
@@ -97,6 +108,20 @@ Deno.serve(async (req) => {
           .from('attendance_sessions')
           .select('staff_id')
           .eq('work_date', workDate)
+          .in('staff_id', staffIds),
+        // Open sessions (any work_date) that are still active — covers night shift in progress
+        supabase
+          .from('attendance_sessions')
+          .select('staff_id, check_in_at')
+          .in('status', ['active', 'on_break'])
+          .is('check_out_at', null)
+          .in('staff_id', staffIds),
+        // Yesterday's sessions whose checkout is on/after today's IST midnight
+        supabase
+          .from('attendance_sessions')
+          .select('staff_id, check_out_at')
+          .eq('work_date', yesterday)
+          .gte('check_out_at', todayIstMidnightUtc.toISOString())
           .in('staff_id', staffIds),
         supabase
           .from('attendance_discipline_log')
