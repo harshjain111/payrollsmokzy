@@ -12,6 +12,7 @@ import {
   AttendanceBreak,
   AttendanceSession,
   formatMinutes,
+  formatSessionTime,
   getSessionBreaks,
   getSignedPhotoUrl,
   googleMapsLink,
