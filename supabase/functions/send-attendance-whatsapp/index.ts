@@ -35,7 +35,7 @@ function stripPlus(phone: string): string {
 function buildPayload(p: Payload): { templateName: string; body: Record<string, unknown> } {
   const to = stripPlus(p.staff_phone);
   const timeStr = formatIST(p.actual_time);
-  const amt = `₹${p.deduction_amount}`;
+  const amt = `${p.deduction_amount}`;
 
   let templateName = '';
   let parameters: Array<{ type: 'text'; text: string }> = [];
@@ -68,14 +68,14 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
       templateName = 'attendance_half_day';
       parameters = [
         { type: 'text', text: p.staff_name },
-        { type: 'text', text: amt },
+        { type: 'text', text: timeStr },
       ];
       break;
     case 'full_day':
       templateName = 'attendance_full_day';
       parameters = [
         { type: 'text', text: p.staff_name },
-        { type: 'text', text: amt },
+        { type: 'text', text: timeStr },
       ];
       break;
   }
