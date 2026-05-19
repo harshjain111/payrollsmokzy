@@ -25,7 +25,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { format } from 'date-fns';
-import { Ban, Loader2, RotateCcw, ShieldAlert } from 'lucide-react';
+import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 interface Row extends DisciplineLogRow {
