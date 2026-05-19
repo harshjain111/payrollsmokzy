@@ -18,6 +18,7 @@ export interface DisciplineRules {
   early_out_full_day_after_min: number;
   absent_no_checkin_deduction: string; // 'full_day' | 'half_day' | numeric string
   absent_no_checkout_deduction: string;
+  penalties_enabled: boolean;
 }
 
 export interface DisciplineLogRow {
@@ -34,6 +35,11 @@ export interface DisciplineLogRow {
   is_absent: boolean;
   absent_reason: string | null;
   computed_at: string;
+  is_cancelled?: boolean;
+  cancelled_by?: string | null;
+  cancelled_by_name?: string | null;
+  cancelled_at?: string | null;
+  cancellation_reason?: string | null;
 }
 
 export interface Shift {
