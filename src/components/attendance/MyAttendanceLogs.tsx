@@ -129,8 +129,8 @@ export function MyAttendanceLogs() {
                     <div>
                       <p className="font-medium">{format(new Date(s.work_date), 'EEE, dd MMM')}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        {format(new Date(s.check_in_at), 'hh:mm a')} –{' '}
-                        {s.check_out_at ? format(new Date(s.check_out_at), 'hh:mm a') : 'ongoing'}
+                        {formatSessionTime(s.check_in_at, s.work_date)} –{' '}
+                        {s.check_out_at ? formatSessionTime(s.check_out_at, s.work_date) : 'ongoing'}
                       </p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         Worked {formatMinutes(s.worked_minutes)}
