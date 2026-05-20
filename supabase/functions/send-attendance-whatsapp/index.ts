@@ -33,8 +33,28 @@ function stripPlus(phone: string): string {
   return phone.startsWith('+') ? phone.slice(1) : phone;
 }
 
+function normalizePhone(phone: string): string {
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 10) return `91${clean}`;
+  if (clean.length === 11 && clean.startsWith('0')) return `91${clean.slice(1)}`;
+  if (clean.length === 12 && clean.startsWith('91')) return clean;
+  throw new Error('Invalid phone number format');
+}
+
+function extractWabanowError(data: unknown): string | null {
+  if (Array.isArray(data)) {
+    const first = data[0] as { errorDescription?: string; errorCode?: number | string } | undefined;
+    if (first?.errorDescription) return `${first.errorDescription}${first.errorCode ? ` (${first.errorCode})` : ''}`;
+  }
+  const obj = data as { error?: { message?: string }; message?: string; errorDescription?: string; errorCode?: number | string };
+  if (obj?.error?.message) return obj.error.message;
+  if (obj?.errorDescription) return `${obj.errorDescription}${obj.errorCode ? ` (${obj.errorCode})` : ''}`;
+  if (obj?.message) return obj.message;
+  return null;
+}
+
 function buildPayload(p: Payload): { templateName: string; body: Record<string, unknown> } {
-  const to = stripPlus(p.staff_phone);
+  const to = normalizePhone(p.staff_phone);
   const timeStr = formatIST(p.actual_time);
   const amt = `${p.deduction_amount}`;
 
@@ -158,26 +178,27 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Wabanow reseller credentials
-  // WHATSAPP_ACCESS_TOKEN = Wabanow API key (sent as 'key' header)
-  // WHATSAPP_PHONE_NUMBER_ID = Wabanow wabaNumber (sent as 'wabaNumber' header)
-  const apiKey = Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
-  const wabaNumber = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')?.trim();
+  // Same provider contract as Smokzy Financial Core: WABANOW_API_KEY + fixed approved WABA number.
+  const apiKey = Deno.env.get('WABANOW_API_KEY')?.trim() || Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
+  const wabaNumber = '918822866510';
 
-  console.log(
-    'Token check:',
-    apiKey ? apiKey.substring(0, 10) + '...' + apiKey.slice(-5) : 'MISSING',
-  );
-  console.log('wabaNumber:', wabaNumber ?? 'MISSING');
-
-  if (!apiKey || !wabaNumber) {
+  if (!apiKey) {
     return new Response(
       JSON.stringify({ success: false, error: 'WhatsApp credentials not configured' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 
-  const { templateName, body: waBody } = buildPayload(payload);
+  let templateName = '';
+  let waBody: Record<string, unknown>;
+  try {
+    ({ templateName, body: waBody } = buildPayload(payload));
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Invalid WhatsApp payload' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
 
   let success = false;
   let metaMessageId: string | null = null;
@@ -206,13 +227,13 @@ Deno.serve(async (req) => {
       (data as { id?: string })?.id ??
       null;
     const looksEmpty = !text || text.trim().length === 0;
+    const providerError = extractWabanowError(data);
 
-    if (!res.ok || looksEmpty || (!msgId && !(data as { success?: boolean })?.success)) {
+    if (!res.ok || looksEmpty || providerError || (!msgId && !(data as { success?: boolean })?.success)) {
       errorMessage =
-        (data as { error?: { message?: string } })?.error?.message ||
-        (looksEmpty
+        looksEmpty
           ? `Wabanow returned empty body (HTTP ${res.status}) — template/language likely rejected`
-          : `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`);
+          : providerError ?? `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`;
       console.error('Wabanow rejected:', errorMessage);
     } else {
       metaMessageId = msgId;
