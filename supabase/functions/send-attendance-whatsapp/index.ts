@@ -178,19 +178,11 @@ Deno.serve(async (req) => {
     );
   }
 
-  // Wabanow reseller credentials
-  // WHATSAPP_ACCESS_TOKEN = Wabanow API key (sent as 'key' header)
-  // WHATSAPP_PHONE_NUMBER_ID = Wabanow wabaNumber (sent as 'wabaNumber' header)
-  const apiKey = Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
-  const wabaNumber = Deno.env.get('WHATSAPP_PHONE_NUMBER_ID')?.trim();
+  // Same provider contract as Smokzy Financial Core: WABANOW_API_KEY + fixed approved WABA number.
+  const apiKey = Deno.env.get('WABANOW_API_KEY')?.trim() || Deno.env.get('WHATSAPP_ACCESS_TOKEN')?.trim();
+  const wabaNumber = '918822866510';
 
-  console.log(
-    'Token check:',
-    apiKey ? apiKey.substring(0, 10) + '...' + apiKey.slice(-5) : 'MISSING',
-  );
-  console.log('wabaNumber:', wabaNumber ?? 'MISSING');
-
-  if (!apiKey || !wabaNumber) {
+  if (!apiKey) {
     return new Response(
       JSON.stringify({ success: false, error: 'WhatsApp credentials not configured' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
@@ -226,13 +218,13 @@ Deno.serve(async (req) => {
       (data as { id?: string })?.id ??
       null;
     const looksEmpty = !text || text.trim().length === 0;
+    const providerError = extractWabanowError(data, `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`);
 
-    if (!res.ok || looksEmpty || (!msgId && !(data as { success?: boolean })?.success)) {
+    if (!res.ok || looksEmpty || providerError !== `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}` || (!msgId && !(data as { success?: boolean })?.success)) {
       errorMessage =
-        (data as { error?: { message?: string } })?.error?.message ||
-        (looksEmpty
+        looksEmpty
           ? `Wabanow returned empty body (HTTP ${res.status}) — template/language likely rejected`
-          : `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`);
+          : providerError;
       console.error('Wabanow rejected:', errorMessage);
     } else {
       metaMessageId = msgId;
