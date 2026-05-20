@@ -41,7 +41,7 @@ function normalizePhone(phone: string): string {
   throw new Error('Invalid phone number format');
 }
 
-function extractWabanowError(data: unknown, fallback: string): string {
+function extractWabanowError(data: unknown): string | null {
   if (Array.isArray(data)) {
     const first = data[0] as { errorDescription?: string; errorCode?: number | string } | undefined;
     if (first?.errorDescription) return `${first.errorDescription}${first.errorCode ? ` (${first.errorCode})` : ''}`;
@@ -50,7 +50,7 @@ function extractWabanowError(data: unknown, fallback: string): string {
   if (obj?.error?.message) return obj.error.message;
   if (obj?.errorDescription) return `${obj.errorDescription}${obj.errorCode ? ` (${obj.errorCode})` : ''}`;
   if (obj?.message) return obj.message;
-  return fallback;
+  return null;
 }
 
 function buildPayload(p: Payload): { templateName: string; body: Record<string, unknown> } {
@@ -189,7 +189,16 @@ Deno.serve(async (req) => {
     );
   }
 
-  const { templateName, body: waBody } = buildPayload(payload);
+  let templateName = '';
+  let waBody: Record<string, unknown>;
+  try {
+    ({ templateName, body: waBody } = buildPayload(payload));
+  } catch (e) {
+    return new Response(
+      JSON.stringify({ success: false, error: e instanceof Error ? e.message : 'Invalid WhatsApp payload' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
+  }
 
   let success = false;
   let metaMessageId: string | null = null;
@@ -218,13 +227,13 @@ Deno.serve(async (req) => {
       (data as { id?: string })?.id ??
       null;
     const looksEmpty = !text || text.trim().length === 0;
-    const providerError = extractWabanowError(data, `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`);
+    const providerError = extractWabanowError(data);
 
-    if (!res.ok || looksEmpty || providerError !== `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}` || (!msgId && !(data as { success?: boolean })?.success)) {
+    if (!res.ok || looksEmpty || providerError || (!msgId && !(data as { success?: boolean })?.success)) {
       errorMessage =
         looksEmpty
           ? `Wabanow returned empty body (HTTP ${res.status}) — template/language likely rejected`
-          : providerError;
+          : providerError ?? `Wabanow error HTTP ${res.status}: ${text.slice(0, 300)}`;
       console.error('Wabanow rejected:', errorMessage);
     } else {
       metaMessageId = msgId;
