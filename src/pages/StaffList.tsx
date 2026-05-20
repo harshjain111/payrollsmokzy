@@ -24,7 +24,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2 } from 'lucide-react';
+import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2, RotateCcw } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -46,6 +47,7 @@ export default function StaffList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [view, setView] = useState<'active' | 'removed'>('active');
   
   // Owner, Admin, and Accountant can add staff
   const canAddStaff = isOwner || isAdmin || isAccountant;
@@ -56,8 +58,6 @@ export default function StaffList() {
 
   const fetchStaff = async () => {
     try {
-      // Only owners can access full staff table with salary
-      // This page should only be accessible to owners anyway
       const { data, error } = await supabase
         .from('staff')
         .select('*')
@@ -72,11 +72,16 @@ export default function StaffList() {
     }
   };
 
-  const filteredStaff = staff.filter(s =>
-    s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const activeCount = staff.filter(s => s.is_active).length;
+  const removedCount = staff.filter(s => !s.is_active).length;
+
+  const filteredStaff = staff
+    .filter(s => (view === 'active' ? s.is_active : !s.is_active))
+    .filter(s =>
+      s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const getInitials = (name: string) => {
     return name
@@ -91,46 +96,49 @@ export default function StaffList() {
     try {
       setDeletingId(member.id);
 
-      // Delete salary history first (configuration data, safe to delete)
-      await supabase
-        .from('salary_history')
-        .delete()
-        .eq('staff_id', member.id);
-
-      // Delete user role if exists
-      if (member.user_id) {
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', member.user_id);
-      }
-
-      // Delete staff record
+      // Soft remove: deactivate to preserve historical records (advances, ledger, settlements)
       const { error } = await supabase
         .from('staff')
-        .delete()
+        .update({ is_active: false })
         .eq('id', member.id);
 
-      if (error) {
-        // Check if error is due to other foreign key constraints
-        if (error.message.includes('foreign key constraint')) {
-          throw new Error('Cannot delete staff with financial records (ledger entries, expenses, settlements). Please deactivate instead.');
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
-        title: 'Staff Deleted',
-        description: `${member.full_name} has been removed.`,
+        title: 'Staff Removed',
+        description: `${member.full_name} is hidden from active lists. History is preserved under Removed Staff.`,
       });
 
-      // Refresh the list
       fetchStaff();
     } catch (error: any) {
-      console.error('Error deleting staff:', error);
+      console.error('Error removing staff:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete staff.',
+        description: error.message || 'Failed to remove staff.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleRestore = async (member: Staff) => {
+    try {
+      setDeletingId(member.id);
+      const { error } = await supabase
+        .from('staff')
+        .update({ is_active: true })
+        .eq('id', member.id);
+      if (error) throw error;
+      toast({
+        title: 'Staff Restored',
+        description: `${member.full_name} is active again.`,
+      });
+      fetchStaff();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to restore staff.',
         variant: 'destructive',
       });
     } finally {
@@ -155,6 +163,14 @@ export default function StaffList() {
         )}
       </PageHeader>
 
+      {/* Active / Removed tabs */}
+      <Tabs value={view} onValueChange={(v) => setView(v as 'active' | 'removed')}>
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid">
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="removed">Removed ({removedCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Search */}
       <Card className="mb-4 sm:mb-6">
         <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
@@ -169,6 +185,7 @@ export default function StaffList() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Staff List */}
       <Card>
@@ -233,7 +250,7 @@ export default function StaffList() {
                                 View Ledger
                               </Link>
                             </DropdownMenuItem>
-                            {isOwner && (
+                            {isOwner && member.is_active && (
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <DropdownMenuItem
@@ -241,15 +258,14 @@ export default function StaffList() {
                                     className="text-destructive focus:text-destructive"
                                   >
                                     <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
+                                    Remove
                                   </DropdownMenuItem>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                                   <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete Staff</AlertDialogTitle>
+                                    <AlertDialogTitle>Remove Staff</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Are you sure you want to delete <strong>{member.full_name}</strong>? 
-                                      This action cannot be undone.
+                                      <strong>{member.full_name}</strong> will be hidden from all active staff lists, dropdowns, and reports. All historical records (advances, ledger, settlements) are preserved and accessible under the <strong>Removed</strong> tab. You can restore them anytime.
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
@@ -259,11 +275,20 @@ export default function StaffList() {
                                       disabled={deletingId === member.id}
                                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
-                                      {deletingId === member.id ? 'Deleting...' : 'Delete'}
+                                      {deletingId === member.id ? 'Removing...' : 'Remove'}
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
+                            )}
+                            {isOwner && !member.is_active && (
+                              <DropdownMenuItem
+                                onSelect={(e) => { e.preventDefault(); handleRestore(member); }}
+                                disabled={deletingId === member.id}
+                              >
+                                <RotateCcw className="mr-2 h-4 w-4" />
+                                {deletingId === member.id ? 'Restoring...' : 'Restore'}
+                              </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -362,7 +387,7 @@ export default function StaffList() {
                                   View Ledger
                                 </Link>
                               </DropdownMenuItem>
-                              {isOwner && (
+                              {isOwner && member.is_active && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <DropdownMenuItem
@@ -370,15 +395,14 @@ export default function StaffList() {
                                       className="text-destructive focus:text-destructive"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete
+                                      Remove
                                     </DropdownMenuItem>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Staff</AlertDialogTitle>
+                                      <AlertDialogTitle>Remove Staff</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Are you sure you want to delete <strong>{member.full_name}</strong>? 
-                                        This action cannot be undone.
+                                        <strong>{member.full_name}</strong> will be hidden from all active staff lists, dropdowns, and reports. All historical records (advances, ledger, settlements) are preserved and accessible under the <strong>Removed</strong> tab. You can restore them anytime.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -388,11 +412,20 @@ export default function StaffList() {
                                         disabled={deletingId === member.id}
                                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                       >
-                                        {deletingId === member.id ? 'Deleting...' : 'Delete'}
+                                        {deletingId === member.id ? 'Removing...' : 'Remove'}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
+                              )}
+                              {isOwner && !member.is_active && (
+                                <DropdownMenuItem
+                                  onSelect={(e) => { e.preventDefault(); handleRestore(member); }}
+                                  disabled={deletingId === member.id}
+                                >
+                                  <RotateCcw className="mr-2 h-4 w-4" />
+                                  {deletingId === member.id ? 'Restoring...' : 'Restore'}
+                                </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
