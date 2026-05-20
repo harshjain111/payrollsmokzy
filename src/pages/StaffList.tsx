@@ -24,7 +24,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2 } from 'lucide-react';
+import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2, RotateCcw } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
 import {
