@@ -387,7 +387,7 @@ export default function StaffList() {
                                   View Ledger
                                 </Link>
                               </DropdownMenuItem>
-                              {isOwner && (
+                              {isOwner && member.is_active && (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <DropdownMenuItem
@@ -395,15 +395,14 @@ export default function StaffList() {
                                       className="text-destructive focus:text-destructive"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete
+                                      Remove
                                     </DropdownMenuItem>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Delete Staff</AlertDialogTitle>
+                                      <AlertDialogTitle>Remove Staff</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Are you sure you want to delete <strong>{member.full_name}</strong>? 
-                                        This action cannot be undone.
+                                        <strong>{member.full_name}</strong> will be hidden from all active staff lists, dropdowns, and reports. All historical records (advances, ledger, settlements) are preserved and accessible under the <strong>Removed</strong> tab. You can restore them anytime.
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
@@ -413,11 +412,20 @@ export default function StaffList() {
                                         disabled={deletingId === member.id}
                                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                       >
-                                        {deletingId === member.id ? 'Deleting...' : 'Delete'}
+                                        {deletingId === member.id ? 'Removing...' : 'Remove'}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
+                              )}
+                              {isOwner && !member.is_active && (
+                                <DropdownMenuItem
+                                  onSelect={(e) => { e.preventDefault(); handleRestore(member); }}
+                                  disabled={deletingId === member.id}
+                                >
+                                  <RotateCcw className="mr-2 h-4 w-4" />
+                                  {deletingId === member.id ? 'Restoring...' : 'Restore'}
+                                </DropdownMenuItem>
                               )}
                             </DropdownMenuContent>
                           </DropdownMenu>
