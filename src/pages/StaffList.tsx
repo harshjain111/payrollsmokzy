@@ -163,6 +163,14 @@ export default function StaffList() {
         )}
       </PageHeader>
 
+      {/* Active / Removed tabs */}
+      <Tabs value={view} onValueChange={(v) => setView(v as 'active' | 'removed')}>
+        <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-grid">
+          <TabsTrigger value="active">Active ({activeCount})</TabsTrigger>
+          <TabsTrigger value="removed">Removed ({removedCount})</TabsTrigger>
+        </TabsList>
+      </Tabs>
+
       {/* Search */}
       <Card className="mb-4 sm:mb-6">
         <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
@@ -177,6 +185,7 @@ export default function StaffList() {
           </div>
         </CardContent>
       </Card>
+
 
       {/* Staff List */}
       <Card>
