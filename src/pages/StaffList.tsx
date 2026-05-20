@@ -47,6 +47,7 @@ export default function StaffList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [view, setView] = useState<'active' | 'removed'>('active');
   
   // Owner, Admin, and Accountant can add staff
   const canAddStaff = isOwner || isAdmin || isAccountant;
@@ -57,8 +58,6 @@ export default function StaffList() {
 
   const fetchStaff = async () => {
     try {
-      // Only owners can access full staff table with salary
-      // This page should only be accessible to owners anyway
       const { data, error } = await supabase
         .from('staff')
         .select('*')
@@ -73,11 +72,16 @@ export default function StaffList() {
     }
   };
 
-  const filteredStaff = staff.filter(s =>
-    s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const activeCount = staff.filter(s => s.is_active).length;
+  const removedCount = staff.filter(s => !s.is_active).length;
+
+  const filteredStaff = staff
+    .filter(s => (view === 'active' ? s.is_active : !s.is_active))
+    .filter(s =>
+      s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
   const getInitials = (name: string) => {
     return name
