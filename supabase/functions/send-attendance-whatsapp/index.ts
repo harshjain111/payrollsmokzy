@@ -33,8 +33,28 @@ function stripPlus(phone: string): string {
   return phone.startsWith('+') ? phone.slice(1) : phone;
 }
 
+function normalizePhone(phone: string): string {
+  const clean = phone.replace(/\D/g, '');
+  if (clean.length === 10) return `91${clean}`;
+  if (clean.length === 11 && clean.startsWith('0')) return `91${clean.slice(1)}`;
+  if (clean.length === 12 && clean.startsWith('91')) return clean;
+  throw new Error('Invalid phone number format');
+}
+
+function extractWabanowError(data: unknown, fallback: string): string {
+  if (Array.isArray(data)) {
+    const first = data[0] as { errorDescription?: string; errorCode?: number | string } | undefined;
+    if (first?.errorDescription) return `${first.errorDescription}${first.errorCode ? ` (${first.errorCode})` : ''}`;
+  }
+  const obj = data as { error?: { message?: string }; message?: string; errorDescription?: string; errorCode?: number | string };
+  if (obj?.error?.message) return obj.error.message;
+  if (obj?.errorDescription) return `${obj.errorDescription}${obj.errorCode ? ` (${obj.errorCode})` : ''}`;
+  if (obj?.message) return obj.message;
+  return fallback;
+}
+
 function buildPayload(p: Payload): { templateName: string; body: Record<string, unknown> } {
-  const to = stripPlus(p.staff_phone);
+  const to = normalizePhone(p.staff_phone);
   const timeStr = formatIST(p.actual_time);
   const amt = `${p.deduction_amount}`;
 
