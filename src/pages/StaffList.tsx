@@ -96,46 +96,49 @@ export default function StaffList() {
     try {
       setDeletingId(member.id);
 
-      // Delete salary history first (configuration data, safe to delete)
-      await supabase
-        .from('salary_history')
-        .delete()
-        .eq('staff_id', member.id);
-
-      // Delete user role if exists
-      if (member.user_id) {
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', member.user_id);
-      }
-
-      // Delete staff record
+      // Soft remove: deactivate to preserve historical records (advances, ledger, settlements)
       const { error } = await supabase
         .from('staff')
-        .delete()
+        .update({ is_active: false })
         .eq('id', member.id);
 
-      if (error) {
-        // Check if error is due to other foreign key constraints
-        if (error.message.includes('foreign key constraint')) {
-          throw new Error('Cannot delete staff with financial records (ledger entries, expenses, settlements). Please deactivate instead.');
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
-        title: 'Staff Deleted',
-        description: `${member.full_name} has been removed.`,
+        title: 'Staff Removed',
+        description: `${member.full_name} is hidden from active lists. History is preserved under Removed Staff.`,
       });
 
-      // Refresh the list
       fetchStaff();
     } catch (error: any) {
-      console.error('Error deleting staff:', error);
+      console.error('Error removing staff:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete staff.',
+        description: error.message || 'Failed to remove staff.',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleRestore = async (member: Staff) => {
+    try {
+      setDeletingId(member.id);
+      const { error } = await supabase
+        .from('staff')
+        .update({ is_active: true })
+        .eq('id', member.id);
+      if (error) throw error;
+      toast({
+        title: 'Staff Restored',
+        description: `${member.full_name} is active again.`,
+      });
+      fetchStaff();
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to restore staff.',
         variant: 'destructive',
       });
     } finally {
