@@ -63,7 +63,9 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
 
   switch (p.slab) {
     case 'on_time':
-      templateName = 'attendance_on_time';
+      // Use a check-out-specific template when this is a check-out event,
+      // otherwise the body wording ("successfully checked in") is misleading.
+      templateName = p.event_type === 'checkout' ? 'attendance_checkout_on_time' : 'attendance_on_time';
       parameters = [
         { type: 'text', text: p.staff_name },
         { type: 'text', text: timeStr },
