@@ -210,11 +210,6 @@ export async function notifyCheckoutWhatsapp(
       dailySalary,
     );
 
-    // No on-time congratulation message for check-outs — the on_time template
-    // body reads "successfully checked in" and would mislead the staff (e.g.
-    // a late-evening check-out being shown as a fresh check-in).
-    if (slab === 'on_time') return;
-
     await dispatch(staff, 'checkout', checkOutIso, scheduledIso, slab, amount);
   } catch (e) {
     console.error('notifyCheckoutWhatsapp failed', e);
