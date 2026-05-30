@@ -44,37 +44,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accountingMode, setAccountingMode] = useState(false);
 
   useEffect(() => {
-    let initTimedOut = false;
+    let initSettled = false;
 
-    // Hard timeout: if auth init takes > 8s, force to login screen
+    // Soft failsafe: if init takes too long, flip the loading flag off so
+    // the UI isn't stuck on a spinner — but DO NOT wipe auth tokens.
+    // (Wiping tokens here was logging users out on slow networks.)
     const initTimeout = window.setTimeout(() => {
-      initTimedOut = true;
-      console.warn('Auth initialization timed out — clearing stale session');
-      // Clear any stale supabase auth tokens
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-      } catch (_) { /* ignore */ }
-      setSession(null);
-      setUser(null);
-      setUserRole(null);
-      setStaffData(null);
+      if (initSettled) return;
+      console.warn('Auth initialization slow — releasing loading state without clearing session');
       setIsLoading(false);
-    }, 8000);
+    }, 15000);
 
-    const clearInitTimeout = () => window.clearTimeout(initTimeout);
+    const settle = () => {
+      initSettled = true;
+      window.clearTimeout(initTimeout);
+    };
 
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        if (initTimedOut) return; // ignore late callbacks
-        clearInitTimeout();
+        settle();
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -93,8 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // THEN check for existing session
     supabase.auth.getSession()
       .then(({ data: { session } }) => {
-        if (initTimedOut) return;
-        clearInitTimeout();
+        settle();
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -105,32 +93,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })
       .catch((error) => {
-        if (initTimedOut) return;
-        clearInitTimeout();
+        settle();
         console.error('Error restoring auth session:', error);
-        // Clear stale tokens on session restore failure
-        try {
-          const keysToRemove: string[] = [];
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-              keysToRemove.push(key);
-            }
-          }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch (_) { /* ignore */ }
-        setSession(null);
-        setUser(null);
-        setUserRole(null);
-        setStaffData(null);
+        // Do NOT wipe tokens here — a transient network error must not
+        // forcibly log the user out. Just stop the spinner.
         setIsLoading(false);
       });
 
     return () => {
-      clearInitTimeout();
+      window.clearTimeout(initTimeout);
       subscription.unsubscribe();
     };
   }, []);
+
 
   const fetchUserData = async (userId: string) => {
     try {
