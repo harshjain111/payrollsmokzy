@@ -72,7 +72,9 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
       ];
       break;
     case 'level_1':
-      templateName = 'attendance_late_level_1';
+      // Check-out late/early uses a dedicated early-out template so the
+      // wording is "checked out early", not "check-in time today was…".
+      templateName = p.event_type === 'checkout' ? 'attendance_early_out_level_1' : 'attendance_late_level_1';
       parameters = [
         { type: 'text', text: p.staff_name },
         { type: 'text', text: timeStr },
@@ -80,7 +82,7 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
       ];
       break;
     case 'level_2':
-      templateName = 'attendance_late_level_2';
+      templateName = p.event_type === 'checkout' ? 'attendance_early_out_level_2' : 'attendance_late_level_2';
       parameters = [
         { type: 'text', text: p.staff_name },
         { type: 'text', text: timeStr },
@@ -88,14 +90,14 @@ function buildPayload(p: Payload): { templateName: string; body: Record<string, 
       ];
       break;
     case 'half_day':
-      templateName = 'attendance_half_day';
+      templateName = p.event_type === 'checkout' ? 'attendance_early_out_half_day' : 'attendance_half_day';
       parameters = [
         { type: 'text', text: p.staff_name },
         { type: 'text', text: timeStr },
       ];
       break;
     case 'full_day':
-      templateName = 'attendance_full_day';
+      templateName = p.event_type === 'checkout' ? 'attendance_early_out_full_day' : 'attendance_full_day';
       parameters = [
         { type: 'text', text: p.staff_name },
         { type: 'text', text: timeStr },
