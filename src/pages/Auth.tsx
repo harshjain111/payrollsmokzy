@@ -78,19 +78,10 @@ export default function Auth() {
     }
   }, [user, authLoading, navigate]);
 
-  // Clear stale auth session on mount
-  useEffect(() => {
-    if (!user && !authLoading) {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-          keysToRemove.push(key);
-        }
-      }
-      keysToRemove.forEach(key => localStorage.removeItem(key));
-    }
-  }, [user, authLoading]);
+  // NOTE: do not wipe sb-*-auth-token keys here. That used to log valid
+  // users out the moment they touched /auth (e.g. via back button), and
+  // amplified the "logged out after a minute" bug on slow networks.
+
 
   const formatPhoneInput = (value: string) => value.replace(/\D/g, '');
 
