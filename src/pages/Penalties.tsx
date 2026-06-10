@@ -143,7 +143,6 @@ export default function Penalties() {
       <PageHeader
         title="Penalties & Deductions"
         description="Auto-deductions for late check-in, early check-out, half day, full day, and absent days. These are automatically applied at salary settlement."
-        icon={ShieldAlert}
       />
 
       {/* Filters */}
