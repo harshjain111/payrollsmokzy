@@ -109,6 +109,7 @@ function AppRoutes() {
       <Route path="/my-attendance" element={<ProtectedRoute><MyAttendance /></ProtectedRoute>} />
       <Route path="/shifts" element={<ProtectedRoute><Shifts /></ProtectedRoute>} />
       <Route path="/whatsapp-logs" element={<ProtectedRoute><WhatsAppLogs /></ProtectedRoute>} />
+      <Route path="/penalties" element={<ProtectedRoute><Penalties /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Catch-all */}
