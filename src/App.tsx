@@ -35,6 +35,7 @@ import Attendance from "./pages/Attendance";
 import MyAttendance from "./pages/MyAttendance";
 import Shifts from "./pages/Shifts";
 import WhatsAppLogs from "./pages/WhatsAppLogs";
+import Penalties from "./pages/Penalties";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
