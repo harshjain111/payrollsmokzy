@@ -127,6 +127,7 @@ function getNavSections(
         items: [
           { title: 'Salaries & Advances', href: '/salaries-advances', icon: Wallet },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
+          { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
           { title: 'Settlements', href: '/settlements', icon: Calculator },
         ],
       },
