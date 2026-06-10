@@ -188,6 +188,7 @@ function getNavSections(
           },
           { title: 'Petty Cash', href: '/petty-cash', icon: Coins },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
+          { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
         ],
       },
       {
