@@ -794,7 +794,15 @@ export default function Settlements() {
 
                 {calculation.disciplineFine > 0 && (
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-muted-foreground">Discipline Fine</span>
+                    <span className="text-muted-foreground flex items-center gap-2">
+                      Discipline Fine
+                      <a
+                        href={`/penalties`}
+                        className="text-[11px] text-primary hover:underline"
+                      >
+                        view breakdown →
+                      </a>
+                    </span>
                     <span className="text-destructive font-medium">
                       -<Amount value={calculation.disciplineFine} />
                     </span>
