@@ -59,6 +59,7 @@ import {
   Coins,
   Clock,
   MessageSquare,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface NavItem {
