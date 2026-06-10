@@ -59,6 +59,7 @@ import {
   Coins,
   Clock,
   MessageSquare,
+  ShieldAlert,
 } from 'lucide-react';
 
 interface NavItem {
@@ -126,6 +127,7 @@ function getNavSections(
         items: [
           { title: 'Salaries & Advances', href: '/salaries-advances', icon: Wallet },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
+          { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
           { title: 'Settlements', href: '/settlements', icon: Calculator },
         ],
       },
@@ -186,6 +188,7 @@ function getNavSections(
           },
           { title: 'Petty Cash', href: '/petty-cash', icon: Coins },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
+          { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
         ],
       },
       {

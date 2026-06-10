@@ -35,6 +35,7 @@ import Attendance from "./pages/Attendance";
 import MyAttendance from "./pages/MyAttendance";
 import Shifts from "./pages/Shifts";
 import WhatsAppLogs from "./pages/WhatsAppLogs";
+import Penalties from "./pages/Penalties";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -108,6 +109,7 @@ function AppRoutes() {
       <Route path="/my-attendance" element={<ProtectedRoute><MyAttendance /></ProtectedRoute>} />
       <Route path="/shifts" element={<ProtectedRoute><Shifts /></ProtectedRoute>} />
       <Route path="/whatsapp-logs" element={<ProtectedRoute><WhatsAppLogs /></ProtectedRoute>} />
+      <Route path="/penalties" element={<ProtectedRoute><Penalties /></ProtectedRoute>} />
       <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
       
       {/* Catch-all */}
