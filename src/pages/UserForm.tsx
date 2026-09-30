@@ -23,7 +23,7 @@ import type { AppRole, StaffPublic } from '@/types/database';
 export default function UserForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { isOwner, isHR, canCreateUsers } = useAuth();
+  const { isHR, canCreateUsers } = useAuth();
   const isEditing = !!id;
 
   const [isSubmitting, setIsSubmitting] = useState(false);

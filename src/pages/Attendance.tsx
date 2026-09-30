@@ -146,9 +146,8 @@ export default function Attendance() {
           .lte('work_date', to)
           .order('check_in_at', { ascending: true }),
         supabase
-          .from('leave_records')
-          .select('staff_id, leave_date, status')
-          .eq('status', 'approved')
+          .from('attendance_leave_dates')
+          .select('staff_id, leave_date')
           .gte('leave_date', from)
           .lte('leave_date', to),
       ]);
