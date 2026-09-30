@@ -64,14 +64,10 @@ export default function UserForm() {
   const fetchAvailableStaff = async () => {
     try {
       // Get staff without linked user_id (unlinked staff)
-      const { data, error } = await supabase
-        .from('staff_attendance_public')
-        .select('id, user_id, employee_id, full_name, department, designation, is_active')
-        .is('user_id', null)
-        .eq('is_active', true);
+      const { data, error } = await supabase.rpc('get_attendance_staff');
 
       if (error) throw error;
-      setAvailableStaff((data || []) as StaffPublic[]);
+      setAvailableStaff(((data || []) as StaffPublic[]).filter((member) => !member.user_id && member.is_active));
     } catch (error) {
       console.error('Error fetching available staff:', error);
     }
