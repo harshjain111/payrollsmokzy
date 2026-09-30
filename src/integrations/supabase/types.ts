@@ -1549,6 +1549,26 @@ export type Database = {
       }
       get_account_id: { Args: { _code: string }; Returns: string }
       get_advances_outstanding: { Args: { _staff_id: string }; Returns: number }
+      get_attendance_leave_dates: {
+        Args: { _date_from: string; _date_to: string }
+        Returns: {
+          leave_date: string
+          staff_id: string
+        }[]
+      }
+      get_attendance_staff: {
+        Args: never
+        Returns: {
+          attendance_tracked: boolean
+          department: string
+          designation: string
+          employee_id: string
+          full_name: string
+          id: string
+          is_active: boolean
+          user_id: string
+        }[]
+      }
       get_expense_account_code: {
         Args: { _category: Database["public"]["Enums"]["expense_category"] }
         Returns: string
