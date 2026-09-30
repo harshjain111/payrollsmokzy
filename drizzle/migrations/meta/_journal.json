@@ -15,6 +15,13 @@
       "when": 1790765235784,
       "tag": "0001_grant_hr_attendance_read_access",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790765339595,
+      "tag": "0002_restrict_hr_leave_access_to_dates",
+      "breakpoints": true
     }
   ]
 }

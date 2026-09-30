@@ -1399,6 +1399,43 @@ export type Database = {
       }
     }
     Views: {
+      attendance_leave_dates: {
+        Row: {
+          leave_date: string | null
+          staff_id: string | null
+        }
+        Insert: {
+          leave_date?: string | null
+          staff_id?: string | null
+        }
+        Update: {
+          leave_date?: string | null
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       staff_attendance_public: {
         Row: {
           attendance_tracked: boolean | null
