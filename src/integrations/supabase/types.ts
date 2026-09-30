@@ -514,6 +514,13 @@ export type Database = {
             foreignKeyName: "expenses_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -574,6 +581,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -642,6 +656,13 @@ export type Database = {
             foreignKeyName: "journal_lines_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -702,6 +723,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -783,6 +811,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -917,6 +952,13 @@ export type Database = {
             foreignKeyName: "payment_requests_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -1001,6 +1043,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -1136,6 +1185,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_settlements_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -1343,6 +1399,76 @@ export type Database = {
       }
     }
     Views: {
+      attendance_leave_dates: {
+        Row: {
+          leave_date: string | null
+          staff_id: string | null
+        }
+        Insert: {
+          leave_date?: string | null
+          staff_id?: string | null
+        }
+        Update: {
+          leave_date?: string | null
+          staff_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      staff_attendance_public: {
+        Row: {
+          attendance_tracked: boolean | null
+          department: string | null
+          designation: string | null
+          employee_id: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          attendance_tracked?: boolean | null
+          department?: string | null
+          designation?: string | null
+          employee_id?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          attendance_tracked?: boolean | null
+          department?: string | null
+          designation?: string | null
+          employee_id?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       staff_public: {
         Row: {
           created_at: string | null
@@ -1423,6 +1549,26 @@ export type Database = {
       }
       get_account_id: { Args: { _code: string }; Returns: string }
       get_advances_outstanding: { Args: { _staff_id: string }; Returns: number }
+      get_attendance_leave_dates: {
+        Args: { _date_from: string; _date_to: string }
+        Returns: {
+          leave_date: string
+          staff_id: string
+        }[]
+      }
+      get_attendance_staff: {
+        Args: never
+        Returns: {
+          attendance_tracked: boolean
+          department: string
+          designation: string
+          employee_id: string
+          full_name: string
+          id: string
+          is_active: boolean
+          user_id: string
+        }[]
+      }
       get_expense_account_code: {
         Args: { _category: Database["public"]["Enums"]["expense_category"] }
         Returns: string
@@ -1498,7 +1644,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "owner" | "accountant" | "staff" | "ca" | "admin"
+      app_role: "owner" | "accountant" | "staff" | "ca" | "admin" | "hr"
       expense_category:
         | "travel"
         | "food"
@@ -1657,7 +1803,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["owner", "accountant", "staff", "ca", "admin"],
+      app_role: ["owner", "accountant", "staff", "ca", "admin", "hr"],
       expense_category: [
         "travel",
         "food",

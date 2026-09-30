@@ -5,11 +5,11 @@ import { Loader2, Wallet } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { user, userRole, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      navigate(user ? '/dashboard' : '/auth');
+      navigate(user ? (userRole === 'hr' ? '/attendance' : '/dashboard') : '/auth');
       return;
     }
 
@@ -18,7 +18,7 @@ const Index = () => {
     }, 7000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [user, isLoading, navigate]);
+  }, [user, userRole, isLoading, navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

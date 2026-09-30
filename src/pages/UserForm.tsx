@@ -18,12 +18,20 @@ import {
 import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Loader2, Phone, Mail, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { AppRole, StaffPublic } from '@/types/database';
+import type { AppRole } from '@/types/database';
+
+interface AvailableStaff {
+  id: string;
+  user_id: string | null;
+  employee_id: string;
+  full_name: string;
+  is_active: boolean;
+}
 
 export default function UserForm() {
   const navigate = useNavigate();
   const { id } = useParams();
-  const { user, isOwner } = useAuth();
+  const { isHR, canCreateUsers } = useAuth();
   const isEditing = !!id;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,37 +48,34 @@ export default function UserForm() {
   const [linkedStaffId, setLinkedStaffId] = useState<string | null>(null);
   
   // Available staff for linking
-  const [availableStaff, setAvailableStaff] = useState<StaffPublic[]>([]);
+  const [availableStaff, setAvailableStaff] = useState<AvailableStaff[]>([]);
 
   useEffect(() => {
-    if (!isOwner) {
+    if (!canCreateUsers || (isHR && isEditing)) {
       toast({
         title: 'Access Denied',
-        description: 'Only owners can manage users.',
+        description: isHR ? 'HR can create Staff users only.' : 'Only owners can manage users.',
         variant: 'destructive',
       });
       navigate('/dashboard');
       return;
     }
 
+    if (isHR) setRole('staff');
     fetchAvailableStaff();
     
     if (isEditing) {
       fetchUserData();
     }
-  }, [id, isOwner]);
+  }, [id, canCreateUsers, isHR, isEditing, navigate]);
 
   const fetchAvailableStaff = async () => {
     try {
       // Get staff without linked user_id (unlinked staff)
-      const { data, error } = await supabase
-        .from('staff_public')
-        .select('*')
-        .is('user_id', null)
-        .eq('is_active', true);
+      const { data, error } = await supabase.rpc('get_attendance_staff');
 
       if (error) throw error;
-      setAvailableStaff((data || []) as StaffPublic[]);
+      setAvailableStaff(((data || []) as AvailableStaff[]).filter((member) => !member.user_id && member.is_active));
     } catch (error) {
       console.error('Error fetching available staff:', error);
     }
@@ -121,6 +126,11 @@ export default function UserForm() {
   };
 
   const handleSubmit = async () => {
+    if (isHR && (isEditing || role !== 'staff')) {
+      toast({ title: 'Access Denied', description: 'HR can create Staff users only.', variant: 'destructive' });
+      return;
+    }
+
     // Validation
     if (!fullName.trim()) {
       toast({ title: 'Validation Error', description: 'Full name is required.', variant: 'destructive' });
@@ -191,7 +201,7 @@ export default function UserForm() {
         });
       }
 
-      navigate('/users');
+      navigate(isHR ? '/attendance' : '/users');
     } catch (error: any) {
       console.error('Error saving user:', error);
       toast({
@@ -215,10 +225,10 @@ export default function UserForm() {
   return (
     <div className="space-y-6 max-w-2xl mx-auto">
       <PageHeader
-        title={isEditing ? 'Edit User' : 'Add New User'}
-        description={isEditing ? 'Update user role' : 'Create a new user account with login credentials'}
+        title={isEditing ? 'Edit User' : isHR ? 'Create Staff User' : 'Add New User'}
+        description={isEditing ? 'Update user role' : isHR ? 'Create a Staff login account' : 'Create a new user account with login credentials'}
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate('/users')} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate(isHR ? '/attendance' : '/users')} className="gap-2">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -330,16 +340,17 @@ export default function UserForm() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="role">Role *</Label>
-                <Select value={role} onValueChange={(v) => setRole(v as AppRole)}>
+                <Select value={role} onValueChange={(v) => setRole(v as AppRole)} disabled={isHR}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select role" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="owner">Owner</SelectItem>
-                    <SelectItem value="admin">Admin</SelectItem>
-                    <SelectItem value="accountant">Accountant</SelectItem>
+                    {!isHR && <SelectItem value="owner">Owner</SelectItem>}
+                    {!isHR && <SelectItem value="admin">Admin</SelectItem>}
+                    {!isHR && <SelectItem value="accountant">Accountant</SelectItem>}
                     <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="ca">CA / Auditor</SelectItem>
+                    {!isHR && <SelectItem value="ca">CA / Auditor</SelectItem>}
+                    {!isHR && <SelectItem value="hr">HR</SelectItem>}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground">
@@ -348,6 +359,7 @@ export default function UserForm() {
                   {role === 'accountant' && 'Can execute payouts and view ledger (no salary access)'}
                   {role === 'staff' && 'Can submit requests and view own data'}
                   {role === 'ca' && 'Read-only access to reports and audit log'}
+                  {role === 'hr' && 'Can view attendance and create Staff users only'}
                 </p>
               </div>
 
@@ -398,7 +410,7 @@ export default function UserForm() {
 
         {/* Actions */}
         <div className="flex gap-3 justify-end">
-          <Button variant="outline" onClick={() => navigate('/users')}>
+          <Button variant="outline" onClick={() => navigate(isHR ? '/attendance' : '/users')}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={isSubmitting} className="gap-2">

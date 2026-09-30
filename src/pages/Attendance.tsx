@@ -55,6 +55,8 @@ interface StaffRow {
   full_name: string;
   department: string | null;
   designation: string | null;
+  is_active: boolean;
+  attendance_tracked: boolean;
 }
 
 type Status = 'FD' | 'HD' | 'P' | 'Absent' | 'Leave';
@@ -104,8 +106,8 @@ function fmtTime(iso: string | null): string {
 }
 
 export default function Attendance() {
-  const { isOwner, isAdmin, isCA } = useAuth();
-  const canView = isOwner || isAdmin || isCA;
+  const { isOwner, isAdmin, isCA, isHR } = useAuth();
+  const canView = isOwner || isAdmin || isCA || isHR;
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -133,31 +135,24 @@ export default function Attendance() {
     setLoading(true);
     try {
       const [staffRes, sessRes, leaveRes] = await Promise.all([
-        supabase
-          .from('staff')
-          .select('id, user_id, employee_id, full_name, department, designation, is_active, attendance_tracked')
-          .eq('is_active', true)
-          .eq('attendance_tracked', true)
-          .order('employee_id', { ascending: false }),
+        supabase.rpc('get_attendance_staff'),
         supabase
           .from('attendance_sessions' as never)
           .select('*')
           .gte('work_date', from)
           .lte('work_date', to)
           .order('check_in_at', { ascending: true }),
-        supabase
-          .from('leave_records')
-          .select('staff_id, leave_date, status')
-          .eq('status', 'approved')
-          .gte('leave_date', from)
-          .lte('leave_date', to),
+        supabase.rpc('get_attendance_leave_dates', { _date_from: from, _date_to: to }),
       ]);
 
       if (staffRes.error) throw staffRes.error;
       if (sessRes.error) throw sessRes.error;
       if (leaveRes.error) throw leaveRes.error;
 
-      setStaff((staffRes.data as StaffRow[]) ?? []);
+      const activeStaff = ((staffRes.data as StaffRow[]) ?? [])
+        .filter((member) => member.is_active && member.attendance_tracked)
+        .sort((a, b) => b.employee_id.localeCompare(a.employee_id));
+      setStaff(activeStaff);
       setSessions((sessRes.data as AttendanceSession[]) ?? []);
       const set = new Set<string>();
       (leaveRes.data ?? []).forEach((l: { staff_id: string; leave_date: string }) =>
@@ -496,7 +491,7 @@ export default function Attendance() {
           </CardContent>
         </Card>
 
-        <PenaltiesPanel />
+        {!isHR && <PenaltiesPanel />}
 
         <SessionDetailsDrawer
           open={drawerOpen}

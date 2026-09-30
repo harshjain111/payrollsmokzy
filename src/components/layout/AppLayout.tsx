@@ -288,6 +288,18 @@ function getNavSections(
     ];
   }
 
+  if (userRole === 'hr') {
+    return [
+      {
+        title: 'HR',
+        items: [
+          { title: 'Attendance', href: '/attendance', icon: Clock },
+          { title: 'Create Staff User', href: '/users/new', icon: UserPlus },
+        ],
+      },
+    ];
+  }
+
   return [];
 }
 
@@ -302,7 +314,7 @@ function NotificationBadge({ count }: { count: number }) {
 }
 
 function AppSidebar() {
-  const { userRole, staffData, signOut, isAccountant, accountingMode, setAccountingMode, user } = useAuth();
+  const { userRole, staffData, signOut, isAccountant, isHR, accountingMode, setAccountingMode, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { state, setOpenMobile, isMobile } = useSidebar();
@@ -514,11 +526,15 @@ function AppSidebar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-48 rounded-lg">
             <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
-              <Settings className="mr-2 h-3.5 w-3.5" />
-              Settings
-            </DropdownMenuItem>
+            {!isHR && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
+                  <Settings className="mr-2 h-3.5 w-3.5" />
+                  Settings
+                </DropdownMenuItem>
+              </>
+            )}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm">
               <LogOut className="mr-2 h-3.5 w-3.5" />
@@ -532,7 +548,7 @@ function AppSidebar() {
 }
 
 function AppHeader() {
-  const { user, staffData, userRole, isAccountant, accountingMode, signOut } = useAuth();
+  const { user, staffData, userRole, isAccountant, isHR, accountingMode, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { state, toggleSidebar } = useSidebar();
@@ -595,7 +611,7 @@ function AppHeader() {
       </div>
       
       <div className="flex items-center gap-3">
-        <NotificationBell />
+        {!isHR && <NotificationBell />}
         <div className="hidden sm:flex items-center gap-3">
           <div className="h-6 w-px bg-border" />
           <DropdownMenu>
@@ -615,14 +631,18 @@ function AppHeader() {
             <DropdownMenuContent align="end" className="w-48 rounded-lg">
               <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
-                <User className="mr-2 h-3.5 w-3.5" />
-                Profile
-              </DropdownMenuItem>
-              <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
-                <Settings className="mr-2 h-3.5 w-3.5" />
-                Settings
-              </DropdownMenuItem>
+              {!isHR && (
+                <>
+                  <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
+                    <User className="mr-2 h-3.5 w-3.5" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
+                    <Settings className="mr-2 h-3.5 w-3.5" />
+                    Settings
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm cursor-pointer">
                 <LogOut className="mr-2 h-3.5 w-3.5" />

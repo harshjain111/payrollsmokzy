@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790765215933,
+      "tag": "0000_add_hr_app_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790765235784,
+      "tag": "0001_grant_hr_attendance_read_access",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790765339595,
+      "tag": "0002_restrict_hr_leave_access_to_dates",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790765355175,
+      "tag": "0003_scope_attendance_reporting_views_by_role",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790765447562,
+      "tag": "0004_secure_hr_attendance_reporting_functions",
+      "breakpoints": true
+    }
+  ]
+}
