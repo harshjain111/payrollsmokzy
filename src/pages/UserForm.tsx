@@ -18,7 +18,15 @@ import {
 import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Loader2, Phone, Mail, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { AppRole, StaffPublic } from '@/types/database';
+import type { AppRole } from '@/types/database';
+
+interface AvailableStaff {
+  id: string;
+  user_id: string | null;
+  employee_id: string;
+  full_name: string;
+  is_active: boolean;
+}
 
 export default function UserForm() {
   const navigate = useNavigate();
@@ -40,7 +48,7 @@ export default function UserForm() {
   const [linkedStaffId, setLinkedStaffId] = useState<string | null>(null);
   
   // Available staff for linking
-  const [availableStaff, setAvailableStaff] = useState<StaffPublic[]>([]);
+  const [availableStaff, setAvailableStaff] = useState<AvailableStaff[]>([]);
 
   useEffect(() => {
     if (!canCreateUsers || (isHR && isEditing)) {
@@ -67,7 +75,7 @@ export default function UserForm() {
       const { data, error } = await supabase.rpc('get_attendance_staff');
 
       if (error) throw error;
-      setAvailableStaff(((data || []) as StaffPublic[]).filter((member) => !member.user_id && member.is_active));
+      setAvailableStaff(((data || []) as AvailableStaff[]).filter((member) => !member.user_id && member.is_active));
     } catch (error) {
       console.error('Error fetching available staff:', error);
     }

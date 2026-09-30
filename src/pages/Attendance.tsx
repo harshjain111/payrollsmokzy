@@ -55,6 +55,8 @@ interface StaffRow {
   full_name: string;
   department: string | null;
   designation: string | null;
+  is_active: boolean;
+  attendance_tracked: boolean;
 }
 
 type Status = 'FD' | 'HD' | 'P' | 'Absent' | 'Leave';
