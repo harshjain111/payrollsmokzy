@@ -12,7 +12,7 @@ interface CreateUserRequest {
   password: string;
   full_name: string;
   email?: string;
-  role: "owner" | "admin" | "accountant" | "staff" | "ca";
+  role: "owner" | "admin" | "accountant" | "staff" | "ca" | "hr";
   is_active: boolean;
   link_staff_id?: string; // Optional: link to existing staff record
 }
@@ -32,7 +32,7 @@ serve(async (req) => {
   try {
     // Get auth header to verify caller is owner
     const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
+    if (!authHeader?.startsWith("Bearer ")) {
       throw new Error("Missing authorization header");
     }
 
@@ -60,24 +60,30 @@ serve(async (req) => {
     );
 
     // Verify the caller is an owner
-    const { data: { user: caller } } = await supabaseClient.auth.getUser();
-    if (!caller) {
+    const token = authHeader.slice("Bearer ".length);
+    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+    const callerId = claimsData?.claims?.sub;
+    if (claimsError || !callerId) {
       throw new Error("Unauthorized");
     }
 
     const { data: roleData } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", caller.id)
+      .eq("user_id", callerId)
       .single();
 
-    if (!roleData || roleData.role !== "owner") {
-      throw new Error("Only owners can create users");
+    if (!roleData || !["owner", "hr"].includes(roleData.role)) {
+      throw new Error("Only owners or HR can create users");
     }
 
     // Parse request body
     const body: CreateUserRequest = await req.json();
     const { phone, password, full_name, email, role, is_active, link_staff_id } = body;
+
+    if (roleData.role === "hr" && role !== "staff") {
+      throw new Error("HR can create Staff users only");
+    }
 
     // Validate required fields
     if (!phone || !password || !full_name || !role) {

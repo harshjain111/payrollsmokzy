@@ -33,6 +33,8 @@ export default function Dashboard() {
       return <StaffDashboard />;
     case 'ca':
       return <CADashboard />;
+    case 'hr':
+      return null;
     default:
       return (
         <div className="text-center py-20">

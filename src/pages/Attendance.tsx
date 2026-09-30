@@ -104,8 +104,8 @@ function fmtTime(iso: string | null): string {
 }
 
 export default function Attendance() {
-  const { isOwner, isAdmin, isCA } = useAuth();
-  const canView = isOwner || isAdmin || isCA;
+  const { isOwner, isAdmin, isCA, isHR } = useAuth();
+  const canView = isOwner || isAdmin || isCA || isHR;
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -134,7 +134,7 @@ export default function Attendance() {
     try {
       const [staffRes, sessRes, leaveRes] = await Promise.all([
         supabase
-          .from('staff')
+          .from('staff_attendance_public')
           .select('id, user_id, employee_id, full_name, department, designation, is_active, attendance_tracked')
           .eq('is_active', true)
           .eq('attendance_tracked', true)
@@ -496,7 +496,7 @@ export default function Attendance() {
           </CardContent>
         </Card>
 
-        <PenaltiesPanel />
+        {!isHR && <PenaltiesPanel />}
 
         <SessionDetailsDrawer
           open={drawerOpen}

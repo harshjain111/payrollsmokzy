@@ -17,6 +17,8 @@ interface AuthContextType {
   isAccountant: boolean;
   isStaff: boolean;
   isCA: boolean;
+  isHR: boolean;
+  canCreateUsers: boolean;
   canManageStaff: boolean;
   canAddStaff: boolean;
   canEditStaff: boolean;
@@ -187,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const isAccountant = userRole === 'accountant';
   const isStaff = userRole === 'staff';
   const isCA = userRole === 'ca';
+  const isHR = userRole === 'hr';
 
   // Permission helpers - STRICT SALARY CONFIDENTIALITY
   
@@ -218,6 +221,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   
   // Settlement access - Owner ONLY
   const canAccessSettlements = isOwner;
+  const canCreateUsers = isOwner || isHR;
 
   const value = {
     user,
@@ -233,6 +237,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAccountant,
     isStaff,
     isCA,
+    isHR,
+    canCreateUsers,
     canManageStaff,
     canAddStaff,
     canEditStaff,
