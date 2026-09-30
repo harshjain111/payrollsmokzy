@@ -514,6 +514,13 @@ export type Database = {
             foreignKeyName: "expenses_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -574,6 +581,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -642,6 +656,13 @@ export type Database = {
             foreignKeyName: "journal_lines_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_lines_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -702,6 +723,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_records_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -783,6 +811,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ledger_entries_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -917,6 +952,13 @@ export type Database = {
             foreignKeyName: "payment_requests_staff_id_fkey"
             columns: ["staff_id"]
             isOneToOne: false
+            referencedRelation: "staff_attendance_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_requests_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
             referencedRelation: "staff_public"
             referencedColumns: ["id"]
           },
@@ -1001,6 +1043,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_history_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -1136,6 +1185,13 @@ export type Database = {
             columns: ["staff_id"]
             isOneToOne: false
             referencedRelation: "staff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "salary_settlements_staff_id_fkey"
+            columns: ["staff_id"]
+            isOneToOne: false
+            referencedRelation: "staff_attendance_public"
             referencedColumns: ["id"]
           },
           {
@@ -1343,6 +1399,39 @@ export type Database = {
       }
     }
     Views: {
+      staff_attendance_public: {
+        Row: {
+          attendance_tracked: boolean | null
+          department: string | null
+          designation: string | null
+          employee_id: string | null
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          user_id: string | null
+        }
+        Insert: {
+          attendance_tracked?: boolean | null
+          department?: string | null
+          designation?: string | null
+          employee_id?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Update: {
+          attendance_tracked?: boolean | null
+          department?: string | null
+          designation?: string | null
+          employee_id?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       staff_public: {
         Row: {
           created_at: string | null
