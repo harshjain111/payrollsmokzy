@@ -22,6 +22,13 @@
       "when": 1790765339595,
       "tag": "0002_restrict_hr_leave_access_to_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790765355175,
+      "tag": "0003_scope_attendance_reporting_views_by_role",
+      "breakpoints": true
     }
   ]
 }
