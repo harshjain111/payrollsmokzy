@@ -112,37 +112,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  const fetchUserData = async (userId: string, attempt = 0) => {
-    try {
-      const [roleResult, staffResult] = await Promise.all([
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .maybeSingle(),
-        supabase
-          .from('staff')
-          .select('*')
-          .eq('user_id', userId)
-          .maybeSingle(),
-      ]);
+  const fetchUserData = async (userId: string) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const [roleResult, staffResult] = await Promise.all([
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .maybeSingle(),
+          supabase
+            .from('staff')
+            .select('*')
+            .eq('user_id', userId)
+            .maybeSingle(),
+        ]);
 
-      if (roleResult.error || staffResult.error) {
-        throw roleResult.error ?? staffResult.error;
-      }
+        if (roleResult.error || staffResult.error) {
+          throw roleResult.error ?? staffResult.error;
+        }
 
-      setUserRole(roleResult.data?.role as AppRole ?? null);
-      setStaffData(staffResult.data ? staffResult.data as Staff : null);
-    } catch (error) {
-      console.error('Error in fetchUserData:', error);
-      if (attempt < 2) {
-        window.setTimeout(() => fetchUserData(userId, attempt + 1), 500 * (attempt + 1));
+        setUserRole(roleResult.data?.role as AppRole ?? null);
+        setStaffData(staffResult.data ? staffResult.data as Staff : null);
+        setIsLoading(false);
         return;
+      } catch (error) {
+        console.error('Error in fetchUserData:', error);
+        if (attempt < 2) {
+          await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+        }
       }
-    } finally {
-      if (attempt >= 2) setIsLoading(false);
-      if (attempt === 0) setIsLoading(false);
     }
+    setIsLoading(false);
   };
 
   useEffect(() => {
