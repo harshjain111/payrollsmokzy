@@ -112,43 +112,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async (userId: string, attempt = 0) => {
     try {
-      // Fetch user role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+      const [roleResult, staffResult] = await Promise.all([
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .maybeSingle(),
+        supabase
+          .from('staff')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle(),
+      ]);
 
-      if (roleError && roleError.code !== 'PGRST116') {
-        console.error('Error fetching role:', roleError);
+      if (roleResult.error || staffResult.error) {
+        throw roleResult.error ?? staffResult.error;
       }
 
-      if (roleData) {
-        setUserRole(roleData.role as AppRole);
-      }
-
-      // Fetch staff data
-      const { data: staffDataResult, error: staffError } = await supabase
-        .from('staff')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-
-      if (staffError && staffError.code !== 'PGRST116') {
-        console.error('Error fetching staff data:', staffError);
-      }
-
-      if (staffDataResult) {
-        setStaffData(staffDataResult as Staff);
-      }
+      setUserRole(roleResult.data?.role as AppRole ?? null);
+      setStaffData(staffResult.data ? staffResult.data as Staff : null);
     } catch (error) {
       console.error('Error in fetchUserData:', error);
+      if (attempt < 2) {
+        window.setTimeout(() => fetchUserData(userId, attempt + 1), 500 * (attempt + 1));
+        return;
+      }
     } finally {
-      setIsLoading(false);
+      if (attempt >= 2) setIsLoading(false);
+      if (attempt === 0) setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const refreshUserData = () => {
+      setIsLoading(true);
+      void fetchUserData(user.id);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === 'visible') refreshUserData();
+    };
+
+    window.addEventListener('focus', refreshUserData);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.removeEventListener('focus', refreshUserData);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+    };
+  }, [user?.id]);
 
   const signIn = async (email: string, password: string) => {
     try {
