@@ -257,7 +257,36 @@ export default function Shifts() {
 
         <TabsContent value="grid" className="space-y-3">
           <Card className="rounded-2xl border-0 shadow-card">
-            <CardContent className="p-0 overflow-x-auto">
+            <CardContent className="p-0">
+              <div className="divide-y md:hidden">
+                {trackedStaff.map((st) => {
+                  const assignment = assignments.find((item) => item.staff_id === st.id);
+                  return (
+                    <div key={st.id} className="space-y-3 p-4">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{st.full_name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{st.designation ?? '—'}</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Shift</Label>
+                        <Select value={assignment?.shift_id ?? 'none'} onValueChange={(value) => assignShift(st.id, value === 'none' ? null : value)}>
+                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">— No shift —</SelectItem>
+                            {shifts.map((shift) => <SelectItem key={shift.id} value={shift.id}>{shift.name}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Override in</Label><Input type="time" defaultValue={assignment?.override_check_in?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_in', event.target.value)} /></div>
+                        <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Override out</Label><Input type="time" defaultValue={assignment?.override_check_out?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_out', event.target.value)} /></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {trackedStaff.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">No tracked staff. Enable attendance for staff in Settings → Attendance Coverage.</p>}
+              </div>
+              <div className="hidden overflow-x-auto md:block">
               <table className="w-full text-sm">
                 <thead className="bg-muted/40">
                   <tr>
@@ -331,6 +360,7 @@ export default function Shifts() {
                   )}
                 </tbody>
               </table>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
