@@ -40,7 +40,8 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  CheckCircle
+  CheckCircle,
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ClearTransactionDataCard } from '@/components/settings/ClearTransactionDataCard';
@@ -48,11 +49,12 @@ import { ManageCategoriesCard } from '@/components/settings/ManageCategoriesCard
 import { ManageClubsCard } from '@/components/settings/ManageClubsCard';
 import { DisciplineRulesCard } from '@/components/settings/DisciplineRulesCard';
 import { AttendanceCoverageCard } from '@/components/settings/AttendanceCoverageCard';
-import { MigrateDataCard } from '@/components/settings/MigrateDataCard';
+import { useInstallApp } from '@/hooks/use-install-app';
 
 export default function Settings() {
   const { user, userRole, signOut, staffData } = useAuth();
   const { language, setLanguage, t } = useLanguage();
+  const { canInstall, install, isInstalled, isIOS } = useInstallApp();
   
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -137,6 +139,13 @@ export default function Settings() {
       toast.success('Signed out from all devices');
     } catch (error: any) {
       toast.error('Failed to sign out from all devices');
+    }
+  };
+
+  const handleInstallApp = async () => {
+    const outcome = await install();
+    if (outcome === 'accepted') {
+      toast.success('Smokzy Payroll installed');
     }
   };
 
@@ -226,6 +235,38 @@ export default function Settings() {
                 Language preference is saved automatically
               </p>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Install App */}
+        <Card>
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <Download className="h-4 w-4 text-primary sm:h-5 sm:w-5" />
+              Install App
+            </CardTitle>
+            <CardDescription className="text-xs sm:text-sm">
+              Keep Smokzy Payroll on this device for quick access
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3 p-4 pt-0 sm:p-6 sm:pt-0">
+            {isInstalled ? (
+              <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 p-3 text-sm font-medium text-foreground">
+                <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
+                App is installed on this device
+              </div>
+            ) : canInstall ? (
+              <Button className="w-full gap-2 sm:w-auto" onClick={handleInstallApp}>
+                <Download className="h-4 w-4" />
+                Install App
+              </Button>
+            ) : (
+              <div className="rounded-lg border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+                {isIOS
+                  ? 'Tap Share in Safari, then choose Add to Home Screen.'
+                  : 'Open your browser menu and choose Install app or Add to Home screen.'}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -415,9 +456,6 @@ export default function Settings() {
 
         {/* Discipline Rules (Owner) */}
         <DisciplineRulesCard />
-
-        {/* One-time move to a self-owned Supabase project - Owner Only */}
-        <MigrateDataCard />
 
         {/* Clear Transaction Data - Owner Only */}
         <ClearTransactionDataCard />
