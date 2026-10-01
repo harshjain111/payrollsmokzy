@@ -80,6 +80,7 @@ function getNavSections(
   userRole: string | null,
   accountingMode: boolean,
   isAccountant: boolean,
+  hrWorkforceMode: boolean,
   counts: { pendingRequests: number; pendingExpenses: number; approvedExpenses: number }
 ): NavSection[] {
   // Owner - full access
@@ -289,11 +290,27 @@ function getNavSections(
   }
 
   if (userRole === 'hr') {
+    if (!hrWorkforceMode) {
+      return [
+        {
+          title: 'My Account',
+          items: [
+            { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+            { title: 'My Attendance', href: '/my-attendance', icon: Clock },
+            { title: 'My Expenses', href: '/expenses', icon: Receipt },
+            { title: 'Request Advance', href: '/requests', icon: ClipboardList },
+            { title: 'Settings', href: '/settings', icon: Settings },
+          ],
+        },
+      ];
+    }
     return [
       {
-        title: 'HR',
+        title: 'Workforce',
         items: [
+          { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
           { title: 'Attendance', href: '/attendance', icon: Clock },
+          { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
           { title: 'Create Staff User', href: '/users/new', icon: UserPlus },
         ],
       },
@@ -314,7 +331,7 @@ function NotificationBadge({ count }: { count: number }) {
 }
 
 function AppSidebar() {
-  const { userRole, staffData, signOut, isAccountant, isHR, accountingMode, setAccountingMode, user } = useAuth();
+  const { userRole, staffData, signOut, isAccountant, isHR, accountingMode, setAccountingMode, hrWorkforceMode, setHrWorkforceMode, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { state, setOpenMobile, isMobile } = useSidebar();
@@ -328,7 +345,7 @@ function AppSidebar() {
     }
   }, [location.pathname, isMobile, setOpenMobile]);
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts.counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts.counts);
 
   const handleSignOut = async () => {
     await signOut();
@@ -421,6 +438,30 @@ function AppSidebar() {
               <TooltipContent side="right" className="text-xs">
                 {accountingMode ? 'Switch to My Account' : 'Switch to Accounting'}
               </TooltipContent>
+            </Tooltip>
+          )}
+        </div>
+      )}
+
+      {isHR && (
+        <div className={cn("px-3 pb-3", isCollapsed && "px-2 pb-2")}>
+          {!isCollapsed ? (
+            <div className="flex items-center rounded-lg bg-sidebar-accent/40 p-0.5">
+              <Button size="sm" variant="ghost" className={cn('h-8 flex-1 gap-1.5 rounded-md text-xs', !hrWorkforceMode ? 'bg-sidebar-foreground/10 text-sidebar-foreground font-medium shadow-sm' : 'text-sidebar-muted hover:bg-transparent hover:text-sidebar-foreground')} onClick={() => { setHrWorkforceMode(false); navigate('/dashboard'); }}>
+                <User className="h-3.5 w-3.5" />My Account
+              </Button>
+              <Button size="sm" variant="ghost" className={cn('h-8 flex-1 gap-1.5 rounded-md text-xs', hrWorkforceMode ? 'bg-primary text-primary-foreground font-medium shadow-sm' : 'text-sidebar-muted hover:bg-transparent hover:text-sidebar-foreground')} onClick={() => { setHrWorkforceMode(true); navigate('/dashboard'); }}>
+                <Briefcase className="h-3.5 w-3.5" />Workforce
+              </Button>
+            </div>
+          ) : (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button size="icon" variant="ghost" className={cn('h-9 w-full rounded-lg', hrWorkforceMode ? 'bg-primary text-primary-foreground' : 'bg-sidebar-accent/40 text-sidebar-muted')} onClick={() => { setHrWorkforceMode(!hrWorkforceMode); navigate('/dashboard'); }}>
+                  {hrWorkforceMode ? <Briefcase className="h-4 w-4" /> : <User className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="text-xs">{hrWorkforceMode ? 'Switch to My Account' : 'Switch to Workforce'}</TooltipContent>
             </Tooltip>
           )}
         </div>
@@ -548,14 +589,14 @@ function AppSidebar() {
 }
 
 function AppHeader() {
-  const { user, staffData, userRole, isAccountant, isHR, accountingMode, signOut } = useAuth();
+  const { user, staffData, userRole, isAccountant, isHR, accountingMode, hrWorkforceMode, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { state, toggleSidebar } = useSidebar();
   const isCollapsed = state === 'collapsed';
   const counts = useNotificationCounts();
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, counts.counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts.counts);
   const allItems = navSections.flatMap(s => s.items);
 
   const getInitials = (name: string) => {
@@ -576,7 +617,11 @@ function AppHeader() {
   );
 
   // Add context indicator for accountant
-  const contextLabel = isAccountant ? (accountingMode ? '(Accounting)' : '(Personal)') : '';
+  const contextLabel = isAccountant
+    ? (accountingMode ? '(Accounting)' : '(Personal)')
+    : isHR
+      ? (hrWorkforceMode ? '(Workforce)' : '(Personal)')
+      : '';
 
   const handleSignOut = async () => {
     await signOut();
