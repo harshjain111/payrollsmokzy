@@ -18,7 +18,7 @@ export default function MyAttendance() {
       {tracked && <AttendanceWidget />}
 
       <Tabs defaultValue="summary" className="space-y-4">
-        <TabsList className={`grid w-full ${tracked ? 'grid-cols-4' : 'grid-cols-3'} md:w-auto md:inline-flex`}>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 md:w-auto md:inline-flex">
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="logs">Daily Logs</TabsTrigger>
           {tracked && <TabsTrigger value="discipline">Discipline</TabsTrigger>}

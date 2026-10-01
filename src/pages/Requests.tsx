@@ -260,11 +260,11 @@ export default function Requests() {
       </PageHeader>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-          <TabsTrigger value="pending" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Approved</TabsTrigger>
-          <TabsTrigger value="rejected" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Rejected</TabsTrigger>
-          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4">
+          <TabsTrigger value="pending" className="text-xs sm:text-sm">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="text-xs sm:text-sm">Approved</TabsTrigger>
+          <TabsTrigger value="rejected" className="text-xs sm:text-sm">Rejected</TabsTrigger>
+          <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
         </TabsList>
       </Tabs>
 

@@ -204,13 +204,13 @@ export default function Expenses() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
-          {isStaff && <TabsTrigger value="draft" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Drafts</TabsTrigger>}
-          <TabsTrigger value="pending" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Approved</TabsTrigger>
-          <TabsTrigger value="reimbursed" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Paid</TabsTrigger>
-          <TabsTrigger value="rejected" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Rejected</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:grid-cols-6">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+          {(isStaff || isHR) && <TabsTrigger value="draft" className="text-xs sm:text-sm">Drafts</TabsTrigger>}
+          <TabsTrigger value="pending" className="text-xs sm:text-sm">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="text-xs sm:text-sm">Approved</TabsTrigger>
+          <TabsTrigger value="reimbursed" className="text-xs sm:text-sm">Paid</TabsTrigger>
+          <TabsTrigger value="rejected" className="text-xs sm:text-sm">Rejected</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4 sm:mt-6">
