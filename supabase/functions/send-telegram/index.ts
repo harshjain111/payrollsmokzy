@@ -3,7 +3,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
+// Telegram Bot API, called directly with the bot token (TELEGRAM_BOT_TOKEN).
+const TELEGRAM_API = 'https://api.telegram.org';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -11,27 +12,19 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY is not configured');
+    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
+    if (!TELEGRAM_BOT_TOKEN) {
+      throw new Error('TELEGRAM_BOT_TOKEN is not configured');
     }
-
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
-    if (!TELEGRAM_API_KEY) {
-      throw new Error('TELEGRAM_API_KEY is not configured');
-    }
+    const botApi = `${TELEGRAM_API}/bot${TELEGRAM_BOT_TOKEN}`;
 
     const body = await req.json();
 
     // Support getUpdates action to discover chat IDs
     if (body.action === 'getUpdates') {
-      const response = await fetch(`${GATEWAY_URL}/getUpdates`, {
+      const response = await fetch(`${botApi}/getUpdates`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-          'X-Connection-Api-Key': TELEGRAM_API_KEY,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ limit: 10 }),
       });
       const data = await response.json();
@@ -57,13 +50,9 @@ Deno.serve(async (req) => {
 
     const text = `🔔 <b>${escapeHtml(title)}</b>\n\n${escapeHtml(message)}`;
 
-    const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
+    const response = await fetch(`${botApi}/sendMessage`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: OWNER_CHAT_ID,
         text,

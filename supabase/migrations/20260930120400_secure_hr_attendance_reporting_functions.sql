@@ -1,3 +1,4 @@
+-- Ported from drizzle/migrations/0004_secure_hr_attendance_reporting_functions.sql.
 CREATE OR REPLACE FUNCTION public.get_attendance_staff()
 RETURNS TABLE (
   id uuid,

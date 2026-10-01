@@ -5,7 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const GATEWAY_URL = 'https://connector-gateway.lovable.dev/telegram';
+// Telegram Bot API, called directly with the bot token (TELEGRAM_BOT_TOKEN).
+const TELEGRAM_API = 'https://api.telegram.org';
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -13,12 +14,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    const TELEGRAM_API_KEY = Deno.env.get('TELEGRAM_API_KEY');
+    const TELEGRAM_BOT_TOKEN = Deno.env.get('TELEGRAM_BOT_TOKEN');
     const OWNER_CHAT_ID = Deno.env.get('TELEGRAM_OWNER_CHAT_ID');
-    
-    if (!LOVABLE_API_KEY || !TELEGRAM_API_KEY || !OWNER_CHAT_ID) {
-      throw new Error('Missing required environment variables');
+
+    if (!TELEGRAM_BOT_TOKEN || !OWNER_CHAT_ID) {
+      throw new Error('Missing required environment variables (TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_CHAT_ID)');
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -45,13 +45,9 @@ Deno.serve(async (req) => {
     }
 
     // Send via Telegram
-    const response = await fetch(`${GATEWAY_URL}/sendMessage`, {
+    const response = await fetch(`${TELEGRAM_API}/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${LOVABLE_API_KEY}`,
-        'X-Connection-Api-Key': TELEGRAM_API_KEY,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         chat_id: OWNER_CHAT_ID,
         text: message,

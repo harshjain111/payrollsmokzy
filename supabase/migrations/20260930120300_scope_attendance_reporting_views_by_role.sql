@@ -1,3 +1,4 @@
+-- Ported from drizzle/migrations/0003_scope_attendance_reporting_views_by_role.sql.
 CREATE OR REPLACE VIEW public.staff_attendance_public
 WITH (security_invoker = false)
 AS
