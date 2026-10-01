@@ -398,7 +398,7 @@ Build this with absolute accounting correctness, strict salary confidentiality, 
 ## Stack
 
 - **Frontend**: Vite + React + TypeScript + Tailwind + shadcn/ui, installable as a PWA.
-- **Backend**: [Supabase](https://supabase.com) (Postgres + RLS, Auth, Storage, Edge Functions). Project ref: `xshnuzoqeoqwarvmsgef`.
+- **Backend**: [Supabase](https://supabase.com) (Postgres + RLS, Auth, Storage, Edge Functions). Project ref: `jotpsrmsauypyycdkbhp`.
 - **Hosting**: [Vercel](https://vercel.com) (static build of `dist/`, see `vercel.json`).
 
 ## Development
@@ -434,7 +434,7 @@ Everything the app needs on the backend lives in `supabase/`:
 ```sh
 npm i -g supabase          # or: brew install supabase/tap/supabase
 supabase login
-supabase link --project-ref xshnuzoqeoqwarvmsgef
+supabase link --project-ref jotpsrmsauypyycdkbhp
 ```
 
 ### Database migrations
@@ -443,19 +443,13 @@ supabase link --project-ref xshnuzoqeoqwarvmsgef
 supabase db push
 ```
 
-The six `20260930…` migrations were originally applied through a different migration runner, so the
-live project already contains them. They are written to be idempotent (`IF NOT EXISTS`,
-`CREATE OR REPLACE`, `DROP POLICY IF EXISTS`), so re-running them is harmless. If `supabase db push`
-reports a mismatch between local and remote history, mark the already-applied versions without
-re-running them:
+On a brand-new project this applies every migration in order and the schema is complete.
 
-```sh
-supabase migration list
-supabase migration repair --status applied 20260930120000 20260930120100 20260930120200 20260930120300 20260930120400 20260930120500
-```
+### Moving data from the old Lovable-managed project
 
-For a brand-new Supabase project, just create it, `supabase link` to it, run `supabase db push`,
-and point `.env` / Vercel at the new URL and publishable key.
+The original data (staff, ledgers, attendance, logins, uploaded photos) lives in the
+Lovable-managed project `xshnuzoqeoqwarvmsgef`. `scripts/migrate-supabase/` contains a
+step-by-step migration into the new project; see `scripts/migrate-supabase/README.md`.
 
 ### Edge Functions
 
@@ -499,9 +493,9 @@ Vercel domain and add it (plus `https://*-<team>.vercel.app/**` for preview depl
 
    | Variable | Value |
    | --- | --- |
-   | `VITE_SUPABASE_URL` | `https://xshnuzoqeoqwarvmsgef.supabase.co` |
+   | `VITE_SUPABASE_URL` | `https://jotpsrmsauypyycdkbhp.supabase.co` |
    | `VITE_SUPABASE_PUBLISHABLE_KEY` | the project's anon / publishable key |
-   | `VITE_SUPABASE_PROJECT_ID` | `xshnuzoqeoqwarvmsgef` |
+   | `VITE_SUPABASE_PROJECT_ID` | `jotpsrmsauypyycdkbhp` |
 
 3. Deploy. Every push to `main` becomes a production deployment; other branches get preview URLs.
 
