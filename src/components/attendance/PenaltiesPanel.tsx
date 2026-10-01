@@ -328,7 +328,7 @@ export function PenaltiesPanel() {
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="w-[160px]"
+              className="w-full sm:w-[160px]"
             />
           </div>
           <div>
@@ -337,10 +337,10 @@ export function PenaltiesPanel() {
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="w-[160px]"
+              className="w-full sm:w-[160px]"
             />
           </div>
-          <div className="flex-1 min-w-[200px]">
+          <div className="flex-1 min-w-[150px] sm:min-w-[200px]">
             <Label className="text-xs text-muted-foreground">Search staff</Label>
             <Input
               placeholder="Name…"

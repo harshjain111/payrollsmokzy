@@ -151,10 +151,10 @@ export default function Penalties() {
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="w-[180px]"
+              className="w-full sm:w-[180px]"
             />
           </div>
-          <div className="flex-1 min-w-[180px]">
+          <div className="flex-1 min-w-[150px] sm:min-w-[180px]">
             <Label className="text-xs text-muted-foreground">Search staff</Label>
             <Input
               placeholder="Name…"

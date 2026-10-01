@@ -56,7 +56,7 @@ export function MyDisciplineTab() {
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
-          className="w-[160px]"
+          className="w-full sm:w-[160px]"
         />
       </div>
 
