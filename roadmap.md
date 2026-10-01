@@ -9,3 +9,4 @@
 - [x] Replace remaining wide mobile tables and tab bars
 - [x] Fix shared shell, forms, dialogs, and action layouts
 - [ ] Verify key phone screens and complete no-overflow checks
+- [x] Add times and per-person summaries to every HR attendance tile popup
