@@ -445,33 +445,13 @@ supabase db push
 
 On a brand-new project this applies every migration in order and the schema is complete.
 
-### Moving data from the old Lovable Cloud project
+### Data history
 
-The original data (staff, ledgers, attendance, logins, uploaded photos) lives in the Lovable Cloud
-project `xshnuzoqeoqwarvmsgef`, whose database credentials Lovable does not expose. The
-`migrate-to-new-project` edge function runs inside that project, where it can reach the
-database, and copies everything into the new project:
-
-1. Merge to `main` so Lovable syncs the function and the Settings card. If Lovable does not
-   deploy the function on its own, ask Lovable's chat to "deploy the migrate-to-new-project
-   edge function".
-2. Open the app on Lovable, sign in as the owner, and go to **Settings → Move data to your own
-   Supabase project**.
-3. Enter the new project's URL, service role key and **Session pooler** connection string, press
-   **Check connection**, then **Start migration**.
-4. Every count in the verification list should show a green tick. Re-running is safe.
-
-It creates the schema, then copies auth users with their password hashes, every public table
-with triggers suspended, every storage file, and the original file owners. The old project
-is only read.
-
-Until the move is done, `.env` keeps pointing at the old project because Lovable still builds
-from this repo. Vercel uses its own environment variables, so it can point at the new project
-already. After the move, switch `.env` and `supabase/config.toml` to the new project and delete
-the function and the Settings card.
-
-If you ever have direct database access to both projects, `scripts/migrate-supabase/` does the
-same job from a terminal with `pg_dump` and `psql`.
+The app originally ran on the Lovable Cloud project `xshnuzoqeoqwarvmsgef`. Its tables, logins
+(with password hashes) and expense-proof files were copied into `jotpsrmsauypyycdkbhp` with a
+one-time, owner-only edge function and Settings card. Both were removed after the move; see
+git history for `supabase/functions/migrate-to-new-project` if you ever need them. Attendance
+photos were not copied, so older attendance records have no photo.
 
 ### Edge Functions
 
