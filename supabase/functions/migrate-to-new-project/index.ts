@@ -101,14 +101,29 @@ async function trySetReplica(tx: Tx): Promise<boolean> {
   }
 }
 
-// Reads the source inside a read-only transaction: a consistent snapshot per table, and the
-// cursor stays on one connection even behind a transaction pooler.
-async function streamRows(src: Sql, query: string, batch: number, onRows: (json: string) => Promise<void>) {
-  await src.begin(async (stx) => {
+// Rows are read in pages ordered by primary key (no server-side cursors, which can stall in the
+// edge runtime). Each request copies at most ROWS_PER_CALL rows and tells the caller where to
+// resume, so no single request runs long enough to hit the platform's time limits.
+const PAGE_SIZE = 1000;
+const ROWS_PER_CALL = 5000;
+
+async function orderByClause(sql: Sql, schema: string, table: string): Promise<string> {
+  const rows = await sql`
+    select a.attname
+    from pg_index i
+    join pg_class c on c.oid = i.indrelid
+    join pg_namespace n on n.oid = c.relnamespace
+    join pg_attribute a on a.attrelid = c.oid and a.attnum = any(i.indkey)
+    where n.nspname = ${schema} and c.relname = ${table} and i.indisprimary
+    order by array_position(i.indkey, a.attnum)`;
+  return rows.length ? rows.map((r) => qi(r.attname as string)).join(', ') : 'ctid';
+}
+
+async function readPage(src: Sql, query: string): Promise<string[]> {
+  return await src.begin(async (stx) => {
     await stx.unsafe('set transaction read only');
-    await stx.unsafe(query).cursor(batch, async (rows) => {
-      await onRows('[' + rows.map((r) => r.j as string).join(',') + ']');
-    });
+    const rows = await stx.unsafe(query);
+    return rows.map((r) => r.j as string);
   });
 }
 
@@ -120,7 +135,7 @@ async function assertSourceTable(src: Sql, schema: string, table: string) {
   }
 }
 
-async function copyTable(src: Sql, tgt: Sql, schema: string, table: string) {
+async function copyTable(src: Sql, tgt: Sql, schema: string, table: string, offset: number) {
   await assertSourceTable(src, schema, table);
   const srcCols = (await columnsOf(src, schema, table, false)).map((c) => c.name);
   const tgtColInfo = await columnsOf(tgt, schema, table, true);
@@ -134,22 +149,41 @@ async function copyTable(src: Sql, tgt: Sql, schema: string, table: string) {
   const fq = fqName(schema, table);
   const colList = cols.map(qi).join(', ');
 
+  const orderBy = await orderByClause(src, schema, table);
+
   let copied = 0;
+  let read = 0;
   let replica = false;
+  let done = false;
   await tgt.begin(async (tx) => {
     replica = await trySetReplica(tx);
     if (!replica && schema === 'public') await tx.unsafe(`alter table ${fq} disable trigger user`);
-    await tx.unsafe(`delete from ${fq}`); // makes re-running a step safe
-    await streamRows(src, `select to_json(t)::text as j from (select ${colList} from ${fq}) t`, 500, async (payload) => {
-      const res = await tx.unsafe(
-        `insert into ${fq} (${colList}) ${overriding} select ${colList} from json_populate_recordset(null::${fq}, $1::json)`,
-        [payload],
+    if (offset === 0) await tx.unsafe(`delete from ${fq}`); // first page: start the table fresh
+    while (read < ROWS_PER_CALL) {
+      const page = await readPage(
+        src,
+        `select to_json(t)::text as j from (select ${colList} from ${fq} order by ${orderBy}
+           limit ${PAGE_SIZE} offset ${offset + read}) t`,
       );
-      copied += res.count;
-    });
+      if (page.length) {
+        // ON CONFLICT DO NOTHING makes a retried request harmless.
+        const res = await tx.unsafe(
+          `insert into ${fq} (${colList}) ${overriding}
+           select ${colList} from json_populate_recordset(null::${fq}, $1::json)
+           on conflict do nothing`,
+          ['[' + page.join(',') + ']'],
+        );
+        copied += res.count;
+        read += page.length;
+      }
+      if (page.length < PAGE_SIZE) {
+        done = true;
+        break;
+      }
+    }
     if (!replica && schema === 'public') await tx.unsafe(`alter table ${fq} enable trigger user`);
   });
-  return { table: `${schema}.${table}`, copied, skippedColumns, replica };
+  return { table: `${schema}.${table}`, copied, skippedColumns, replica, done, nextOffset: offset + read };
 }
 
 async function applySchema(tgt: Sql) {
@@ -243,15 +277,22 @@ async function syncStorageOwners(src: Sql, tgt: Sql) {
   let updated = 0;
   await tgt.begin(async (tx) => {
     await trySetReplica(tx);
-    await streamRows(src, `select to_json(t)::text as j from (select ${select} from storage.objects) t`, 1000, async (payload) => {
+    for (let offset = 0; ; offset += PAGE_SIZE) {
+      const page = await readPage(
+        src,
+        `select to_json(t)::text as j from (select ${select} from storage.objects
+           order by bucket_id, name limit ${PAGE_SIZE} offset ${offset}) t`,
+      );
+      if (!page.length) break;
       const res = await tx.unsafe(
         `update storage.objects o set ${set}
          from json_populate_recordset(null::storage.objects, $1::json) s
          where o.bucket_id = s.bucket_id and o.name = s.name`,
-        [payload],
+        ['[' + page.join(',') + ']'],
       );
       updated += res.count;
-    });
+      if (page.length < PAGE_SIZE) break;
+    }
   });
   return updated;
 }
@@ -314,7 +355,7 @@ Deno.serve(async (req) => {
     return respond({ ok: false, error: 'SUPABASE_DB_URL is not available to edge functions on this project.' });
   }
 
-  let body: { action?: string; target?: Target; schema?: string; table?: string; bucket?: string; names?: string[] };
+  let body: { action?: string; target?: Target; schema?: string; table?: string; offset?: number; bucket?: string; names?: string[] };
   try {
     body = await req.json();
   } catch {
@@ -369,7 +410,7 @@ Deno.serve(async (req) => {
         return respond({ ok: true, ...(await applySchema(tgt)) });
       case 'copy-table':
         if (!body.schema || !body.table) return respond({ ok: false, error: 'schema and table are required' }, 400);
-        return respond({ ok: true, ...(await copyTable(src, tgt, body.schema, body.table)) });
+        return respond({ ok: true, ...(await copyTable(src, tgt, body.schema, body.table, Math.max(0, Math.floor(Number(body.offset) || 0)))) });
       case 'list-files': {
         if (!body.bucket) return respond({ ok: false, error: 'bucket is required' }, 400);
         await ensureBucket(srcAdmin, tgtAdmin, body.bucket);

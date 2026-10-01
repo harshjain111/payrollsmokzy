@@ -35,7 +35,7 @@ type CheckResult = {
 };
 type VerifyRow = { table: string; source: number | null; target: number | null; match: boolean };
 
-const FILE_BATCH = 20;
+const FILE_BATCH = 10;
 
 export function MigrateDataCard() {
   const { isOwner } = useAuth();
@@ -53,13 +53,36 @@ export function MigrateDataCard() {
 
   const addLog = (line: string) => setLog((l) => [...l, line]);
 
-  const call = async <T,>(body: Record<string, unknown>): Promise<T> => {
+  const callOnce = async <T,>(body: Record<string, unknown>): Promise<T> => {
     const { data, error } = await supabase.functions.invoke('migrate-to-new-project', {
       body: { ...body, target: { url: targetUrl.trim(), serviceRoleKey: serviceRoleKey.trim(), dbUrl: dbUrl.trim() } },
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Surface the function's own error message when it sent one.
+      const ctx = (error as { context?: Response }).context;
+      if (ctx && typeof ctx.json === 'function') {
+        const payload = await ctx.json().catch(() => null);
+        if (payload?.error) throw new Error(payload.error);
+      }
+      throw new Error(error.message);
+    }
     if (!data?.ok) throw new Error(data?.error ?? 'Unknown error');
     return data as T;
+  };
+
+  // Every action is safe to repeat, so transient failures (timeouts, dropped connections) are retried.
+  const call = async <T,>(body: Record<string, unknown>, attempts = 3): Promise<T> => {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await callOnce<T>(body);
+      } catch (e) {
+        const msg = (e as Error).message;
+        const transient = /failed to send a request|fetch|network|timed? ?out|worker|546|504|502/i.test(msg);
+        if (!transient || attempt >= attempts) throw e;
+        addLog(`  retrying after: ${msg}`);
+        await new Promise((r) => setTimeout(r, 3000 * attempt));
+      }
+    }
   };
 
   const runCheck = async () => {
@@ -100,19 +123,31 @@ export function MigrateDataCard() {
       advance();
 
       for (const t of check.tables) {
-        const res = await call<{ copied: number; skippedColumns: string[]; replica: boolean }>({
-          action: 'copy-table',
-          schema: t.schema,
-          table: t.table,
-        });
+        addLog(`Copying ${t.schema}.${t.table} (${t.rows ?? '?'} rows)…`);
+        let offset = 0;
+        let copied = 0;
+        let skipped: string[] = [];
+        for (;;) {
+          const res = await call<{ copied: number; skippedColumns: string[]; done: boolean; nextOffset: number }>({
+            action: 'copy-table',
+            schema: t.schema,
+            table: t.table,
+            offset,
+          });
+          copied += res.copied;
+          skipped = res.skippedColumns;
+          if (res.done) break;
+          offset = res.nextOffset;
+        }
         addLog(
-          `${t.schema}.${t.table}: ${res.copied} rows` +
-            (res.skippedColumns.length ? ` (columns not on new project, skipped: ${res.skippedColumns.join(', ')})` : ''),
+          `  ${copied} rows copied` +
+            (skipped.length ? ` (columns not on new project, skipped: ${skipped.join(', ')})` : ''),
         );
         advance();
       }
 
       for (const bucket of bucketIds) {
+        addLog(`Copying files in ${bucket} (${check.buckets[bucket]})…`);
         const { names } = await call<{ names: string[] }>({ action: 'list-files', bucket });
         let copied = 0;
         const failed: string[] = [];
