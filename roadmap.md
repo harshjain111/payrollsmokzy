@@ -1,0 +1,6 @@
+- [ ] Refine HR personal/workforce access and navigation
+- [ ] Add HR dashboard attendance tiles with staff detail popups
+- [ ] Enable HR own attendance, leave, advance, and expense workflows
+- [ ] Give HR read-only penalty visibility
+- [ ] Remove mobile viewport overflow across the app
+- [ ] Verify role security, build, tests, and mobile UI
