@@ -23,9 +23,16 @@ export function InstallPrompt() {
         <Button size="sm" onClick={handleInstall}>
           Install App
         </Button>
-        <button onClick={() => setDismissed(true)} className="text-muted-foreground hover:text-foreground">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Dismiss install prompt"
+          onClick={() => setDismissed(true)}
+          className="h-8 w-8 shrink-0"
+        >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
     </div>
   );
