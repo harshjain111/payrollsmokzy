@@ -455,6 +455,14 @@ photos were not copied, so older attendance records have no photo.
 
 ### Edge Functions
 
+GitHub Actions deploys them automatically (`.github/workflows/supabase-deploy.yml`) on every
+push to `main` that touches `supabase/functions` or `supabase/config.toml`, and on demand from
+the Actions tab. It needs the repository secret `SUPABASE_ACCESS_TOKEN`
+(https://supabase.com/dashboard/account/tokens). Any function secrets from the table below that
+are also stored as repository secrets are copied to Supabase on each run.
+
+To deploy by hand instead:
+
 Deploy all functions:
 
 ```sh
