@@ -31,6 +31,11 @@ interface StatusTile {
   tone: string;
 }
 
+interface AttendancePerson {
+  member: StaffRow;
+  session: AttendanceSession | null;
+}
+
 const tiles: StatusTile[] = [
   { key: 'checked-in', title: 'Checked In', subtitle: 'Working now', icon: CalendarClock, tone: 'text-success bg-success/10' },
   { key: 'break', title: 'On Break', subtitle: 'Away temporarily', icon: Coffee, tone: 'text-warning bg-warning/10' },
@@ -38,6 +43,29 @@ const tiles: StatusTile[] = [
   { key: 'absent', title: 'Absent', subtitle: 'No attendance today', icon: Users, tone: 'text-destructive bg-destructive/10' },
   { key: 'leave', title: 'On Leave', subtitle: 'Approved leave', icon: ShieldAlert, tone: 'text-primary bg-primary/10' },
 ];
+
+function formatTime(value: string | null | undefined) {
+  if (!value) return '—';
+  return format(new Date(value), 'h:mm a');
+}
+
+function formatMinutes(total: number | null | undefined) {
+  if (total === null || total === undefined) return '—';
+  const hours = Math.floor(total / 60);
+  const minutes = total % 60;
+  if (hours === 0) return `${minutes}m`;
+  return minutes === 0 ? `${hours}h` : `${hours}h ${minutes}m`;
+}
+
+function getStatusSummary(group: AttendanceGroup, session: AttendanceSession | null) {
+  if (group === 'absent') return 'No attendance recorded today';
+  if (group === 'leave') return 'Approved leave for today';
+  if (group === 'break') return `Checked in ${formatTime(session?.check_in_at)} · On break`;
+  if (group === 'completed') {
+    return `${formatTime(session?.check_in_at)} – ${formatTime(session?.check_out_at)} · ${formatMinutes(session?.worked_minutes)} worked`;
+  }
+  return `Checked in at ${formatTime(session?.check_in_at)} · Working now`;
+}
 
 export function HRDashboard() {
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -77,25 +105,25 @@ export function HRDashboard() {
       const previous = latest.get(key);
       if (!previous || new Date(session.check_in_at) > new Date(previous.check_in_at)) latest.set(key, session);
     });
-    const result: Record<AttendanceGroup, StaffRow[]> = {
+    const result: Record<AttendanceGroup, AttendancePerson[]> = {
       'checked-in': [], break: [], completed: [], absent: [], leave: [],
     };
     staff.forEach((member) => {
       if (leaveIds.has(member.id)) {
-        result.leave.push(member);
+        result.leave.push({ member, session: latest.get(member.id) ?? null });
         return;
       }
       const session = latest.get(member.id);
-      if (!session) result.absent.push(member);
-      else if (session.status === 'on_break') result.break.push(member);
-      else if (session.status === 'completed') result.completed.push(member);
-      else result['checked-in'].push(member);
+      if (!session) result.absent.push({ member, session: null });
+      else if (session.status === 'on_break') result.break.push({ member, session });
+      else if (session.status === 'completed') result.completed.push({ member, session });
+      else result['checked-in'].push({ member, session });
     });
     return result;
   }, [leaveIds, sessions, staff]);
 
   const selectedTile = tiles.find((tile) => tile.key === selectedGroup);
-  const visiblePeople = (selectedGroup ? grouped[selectedGroup] : []).filter((member) => {
+  const visiblePeople = (selectedGroup ? grouped[selectedGroup] : []).filter(({ member }) => {
     const query = search.trim().toLowerCase();
     return !query || member.full_name.toLowerCase().includes(query) || member.employee_id.toLowerCase().includes(query);
   });
@@ -153,13 +181,34 @@ export function HRDashboard() {
           <div className="max-h-[55vh] space-y-2 overflow-y-auto pr-1">
             {visiblePeople.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">No staff found.</p>
-            ) : visiblePeople.map((member) => (
-              <div key={member.id} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="min-w-0">
+            ) : visiblePeople.map(({ member, session }) => (
+              <div key={member.id} className="min-w-0 rounded-lg border p-3">
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{member.full_name}</p>
                   <p className="truncate text-xs text-muted-foreground">{member.employee_id}{member.department ? ` · ${member.department}` : ''}</p>
+                  </div>
+                  <Badge variant="secondary" className="shrink-0">{selectedTile?.title}</Badge>
                 </div>
-                <Badge variant="secondary" className="shrink-0">{selectedTile?.title}</Badge>
+                <p className="mt-2 text-xs font-medium text-foreground">
+                  {selectedGroup ? getStatusSummary(selectedGroup, session) : ''}
+                </p>
+                {session && selectedGroup !== 'absent' && selectedGroup !== 'leave' && (
+                  <div className="mt-2 grid grid-cols-3 gap-2 rounded-md bg-muted/60 p-2 text-center">
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Check in</p>
+                      <p className="text-xs font-semibold tabular-nums">{formatTime(session.check_in_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Check out</p>
+                      <p className="text-xs font-semibold tabular-nums">{formatTime(session.check_out_at)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-muted-foreground">Break</p>
+                      <p className="text-xs font-semibold tabular-nums">{formatMinutes(session.total_break_minutes)}</p>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
