@@ -316,7 +316,29 @@ export default function PettyCash() {
         />
       ) : (
         <Card>
-          <div className="overflow-x-auto">
+          <div className="divide-y md:hidden">
+            {transactions.map((txn) => (
+              <div key={txn.id} className="space-y-3 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium">{format(new Date(txn.transaction_date), 'dd MMM yyyy')}</p>
+                    <Badge variant={TRANSACTION_TYPE_COLORS[txn.transaction_type] as any} className="mt-1 text-[10px]">
+                      {TRANSACTION_TYPE_LABELS[txn.transaction_type]}
+                    </Badge>
+                  </div>
+                  <span className={cn('shrink-0 font-semibold', isInflow(txn.transaction_type) ? 'text-success' : 'text-destructive')}>
+                    {isInflow(txn.transaction_type) ? '+' : '-'}₹{txn.amount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">Balance after</span>
+                  <span className="font-medium">₹{txn.balance_after.toLocaleString('en-IN')}</span>
+                </div>
+                {txn.notes && <p className="break-words text-xs text-muted-foreground">{txn.notes}</p>}
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>

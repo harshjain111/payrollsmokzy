@@ -51,7 +51,7 @@
    const [selectedStatus, setSelectedStatus] = useState<string>('all');
    const [searchQuery, setSearchQuery] = useState('');
  
-   const isStaff = userRole === 'staff';
+   const isStaff = userRole === 'staff' || userRole === 'hr';
    const canApprove = userRole === 'owner' || userRole === 'admin' || userRole === 'accountant';
  
    useEffect(() => {
@@ -341,7 +341,27 @@
                }
              />
            ) : (
-             <div className="overflow-x-auto">
+             <>
+             <div className="divide-y md:hidden">
+               {filteredRecords.map((record) => (
+                 <div key={record.id} className="space-y-3 p-4">
+                   <div className="flex items-start justify-between gap-3">
+                     <div className="min-w-0">
+                       {!isStaff && <p className="truncate font-medium">{record.staff?.full_name}</p>}
+                       <p className="text-sm font-medium">{format(new Date(record.leave_date), 'EEE, dd MMM')}</p>
+                     </div>
+                     <Badge variant={getStatusVariant(record.status)} className="shrink-0 gap-1">{getStatusIcon(record.status)}{isStaff && record.status === 'pending' ? 'Waiting' : LEAVE_STATUS_LABELS[record.status]}</Badge>
+                   </div>
+                   <div className="flex items-center justify-between gap-3 text-xs">
+                     <Badge variant="outline">{isStaff ? (record.leave_type === 'paid' ? 'Paid' : 'Leave') : LEAVE_TYPE_CONFIG[record.leave_type]?.label}</Badge>
+                     <span className={cn('font-medium', record.deduction_days > 0 ? 'text-destructive' : 'text-success')}>{record.deduction_days === 0 ? 'No deduction' : `-${record.deduction_days} day`}</span>
+                   </div>
+                   {record.remarks && <p className="break-words text-xs text-muted-foreground">{record.remarks}</p>}
+                   {canApprove && record.status === 'pending' && <Button size="sm" className="w-full" onClick={() => handleReviewClick(record)}>Review</Button>}
+                 </div>
+               ))}
+             </div>
+             <div className="hidden overflow-x-auto md:block">
                <Table>
                  <TableHeader>
                    <TableRow>
@@ -442,6 +462,7 @@
                  </TableBody>
                </Table>
              </div>
+             </>
            )}
          </CardContent>
        </Card>
@@ -451,7 +472,7 @@
          open={showCreateDialog}
          onOpenChange={setShowCreateDialog}
          onSuccess={fetchLeaveRecords}
-         staffId={isStaff ? staffData?.id : undefined}
+          staffId={isStaff ? staffData?.id : undefined}
        />
  
        <LeaveApprovalDialog

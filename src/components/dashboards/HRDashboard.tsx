@@ -13,6 +13,7 @@ import type { AttendanceSession } from '@/lib/attendance';
 
 interface StaffRow {
   id: string;
+  user_id: string | null;
   employee_id: string;
   full_name: string;
   department: string | null;
@@ -69,8 +70,9 @@ export function HRDashboard() {
 
   const grouped = useMemo(() => {
     const latest = new Map<string, AttendanceSession>();
+    const staffByUser = new Map(staff.filter((member) => member.user_id).map((member) => [member.user_id, member.id]));
     sessions.forEach((session) => {
-      const key = session.staff_id;
+      const key = session.staff_id ?? staffByUser.get(session.user_id);
       if (!key) return;
       const previous = latest.get(key);
       if (!previous || new Date(session.check_in_at) > new Date(previous.check_in_at)) latest.set(key, session);

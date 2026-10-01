@@ -278,7 +278,29 @@ export default function WhatsAppLogs() {
       {/* Table */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {!loading && logs.length > 0 && (
+            <div className="divide-y md:hidden">
+              {logs.map((row) => (
+                <div key={row.id} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{(row.staff_id && staffMap[row.staff_id]) || row.staff_phone}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(row.sent_at), 'dd MMM yyyy, h:mm a')}</p>
+                    </div>
+                    <Badge className={row.success ? 'border-0 bg-success/15 text-success' : 'border-0 bg-destructive/15 text-destructive'}>{row.success ? 'Sent' : 'Failed'}</Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="secondary">{row.event_type === 'checkin' ? 'Check-in' : 'Checkout'}</Badge>
+                    <Badge variant="secondary" className={cn('border-0', slabBadge[row.slab])}>{slabLabel[row.slab] ?? row.slab}</Badge>
+                    {Number(row.deduction_amount) > 0 && <span className="font-medium text-destructive">₹{Number(row.deduction_amount).toLocaleString('en-IN')}</span>}
+                  </div>
+                  {(row.error_message || row.meta_message_id) && <p className="break-words text-xs text-muted-foreground">{row.error_message ?? row.meta_message_id}</p>}
+                  {!row.success && <Button size="sm" variant="outline" disabled={retrying === row.id} onClick={() => retry(row)}><RefreshCw className={cn('mr-1 h-3.5 w-3.5', retrying === row.id && 'animate-spin')} />Retry</Button>}
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>

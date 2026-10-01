@@ -230,7 +230,30 @@ export default function UsersList() {
               }
             />
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            <div className="divide-y md:hidden">
+              {filteredUsers.map((user) => (
+                <div key={user.id} className="space-y-3 p-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar className="h-9 w-9 shrink-0"><AvatarFallback className="bg-primary/10 text-sm text-primary">{getInitials(user.full_name || undefined)}</AvatarFallback></Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium">{user.full_name || 'Unknown'}</p>
+                      <p className="truncate text-xs text-muted-foreground">{user.phone || user.email || 'No contact'}</p>
+                    </div>
+                    <Badge variant={getRoleBadgeVariant(user.role)}>{getRoleLabel(user.role)}</Badge>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                    <span className="truncate">{user.staff_name || 'Not linked to staff'}</span>
+                    <span className="shrink-0">{format(new Date(user.created_at), 'dd MMM yyyy')}</span>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button asChild size="sm" variant="outline"><Link to={`/users/${user.user_id}/edit`}><Edit className="mr-2 h-4 w-4" />Edit</Link></Button>
+                    <Button size="sm" variant="outline" onClick={() => setResetPasswordUser(user)}><Key className="mr-2 h-4 w-4" />Password</Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <Table>
                 <TableHeader>
                   <TableRow className="bg-secondary/50">
@@ -347,6 +370,7 @@ export default function UsersList() {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </CardContent>
       </Card>
