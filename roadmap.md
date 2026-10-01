@@ -3,4 +3,4 @@
 - [x] Enable HR own attendance, leave, advance, and expense workflows
 - [x] Give HR read-only penalty visibility
 - [x] Remove mobile viewport overflow across the app
-- [x] Verify role security, build, tests, and mobile UI
+- [ ] Verify role security, build, tests, and mobile UI
