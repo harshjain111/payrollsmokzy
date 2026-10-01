@@ -88,17 +88,21 @@ SALARY DATA:
 - Advances Adjusted from Salary: ₹${settlements.reduce((s, s2) => s + Number(s2.advances_adjusted || 0), 0).toLocaleString('en-IN')}
 `;
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    // Any OpenAI-compatible chat-completions endpoint works here. Defaults to
+    // Google's Gemini endpoint so the model stays the same as before.
+    const AI_API_KEY = Deno.env.get("AI_API_KEY");
+    if (!AI_API_KEY) throw new Error("AI_API_KEY is not configured");
+    const AI_BASE_URL = (Deno.env.get("AI_BASE_URL") || "https://generativelanguage.googleapis.com/v1beta/openai").replace(/\/$/, "");
+    const AI_MODEL = Deno.env.get("AI_MODEL") || "gemini-3-flash-preview";
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResponse = await fetch(`${AI_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${AI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: AI_MODEL,
         messages: [
           {
             role: "system",
@@ -126,7 +130,7 @@ Be specific with numbers. Flag expense spikes, unusual patterns, cost optimizati
         });
       }
       if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits to continue." }), {
+        return new Response(JSON.stringify({ error: "AI provider billing error. Check the AI_API_KEY account." }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }

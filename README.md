@@ -395,25 +395,115 @@ Built specifically for Smokzy’s real operational needs.
 
 Build this with absolute accounting correctness, strict salary confidentiality, and operational ease.
 
-This project was built with [Lovable](https://lovable.dev).
+## Stack
 
-**Live app**: https://snug-salary-safe.lovable.app
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9f1417a2-0b73-4fb4-84a1-a73b5fcb1457).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+- **Frontend**: Vite + React + TypeScript + Tailwind + shadcn/ui, installable as a PWA.
+- **Backend**: [Supabase](https://supabase.com) (Postgres + RLS, Auth, Storage, Edge Functions). Project ref: `xshnuzoqeoqwarvmsgef`.
+- **Hosting**: [Vercel](https://vercel.com) (static build of `dist/`, see `vercel.json`).
 
 ## Development
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+You need Node.js 20+ and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
 
 ```sh
 git clone <this-repository-url>
 cd <repository-name>
 npm i
+cp .env.example .env   # fill in your Supabase URL and publishable key
 npm run dev
 ```
+
+Useful scripts:
+
+```sh
+npm run build   # production build into dist/
+npm run test    # vitest
+npm run lint    # eslint
+```
+
+## Supabase
+
+Everything the app needs on the backend lives in `supabase/`:
+
+- `supabase/migrations/` — the full schema, RLS policies, views and functions. Apply in order.
+- `supabase/functions/` — Edge Functions (user management, Telegram/WhatsApp notifications, AI insights, webhooks).
+- `supabase/config.toml` — per-function `verify_jwt` settings for the webhook-style functions.
+
+### Connect the CLI to the project
+
+```sh
+npm i -g supabase          # or: brew install supabase/tap/supabase
+supabase login
+supabase link --project-ref xshnuzoqeoqwarvmsgef
+```
+
+### Database migrations
+
+```sh
+supabase db push
+```
+
+The six `20260930…` migrations were originally applied through a different migration runner, so the
+live project already contains them. They are written to be idempotent (`IF NOT EXISTS`,
+`CREATE OR REPLACE`, `DROP POLICY IF EXISTS`), so re-running them is harmless. If `supabase db push`
+reports a mismatch between local and remote history, mark the already-applied versions without
+re-running them:
+
+```sh
+supabase migration list
+supabase migration repair --status applied 20260930120000 20260930120100 20260930120200 20260930120300 20260930120400 20260930120500
+```
+
+For a brand-new Supabase project, just create it, `supabase link` to it, run `supabase db push`,
+and point `.env` / Vercel at the new URL and publishable key.
+
+### Edge Functions
+
+Deploy all functions:
+
+```sh
+supabase functions deploy
+```
+
+Set the secrets the functions read (`SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+`SUPABASE_SERVICE_ROLE_KEY` are injected automatically):
+
+| Secret | Used by |
+| --- | --- |
+| `TELEGRAM_BOT_TOKEN` | `send-telegram`, `telegram-report` — a bot token from [@BotFather](https://t.me/BotFather) |
+| `TELEGRAM_OWNER_CHAT_ID` | `send-telegram`, `telegram-report` — call `send-telegram` with `{ "action": "getUpdates" }` to discover it |
+| `AI_API_KEY` | `ai-insights` — API key for an OpenAI-compatible chat-completions provider |
+| `AI_BASE_URL` | `ai-insights` — optional, defaults to Google Gemini's OpenAI-compatible endpoint |
+| `AI_MODEL` | `ai-insights` — optional, defaults to `gemini-3-flash-preview` |
+| `WHATSAPP_ACCESS_TOKEN`, `WABANOW_API_KEY` | `send-attendance-whatsapp` |
+| `JUVLON_API_KEY` | `daily-summary-email` |
+| `FINANCIAL_CORE_WEBHOOK_URL` | `sync-to-financial` |
+| `SMOKZY_ORDER_WEBHOOK_SECRET` | `receive-smokzy-order` |
+| `REIMBURSEMENT_WEBHOOK_SECRET` | `receive-reimbursement` |
+
+```sh
+supabase secrets set TELEGRAM_BOT_TOKEN=... TELEGRAM_OWNER_CHAT_ID=... AI_API_KEY=...
+```
+
+### Auth URLs
+
+In the Supabase dashboard under **Authentication → URL Configuration**, set **Site URL** to your
+Vercel domain and add it (plus `https://*-<team>.vercel.app/**` for preview deployments) to
+**Redirect URLs**. Remove the old `lovable.app` entries.
+
+## Deploy on Vercel
+
+1. In Vercel, **Add New → Project** and import this GitHub repository. Vercel detects Vite; the
+   build command (`npm run build`) and output directory (`dist`) are also pinned in `vercel.json`.
+2. Add the environment variables for **Production** and **Preview**:
+
+   | Variable | Value |
+   | --- | --- |
+   | `VITE_SUPABASE_URL` | `https://xshnuzoqeoqwarvmsgef.supabase.co` |
+   | `VITE_SUPABASE_PUBLISHABLE_KEY` | the project's anon / publishable key |
+   | `VITE_SUPABASE_PROJECT_ID` | `xshnuzoqeoqwarvmsgef` |
+
+3. Deploy. Every push to `main` becomes a production deployment; other branches get preview URLs.
+
+`vercel.json` rewrites all non-asset routes to `index.html` (React Router) and sets no-cache headers
+on the service worker so PWA updates roll out immediately.
