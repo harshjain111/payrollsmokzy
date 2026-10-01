@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -16,7 +17,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { CheckCircle2, DatabaseZap, Loader2, XCircle } from 'lucide-react';
+import { CheckCircle2, DatabaseZap, Loader2, MinusCircle, XCircle } from 'lucide-react';
 
 /**
  * One-time tool to move everything from the Lovable Cloud project into a Supabase project the
@@ -48,6 +49,8 @@ export function MigrateDataCard() {
   const [log, setLog] = useState<string[]>([]);
   const [verification, setVerification] = useState<VerifyRow[] | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  // What to copy: 'db' = all tables and logins, plus one entry per storage bucket.
+  const [include, setInclude] = useState<Record<string, boolean>>({});
 
   if (!isOwner) return null;
 
@@ -92,6 +95,7 @@ export function MigrateDataCard() {
     try {
       const res = await call<CheckResult>({ action: 'check' });
       setCheck(res);
+      setInclude({ db: true, ...Object.fromEntries(Object.keys(res.buckets).map((b) => [b, true])) });
       const rows = res.tables.reduce((n, t) => n + (t.rows ?? 0), 0);
       const files = Object.values(res.buckets).reduce((n, c) => n + c, 0);
       addLog(`Connected. Old project ${res.sourceRef} → new project ${res.targetRef}.`);
@@ -105,14 +109,18 @@ export function MigrateDataCard() {
     }
   };
 
+  const isSkipped = (row: string) =>
+    row.startsWith('storage: ') ? !include[row.slice('storage: '.length)] : !include.db;
+
   const runMigration = async () => {
     if (!check) return;
     setConfirmOpen(false);
     setBusy(true);
     setVerification(null);
     setProgress(0);
-    const bucketIds = Object.keys(check.buckets).filter((b) => check.buckets[b] > 0);
-    const totalSteps = 1 + check.tables.length + bucketIds.length + 1;
+    const tables = include.db ? check.tables : [];
+    const bucketIds = Object.keys(check.buckets).filter((b) => check.buckets[b] > 0 && include[b]);
+    const totalSteps = 1 + tables.length + bucketIds.length + 1;
     let step = 0;
     const advance = () => setProgress(Math.round((++step / totalSteps) * 100));
 
@@ -122,7 +130,8 @@ export function MigrateDataCard() {
       addLog(`Schema ready (${schema.applied.length} migrations applied now).`);
       advance();
 
-      for (const t of check.tables) {
+      if (!include.db) addLog('Skipping tables and logins (unticked).');
+      for (const t of tables) {
         addLog(`Copying ${t.schema}.${t.table} (${t.rows ?? '?'} rows)…`);
         let offset = 0;
         let copied = 0;
@@ -146,6 +155,9 @@ export function MigrateDataCard() {
         advance();
       }
 
+      Object.keys(check.buckets)
+        .filter((b) => !include[b])
+        .forEach((b) => addLog(`Skipping files in ${b} (unticked).`));
       for (const bucket of bucketIds) {
         addLog(`Copying files in ${bucket} (${check.buckets[bucket]})…`);
         const { names } = await call<{ names: string[] }>({ action: 'list-files', bucket });
@@ -171,7 +183,7 @@ export function MigrateDataCard() {
       addLog(`File owners restored: ${fin.storageOwners}.`);
       setVerification(fin.verification);
       advance();
-      const mismatches = fin.verification.filter((v) => !v.match).length;
+      const mismatches = fin.verification.filter((v) => !v.match && !isSkipped(v.table)).length;
       addLog(mismatches ? `Done with ${mismatches} mismatches. Re-run to retry.` : 'Done. Every count matches.');
     } catch (e) {
       addLog(`Stopped: ${(e as Error).message}. Fix the problem and run again; finished steps are safe to repeat.`);
@@ -246,6 +258,30 @@ export function MigrateDataCard() {
           </Button>
         </div>
 
+        {check && (
+          <div className="space-y-2 rounded-md border p-3 text-sm">
+            <p className="font-medium">What to copy</p>
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={!!include.db}
+                onCheckedChange={(v) => setInclude((i) => ({ ...i, db: v === true }))}
+                disabled={busy}
+              />
+              All tables and logins ({check.tables.reduce((n, t) => n + (t.rows ?? 0), 0)} rows)
+            </label>
+            {Object.entries(check.buckets).map(([bucket, files]) => (
+              <label key={bucket} className="flex items-center gap-2">
+                <Checkbox
+                  checked={!!include[bucket]}
+                  onCheckedChange={(v) => setInclude((i) => ({ ...i, [bucket]: v === true }))}
+                  disabled={busy}
+                />
+                Files in {bucket} ({files})
+              </label>
+            ))}
+          </div>
+        )}
+
         {busy && check ? <Progress value={progress} /> : null}
 
         {log.length > 0 && (
@@ -259,7 +295,9 @@ export function MigrateDataCard() {
             {verification.map((v) => (
               <div key={v.table} className="flex items-center justify-between gap-2 border-b py-1 last:border-0">
                 <span className="flex min-w-0 items-center gap-2">
-                  {v.match ? (
+                  {isSkipped(v.table) ? (
+                    <MinusCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  ) : v.match ? (
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-green-600" />
                   ) : (
                     <XCircle className="h-4 w-4 shrink-0 text-destructive" />
@@ -267,7 +305,7 @@ export function MigrateDataCard() {
                   <span className="truncate">{v.table}</span>
                 </span>
                 <span className="shrink-0 tabular-nums text-muted-foreground">
-                  {v.source ?? '–'} → {v.target ?? '–'}
+                  {isSkipped(v.table) ? 'skipped' : `${v.source ?? '–'} → ${v.target ?? '–'}`}
                 </span>
               </div>
             ))}
@@ -279,7 +317,7 @@ export function MigrateDataCard() {
             <AlertDialogHeader>
               <AlertDialogTitle>Copy everything to {check?.targetRef}?</AlertDialogTitle>
               <AlertDialogDescription>
-                Any existing rows and users in the NEW project are replaced with a copy of this app&apos;s data.
+                For each ticked item, what is in the NEW project is replaced with a copy of this app&apos;s data.
                 Nothing in the current app is changed. Avoid entering new data while this runs.
               </AlertDialogDescription>
             </AlertDialogHeader>
