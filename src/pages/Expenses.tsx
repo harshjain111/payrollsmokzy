@@ -40,7 +40,8 @@ export default function Expenses() {
     isStaff,
     staffData,
     accountingMode,
-    canApproveExpenses 
+    canApproveExpenses,
+    isHR,
   } = useAuth();
   
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -73,7 +74,7 @@ export default function Expenses() {
       // Staff always sees only their own expenses
       // Accountant in personal mode (My Account) sees only their own expenses
       // This ensures complete isolation between personal and role contexts
-      if (isStaff || (isAccountant && !accountingMode)) {
+      if (isStaff || isHR || (isAccountant && !accountingMode)) {
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
         } else {
@@ -150,7 +151,7 @@ export default function Expenses() {
   // Staff can create expenses for themselves
   // Owner, Admin can create expenses for any staff
   // Accountant can create expenses - in personal mode (My Account) for themselves, in Accounting mode for any staff
-  const canCreateExpense = isStaff || isOwner || isAdmin || isAccountant;
+  const canCreateExpense = (isStaff || isOwner || isAdmin || isAccountant || isHR) && Boolean(staffData?.id || isOwner || isAdmin || (isAccountant && accountingMode));
   
   // Only Owner and Admin can approve/reject (NOT Accountant)
   const canApprove = canApproveExpenses;

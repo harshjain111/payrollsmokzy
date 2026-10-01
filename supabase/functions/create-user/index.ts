@@ -147,7 +147,7 @@ serve(async (req) => {
     }
 
     // If linking to existing staff record
-    if (link_staff_id && role === 'staff') {
+    if (link_staff_id && (role === 'staff' || role === 'hr')) {
       const { error: staffError } = await supabaseAdmin
         .from("staff")
         .update({ user_id: userId })

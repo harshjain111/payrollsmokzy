@@ -20,7 +20,7 @@ export function PageHeader({ title, description, children, className }: PageHead
           </p>
         )}
       </div>
-      {children && <div className="flex items-center gap-3">{children}</div>}
+      {children && <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">{children}</div>}
     </div>
   );
 }

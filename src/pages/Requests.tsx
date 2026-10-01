@@ -48,7 +48,8 @@ export default function Requests() {
     user, 
     isAccountant, 
     accountingMode,
-    canApproveRequests
+    canApproveRequests,
+    isHR,
   } = useAuth();
   
   const [requests, setRequests] = useState<RequestWithStaff[]>([]);
@@ -82,7 +83,7 @@ export default function Requests() {
       // Staff always sees only their own requests
       // Accountant in personal mode (My Account) sees only their own requests
       // This ensures complete isolation between personal and role contexts
-      if (isStaff || (isAccountant && !accountingMode)) {
+      if (isStaff || isHR || (isAccountant && !accountingMode)) {
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
         } else {
@@ -235,7 +236,7 @@ export default function Requests() {
   
   // Staff, Accountant, and Admin can create requests
   // Owner can also create but usually doesn't need to
-  const canCreateRequest = isStaff || isAccountant || isAdmin || isOwner;
+  const canCreateRequest = (isStaff || isAccountant || isAdmin || isOwner || isHR) && Boolean(staffData?.id || isAdmin || isOwner || (isAccountant && accountingMode));
 
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
