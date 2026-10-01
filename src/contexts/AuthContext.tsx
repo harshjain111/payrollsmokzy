@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, UserRole, Staff } from '@/types/database';
@@ -47,6 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [accountingMode, setAccountingMode] = useState(false);
   const [hrWorkforceMode, setHrWorkforceMode] = useState(true);
+  const userDataRefreshInFlight = useRef(false);
+  const lastUserDataRefreshAt = useRef(0);
 
   useEffect(() => {
     let initSettled = false;
@@ -112,7 +114,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
 
-  const fetchUserData = async (userId: string) => {
+  const fetchUserData = async (userId: string, background = false) => {
+    if (background && userDataRefreshInFlight.current) return;
+    userDataRefreshInFlight.current = true;
+
     for (let attempt = 0; attempt < 3; attempt += 1) {
       try {
         const [roleResult, staffResult] = await Promise.all([
@@ -134,7 +139,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUserRole(roleResult.data?.role as AppRole ?? null);
         setStaffData(staffResult.data ? staffResult.data as Staff : null);
-        setIsLoading(false);
+        lastUserDataRefreshAt.current = Date.now();
+        userDataRefreshInFlight.current = false;
+        if (!background) setIsLoading(false);
         return;
       } catch (error) {
         console.error('Error in fetchUserData:', error);
@@ -143,15 +150,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     }
-    setIsLoading(false);
+    userDataRefreshInFlight.current = false;
+    if (!background) setIsLoading(false);
   };
 
   useEffect(() => {
     if (!user?.id) return;
 
     const refreshUserData = () => {
-      setIsLoading(true);
-      void fetchUserData(user.id);
+      // Returning to a browser tab can fire both `focus` and
+      // `visibilitychange`. Refresh quietly and at most once per minute so
+      // the current page and any unsaved form input remain mounted.
+      if (Date.now() - lastUserDataRefreshAt.current < 60_000) return;
+      void fetchUserData(user.id, true);
     };
     const refreshWhenVisible = () => {
       if (document.visibilityState === 'visible') refreshUserData();
