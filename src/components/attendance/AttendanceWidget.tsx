@@ -273,13 +273,13 @@ export function AttendanceWidget() {
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
           {!onBreak ? (
             <Button
               variant="outline"
               onClick={handleStartBreak}
               disabled={breakLoading}
-              className="flex-1 min-w-[140px]"
+              className="w-full"
             >
               {breakLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -293,7 +293,7 @@ export function AttendanceWidget() {
               variant="outline"
               onClick={handleEndBreak}
               disabled={breakLoading}
-              className="flex-1 min-w-[140px]"
+              className="w-full"
             >
               {breakLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -306,7 +306,7 @@ export function AttendanceWidget() {
           <Button
             onClick={() => setShowCheckOut(true)}
             variant="destructive"
-            className="flex-1 min-w-[140px]"
+            className="w-full"
           >
             <LogOut className="mr-2 h-4 w-4" />
             Check Out

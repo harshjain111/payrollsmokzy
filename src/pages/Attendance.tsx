@@ -415,7 +415,7 @@ export default function Attendance() {
         <Card className="max-w-full min-w-0 overflow-hidden rounded-2xl border-0 shadow-card">
           <CardContent className="min-w-0 p-4 md:p-6 space-y-4">
             {/* Filter bar */}
-            <div className="grid grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap">
+            <div className="grid grid-cols-1 sm:grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap">
               <div className="min-w-0">
                 <label className="text-xs text-muted-foreground">From</label>
                 <Input
@@ -458,10 +458,10 @@ export default function Attendance() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <Button variant="outline" onClick={fetchAll} className="w-full lg:w-auto">
+              <Button variant="outline" onClick={fetchAll} className="col-span-2 w-full lg:w-auto">
                 Refresh
               </Button>
-              <Button variant="outline" onClick={handleExportExcel} className="w-full gap-2 lg:w-auto">
+              <Button variant="outline" onClick={handleExportExcel} className="col-span-2 w-full gap-2 lg:w-auto">
                 <FileSpreadsheet className="h-4 w-4" /> Export Excel
               </Button>
               <Button variant="outline" onClick={handleExportPDF} className="col-span-2 w-full gap-2 lg:col-span-1 lg:w-auto">

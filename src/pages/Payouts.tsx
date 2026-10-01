@@ -551,18 +551,18 @@ export default function Payouts() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 p-1 sm:grid-cols-4">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">
             All ({totalPending})
           </TabsTrigger>
-          <TabsTrigger value="expenses" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+          <TabsTrigger value="expenses" className="text-xs sm:text-sm">
             Expenses ({approvedExpenses.length})
           </TabsTrigger>
-          <TabsTrigger value="advances" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+          <TabsTrigger value="advances" className="text-xs sm:text-sm">
             Advances ({approvedAdvances.length})
           </TabsTrigger>
           {canRecordSalaryPayments && (
-            <TabsTrigger value="salary" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">
+            <TabsTrigger value="salary" className="text-xs sm:text-sm">
               Salary ({pendingSalaries.length})
             </TabsTrigger>
           )}

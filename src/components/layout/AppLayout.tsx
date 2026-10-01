@@ -643,9 +643,9 @@ function AppHeader() {
             <PanelLeftClose className="h-4 w-4" />
           )}
         </Button>
-        <div className="hidden sm:block">
-          <h1 className="text-base font-semibold text-foreground">
-            {currentNavItem?.title || 'Dashboard'}
+        <div className="hidden sm:block min-w-0">
+          <h1 className="text-base font-semibold text-foreground flex items-center min-w-0">
+            {<span className="truncate block">{currentNavItem?.title || 'Dashboard'} </span>}
             {contextLabel && (
               <span className="ml-2 text-xs font-normal text-muted-foreground">
                 {contextLabel}

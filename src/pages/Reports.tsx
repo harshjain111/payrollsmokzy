@@ -314,7 +314,9 @@ export default function Reports() {
             <CardHeader><CardTitle>Staff Ledger Report</CardTitle></CardHeader>
             <CardContent>
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
-                <Table>
+                <>
+                <div className="divide-y md:hidden">{reportData.map((line: any) => <div key={line.id} className="space-y-2 py-4"><div className="flex justify-between gap-3"><span className="font-medium">{line.account?.name || line.account?.code}</span><span className="shrink-0 text-xs text-muted-foreground">{line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}</span></div><p className="break-words text-xs text-muted-foreground">{line.journal_entry?.description || line.description}</p><div className="flex justify-between gap-3 text-xs"><span className="font-mono">{line.journal_entry?.reference_no}</span><span>{Number(line.debit) > 0 ? <>Debit <Amount value={line.debit} /></> : <>Credit <Amount value={line.credit} /></>}</span></div></div>)}</div>
+                <div className="hidden md:block"><Table>
                   <TableHeader><TableRow>
                     <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Account</TableHead>
                     <TableHead>Description</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead>
@@ -332,7 +334,8 @@ export default function Reports() {
                     ))}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No entries found</TableCell></TableRow>}
                   </TableBody>
-                </Table>
+                </Table></div>
+                </>
               )}
             </CardContent>
           </Card>
@@ -344,7 +347,9 @@ export default function Reports() {
               <CardHeader><CardTitle>Salary Register - {selectedMonth ? format(new Date(selectedMonth + '-01'), 'MMMM yyyy') : ''}</CardTitle></CardHeader>
               <CardContent>
                 {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
-                  <Table>
+                  <>
+                  <div className="divide-y md:hidden">{reportData.map((settlement: any) => <div key={settlement.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><span className="font-medium">{settlement.staff?.full_name}</span><Amount value={settlement.balance_payable} /></div><div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground"><span>Base: ₹{Number(settlement.base_salary).toLocaleString('en-IN')}</span><span className="text-right">Leave: {settlement.leave_days} days</span><span>Deduction: ₹{Number(settlement.leave_deduction).toLocaleString('en-IN')}</span><span className="text-right">Advance: ₹{Number(settlement.advances_adjusted).toLocaleString('en-IN')}</span></div></div>)}</div>
+                  <div className="hidden md:block"><Table>
                     <TableHeader><TableRow>
                       <TableHead>Staff</TableHead><TableHead className="text-right">Base Salary</TableHead>
                       <TableHead className="text-right">Leave Days</TableHead><TableHead className="text-right">Deduction</TableHead>
@@ -365,7 +370,8 @@ export default function Reports() {
                       ))}
                       {reportData.length === 0 && <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">No settlements for this month</TableCell></TableRow>}
                     </TableBody>
-                  </Table>
+                  </Table></div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -377,7 +383,9 @@ export default function Reports() {
             <CardHeader><CardTitle>Payment Register</CardTitle></CardHeader>
             <CardContent>
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
-                <Table>
+                <>
+                <div className="divide-y md:hidden">{reportData.map((entry: any) => { const amount = (entry.lines || []).reduce((sum: number, line: any) => sum + (Number(line.debit) || 0), 0) / 2; return <div key={entry.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{entry.staff?.full_name || '-'}</p><p className="text-xs text-muted-foreground">{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</p></div><Amount value={amount} /></div><div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{entry.transaction_type?.replace(/_/g, ' ')}</span><span className="font-mono">{entry.reference_no}</span><span>{entry.paid_by_user_name || '-'}</span></div></div>; })}</div>
+                <div className="hidden md:block"><Table>
                   <TableHeader><TableRow>
                     <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Staff</TableHead>
                     <TableHead>Type</TableHead><TableHead>Paid By</TableHead><TableHead className="text-right">Amount</TableHead>
@@ -399,7 +407,8 @@ export default function Reports() {
                     })}
                     {reportData.length === 0 && <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No payments found</TableCell></TableRow>}
                   </TableBody>
-                </Table>
+                </Table></div>
+                </>
               )}
             </CardContent>
           </Card>

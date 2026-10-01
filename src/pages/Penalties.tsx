@@ -144,17 +144,17 @@ export default function Penalties() {
 
       {/* Filters */}
       <Card className="rounded-2xl border-0 shadow-card">
-        <CardContent className="p-4 flex flex-wrap items-end gap-3">
-          <div>
+        <CardContent className="grid grid-cols-1 items-end gap-3 p-4 sm:grid-cols-2 lg:flex lg:flex-wrap">
+          <div className="min-w-0">
             <Label className="text-xs text-muted-foreground">Month</Label>
             <Input
               type="month"
               value={month}
               onChange={(e) => setMonth(e.target.value)}
-              className="w-[180px]"
+              className="w-full sm:w-[180px]"
             />
           </div>
-          <div className="flex-1 min-w-[180px]">
+          <div className="min-w-0 flex-1 lg:min-w-[180px]">
             <Label className="text-xs text-muted-foreground">Search staff</Label>
             <Input
               placeholder="Name…"
@@ -162,7 +162,7 @@ export default function Penalties() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <div className="ml-auto rounded-xl bg-destructive/10 px-4 py-2 text-right">
+          <div className="rounded-xl bg-destructive/10 px-4 py-2 text-left sm:col-span-2 lg:ml-auto lg:text-right">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
               Total this month
             </p>
@@ -194,8 +194,8 @@ export default function Penalties() {
               {summaries.map((s) => (
                 <AccordionItem key={s.staff_id} value={s.staff_id}>
                   <AccordionTrigger className="hover:no-underline">
-                    <div className="flex flex-1 items-center justify-between gap-3 pr-3 text-left">
-                      <div>
+                    <div className="flex min-w-0 flex-1 items-center justify-between gap-2 pr-2 text-left">
+                      <div className="min-w-0">
                         <p className="font-medium">{s.staff_name}</p>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {s.lateCount > 0 && (
@@ -225,7 +225,7 @@ export default function Penalties() {
                       </div>
                       <Amount
                         value={s.totalFine}
-                        className="font-bold text-destructive"
+                        className="shrink-0 font-bold text-destructive"
                       />
                     </div>
                   </AccordionTrigger>

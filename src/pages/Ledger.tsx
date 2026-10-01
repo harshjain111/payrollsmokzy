@@ -449,7 +449,7 @@ export default function Ledger() {
       )}
 
       {/* Summary Cards - Mobile Optimized */}
-      <div className="grid gap-2 sm:gap-5 grid-cols-3">
+      <div className="grid gap-2 sm:gap-5 grid-cols-1 sm:grid-cols-3">
         <Card className="rounded-xl sm:rounded-2xl shadow-card border-0 overflow-hidden">
           <CardContent className="p-2 sm:p-4">
             <div className="flex flex-col">
@@ -461,7 +461,7 @@ export default function Ledger() {
               <span className="text-[10px] sm:text-xs text-muted-foreground">
                 {selectedStaff === 'all' ? 'Staff Debits' : 'Debits'}
               </span>
-              <span className="text-sm sm:text-xl font-bold font-mono truncate">
+              <span className="text-sm sm:text-xl font-bold font-mono">
                 ₹{totals.debit.toLocaleString('en-IN')}
               </span>
             </div>
@@ -479,7 +479,7 @@ export default function Ledger() {
               <span className="text-[10px] sm:text-xs text-muted-foreground">
                 {selectedStaff === 'all' ? 'Staff Credits' : 'Credits'}
               </span>
-              <span className="text-sm sm:text-xl font-bold font-mono truncate">
+              <span className="text-sm sm:text-xl font-bold font-mono">
                 ₹{totals.credit.toLocaleString('en-IN')}
               </span>
             </div>
@@ -497,7 +497,7 @@ export default function Ledger() {
               <span className="text-[10px] sm:text-xs text-muted-foreground">
                 {selectedStaff === 'all' ? 'Net Outstanding' : 'Balance'}
               </span>
-              <span className={`text-sm sm:text-xl font-bold font-mono truncate ${closingBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
+              <span className={`text-sm sm:text-xl font-bold font-mono ${closingBalance >= 0 ? 'text-success' : 'text-destructive'}`}>
                 ₹{Math.abs(closingBalance).toLocaleString('en-IN')}
               </span>
             </div>
@@ -588,7 +588,7 @@ export default function Ledger() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-xs text-warning h-6 px-2 mt-1"
+                        className="text-xs text-warning h-8 px-2 mt-1"
                         onClick={() => handleRectify(line)}
                       >
                         <RotateCcw className="h-3 w-3 mr-1" />

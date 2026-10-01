@@ -261,7 +261,7 @@ export default function PettyCash() {
               <span className="text-sm font-medium">Filters:</span>
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-[160px] text-sm">
+              <SelectTrigger className="w-full sm:w-[160px] text-sm">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent className="bg-popover">

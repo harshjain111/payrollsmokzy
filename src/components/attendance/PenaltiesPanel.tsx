@@ -321,26 +321,26 @@ export function PenaltiesPanel() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div>
+        <div className="grid grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap">
+          <div className="min-w-0">
             <Label className="text-xs text-muted-foreground">From</Label>
             <Input
               type="date"
               value={from}
               onChange={(e) => setFrom(e.target.value)}
-              className="w-[160px]"
+              className="w-full sm:w-[160px]"
             />
           </div>
-          <div>
+          <div className="min-w-0">
             <Label className="text-xs text-muted-foreground">To</Label>
             <Input
               type="date"
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              className="w-[160px]"
+              className="w-full sm:w-[160px]"
             />
           </div>
-          <div className="flex-1 min-w-[200px]">
+          <div className="col-span-2 min-w-0 flex-1 lg:col-span-1 lg:min-w-[200px]">
             <Label className="text-xs text-muted-foreground">Search staff</Label>
             <Input
               placeholder="Name…"
@@ -348,7 +348,7 @@ export function PenaltiesPanel() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={load}>
+          <Button variant="outline" onClick={load} className="col-span-2 w-full lg:col-span-1 lg:w-auto">
             Refresh
           </Button>
         </div>
@@ -362,7 +362,24 @@ export function PenaltiesPanel() {
             No penalties charged in this period.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="divide-y md:hidden">
+            {filtered.map((row) => (
+              <div key={row.id} className="space-y-3 py-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><p className="truncate font-medium">{row.staff_name}</p><p className="text-xs text-muted-foreground">{format(new Date(row.work_date), 'dd MMM yyyy')} · {formatScheduleRange(row.scheduled_check_in, row.scheduled_check_out)}</p></div>
+                  <span className={row.is_cancelled ? 'shrink-0 text-sm text-muted-foreground line-through' : 'shrink-0 text-sm font-semibold text-destructive'}>₹{Number(row.fine_amount).toFixed(0)}</span>
+                </div>
+                <p className={row.is_cancelled ? 'break-words text-xs text-muted-foreground line-through' : 'break-words text-xs'}>{row.fine_reason || (row.is_absent ? row.absent_reason || 'Absent' : '—')}</p>
+                {row.is_cancelled && <p className="break-words text-[10px] text-success">Cancelled by {row.cancelled_by_name || 'system'} — {row.cancellation_reason}</p>}
+                <div className="flex items-center justify-between gap-3">
+                  <Badge variant={row.is_cancelled ? 'secondary' : 'destructive'}>{row.is_cancelled ? 'Cancelled' : 'Active'}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => row.is_cancelled ? openRestore(row) : openCancel(row)} className={!row.is_cancelled ? 'gap-1 border-destructive/30 text-destructive hover:bg-destructive/10' : 'gap-1'}>{row.is_cancelled ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}{row.is_cancelled ? 'Restore' : 'Cancel'}</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="hidden overflow-x-auto md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -440,6 +457,7 @@ export function PenaltiesPanel() {
               </TableBody>
             </Table>
           </div>
+          </>
         )}
       </CardContent>
 
