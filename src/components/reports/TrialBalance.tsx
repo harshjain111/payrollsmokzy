@@ -126,7 +126,23 @@ export function TrialBalance() {
           </Alert>
         )}
 
-        <div className="overflow-x-auto">
+        <div className="divide-y md:hidden">
+          {data.map((row) => (
+            <div key={row.account_code} className="space-y-3 py-4">
+              <div className="flex min-w-0 items-start justify-between gap-3">
+                <div className="min-w-0"><p className="truncate font-medium">{row.account_name}</p><p className="font-mono text-xs text-muted-foreground">{row.account_code}</p></div>
+                <Badge variant={getAccountTypeBadge(row.account_type)} className="shrink-0 capitalize text-xs">{row.account_type}</Badge>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                <div><p className="text-muted-foreground">Debit</p><Amount value={row.total_debit} /></div>
+                <div><p className="text-muted-foreground">Credit</p><Amount value={row.total_credit} /></div>
+                <div className="text-right"><p className="text-muted-foreground">Balance</p><Amount value={Math.abs(row.balance)} />{Number(row.balance) < 0 && ' Cr'}</div>
+              </div>
+            </div>
+          ))}
+          {data.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No journal entries found.</p>}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <Table>
             <TableHeader>
               <TableRow>
@@ -161,7 +177,7 @@ export function TrialBalance() {
                     <TableCell className="text-right">
                       {Number(row.total_credit) > 0 ? <Amount value={row.total_credit} /> : '-'}
                     </TableCell>
-                    <TableCell className={`text-right font-medium ${Number(row.balance) < 0 ? 'text-red-600' : ''}`}>
+                    <TableCell className={`text-right font-medium ${Number(row.balance) < 0 ? 'text-destructive' : ''}`}>
                       <Amount value={Math.abs(row.balance)} />
                       {Number(row.balance) < 0 && ' Cr'}
                     </TableCell>
@@ -179,7 +195,7 @@ export function TrialBalance() {
                   <TableCell className="text-right">
                     <Amount value={totalCredits} />
                   </TableCell>
-                  <TableCell className={`text-right ${!isBalanced ? 'text-destructive' : 'text-green-600'}`}>
+                  <TableCell className={`text-right ${!isBalanced ? 'text-destructive' : 'text-success'}`}>
                     {isBalanced ? (
                       <span className="flex items-center justify-end gap-1">
                         <CheckCircle2 className="h-4 w-4" />
