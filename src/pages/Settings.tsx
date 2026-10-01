@@ -49,6 +49,7 @@ import { ManageCategoriesCard } from '@/components/settings/ManageCategoriesCard
 import { ManageClubsCard } from '@/components/settings/ManageClubsCard';
 import { DisciplineRulesCard } from '@/components/settings/DisciplineRulesCard';
 import { AttendanceCoverageCard } from '@/components/settings/AttendanceCoverageCard';
+import { MigrateDataCard } from '@/components/settings/MigrateDataCard';
 import { useInstallApp } from '@/hooks/use-install-app';
 
 export default function Settings() {
@@ -456,6 +457,9 @@ export default function Settings() {
 
         {/* Discipline Rules (Owner) */}
         <DisciplineRulesCard />
+
+        {/* One-time move to a self-owned Supabase project - Owner Only */}
+        <MigrateDataCard />
 
         {/* Clear Transaction Data - Owner Only */}
         <ClearTransactionDataCard />
