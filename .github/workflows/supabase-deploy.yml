@@ -3,7 +3,8 @@ name: Deploy Supabase edge functions
 # Deploys every function in supabase/functions to the Supabase project and syncs function
 # secrets that are stored as GitHub repository secrets.
 #
-# One-time setup: add a repository secret SUPABASE_ACCESS_TOKEN
+# One-time setup: add the secret SUPABASE_ACCESS_TOKEN to the GitHub environment
+# "SUPABASE_ACCESS_TOKEN" (or as a repository secret)
 # (create it at https://supabase.com/dashboard/account/tokens).
 # Optional: add any of the function secrets listed in SECRET_NAMES below as repository
 # secrets; the ones that exist are pushed to Supabase on every run.
@@ -27,6 +28,9 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # The secrets live in the GitHub environment named "SUPABASE_ACCESS_TOKEN"
+    # (Settings > Environments). Repository secrets with the same names also work.
+    environment: SUPABASE_ACCESS_TOKEN
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       PROJECT_REF: jotpsrmsauypyycdkbhp
