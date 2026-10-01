@@ -708,7 +708,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar />
         <SidebarInset className="flex min-w-0 flex-col flex-1 overflow-x-hidden">
           <AppHeader />
-          <main className="flex-1 min-w-0 overflow-x-hidden p-4 sm:p-6 animate-fade-in">
+          <main className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-6 animate-fade-in">
             {children}
           </main>
         </SidebarInset>
