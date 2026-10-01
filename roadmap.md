@@ -5,7 +5,7 @@
 - [x] Remove mobile viewport overflow across the app
 - [x] Verify role security, build, tests, and mobile UI
 
-- [ ] Audit every page for mobile overflow and difficult controls
-- [ ] Replace remaining wide mobile tables and tab bars
-- [ ] Fix shared shell, forms, dialogs, and action layouts
+- [x] Audit every page for mobile overflow and difficult controls
+- [x] Replace remaining wide mobile tables and tab bars
+- [x] Fix shared shell, forms, dialogs, and action layouts
 - [ ] Verify key phone screens and complete no-overflow checks
