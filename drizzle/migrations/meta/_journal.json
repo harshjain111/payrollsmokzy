@@ -36,6 +36,13 @@
       "when": 1790765447562,
       "tag": "0004_secure_hr_attendance_reporting_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790844001999,
+      "tag": "0005_grant_hr_read_only_discipline_access",
+      "breakpoints": true
     }
   ]
 }

@@ -193,38 +193,38 @@ export default function Reports() {
       </PageHeader>
 
       <Tabs value={activeReport} onValueChange={v => setActiveReport(v as ReportType)}>
-        <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <div className="min-w-0">
           <TabsList className={cn(
-            "inline-flex w-max min-w-full sm:w-full sm:grid gap-1",
-            canSeeSalaryReports ? "sm:grid-cols-9" : "sm:grid-cols-8"
+            "grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4",
+            canSeeSalaryReports ? "lg:grid-cols-9" : "lg:grid-cols-8"
           )}>
-            <TabsTrigger value="expenses" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="expenses" className="min-w-0 gap-1 px-2">
               <Receipt className="h-4 w-4" /><span className="text-xs sm:text-sm">Expenses</span>
             </TabsTrigger>
-            <TabsTrigger value="advances" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="advances" className="min-w-0 gap-1 px-2">
               <ArrowUpRight className="h-4 w-4" /><span className="text-xs sm:text-sm">Advances</span>
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="transactions" className="min-w-0 gap-1 px-2">
               <ListOrdered className="h-4 w-4" /><span className="text-xs sm:text-sm">Transactions</span>
             </TabsTrigger>
-            <TabsTrigger value="ai_insights" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="ai_insights" className="min-w-0 gap-1 px-2">
               <Sparkles className="h-4 w-4" /><span className="text-xs sm:text-sm">AI Insights</span>
             </TabsTrigger>
-            <TabsTrigger value="summary" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="summary" className="min-w-0 gap-1 px-2">
               <BarChart3 className="h-4 w-4" /><span className="text-xs sm:text-sm">Summary</span>
             </TabsTrigger>
-            <TabsTrigger value="trial_balance" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="trial_balance" className="min-w-0 gap-1 px-2">
               <Scale className="h-4 w-4" /><span className="text-xs sm:text-sm">Trial Balance</span>
             </TabsTrigger>
-            <TabsTrigger value="ledger" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="ledger" className="min-w-0 gap-1 px-2">
               <FileText className="h-4 w-4" /><span className="text-xs sm:text-sm">Ledger</span>
             </TabsTrigger>
             {canSeeSalaryReports && (
-              <TabsTrigger value="salary" className="flex items-center gap-1 px-3 whitespace-nowrap">
+              <TabsTrigger value="salary" className="min-w-0 gap-1 px-2">
                 <Wallet className="h-4 w-4" /><span className="text-xs sm:text-sm">Salary</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="payment" className="flex items-center gap-1 px-3 whitespace-nowrap">
+            <TabsTrigger value="payment" className="min-w-0 gap-1 px-2">
               <FileSpreadsheet className="h-4 w-4" /><span className="text-xs sm:text-sm">Payments</span>
             </TabsTrigger>
           </TabsList>

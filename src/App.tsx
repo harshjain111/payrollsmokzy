@@ -75,8 +75,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/auth" replace />;
   }
 
-  if (userRole === 'hr' && !['/attendance', '/users/new'].includes(location.pathname)) {
-    return <Navigate to="/attendance" replace />;
+  const hrAllowedPaths = [
+    '/dashboard', '/attendance', '/my-attendance', '/requests', '/requests/new',
+    '/expenses', '/expenses/new', '/penalties', '/settings', '/users/new',
+  ];
+  if (userRole === 'hr' && !hrAllowedPaths.includes(location.pathname)) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <AppLayout>{children}</AppLayout>;

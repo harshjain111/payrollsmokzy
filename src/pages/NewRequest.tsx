@@ -28,7 +28,7 @@ const requestSchema = z.object({
 
 export default function NewRequest() {
   const navigate = useNavigate();
-  const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner } = useAuth();
+  const { user, staffData, isAccountant, accountingMode, isStaff, isAdmin, isOwner, isHR } = useAuth();
 
   const [staffList, setStaffList] = useState<StaffPublic[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string>('');
@@ -39,7 +39,7 @@ export default function NewRequest() {
 
   // Staff creating for themselves
   // Accountant in personal mode also creates for themselves
-  const isPersonalRequest = isStaff || (isAccountant && !accountingMode);
+  const isPersonalRequest = isStaff || isHR || (isAccountant && !accountingMode);
   
   // Admin, Owner, Accountant (in accounting mode) can create for any staff
   const canRequestForOthers = isOwner || isAdmin || (isAccountant && accountingMode);

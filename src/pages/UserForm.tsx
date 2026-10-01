@@ -184,7 +184,7 @@ export default function UserForm() {
               email: email.trim() || null,
               role: role,
               is_active: isActive,
-              link_staff_id: role === 'staff' ? linkedStaffId : null,
+               link_staff_id: role === 'staff' || role === 'hr' ? linkedStaffId : null,
             }),
           }
         );
@@ -380,8 +380,8 @@ export default function UserForm() {
               )}
             </div>
 
-            {/* Link to existing staff - only for staff role */}
-            {role === 'staff' && !isEditing && availableStaff.length > 0 && (
+            {/* Personal self-service requires a linked staff record. */}
+            {(role === 'staff' || role === 'hr') && !isEditing && availableStaff.length > 0 && (
               <div className="space-y-2 pt-4 border-t">
                 <Label htmlFor="linkedStaff">Link to Existing Staff Record (Optional)</Label>
                 <Select 

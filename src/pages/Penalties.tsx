@@ -41,8 +41,8 @@ interface StaffSummary {
 }
 
 export default function Penalties() {
-  const { isOwner, isAdmin } = useAuth();
-  const canView = isOwner || isAdmin;
+  const { isOwner, isAdmin, isHR } = useAuth();
+  const canView = isOwner || isAdmin || isHR;
 
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [search, setSearch] = useState('');
@@ -69,12 +69,9 @@ export default function Penalties() {
       const ids = Array.from(new Set(logs.map((l) => l.staff_id)));
       const map: Record<string, string> = {};
       if (ids.length) {
-        const { data: staff } = await supabase
-          .from('staff')
-          .select('id, full_name')
-          .in('id', ids);
+        const { data: staff } = await supabase.rpc('get_attendance_staff');
         (staff ?? []).forEach((s: { id: string; full_name: string }) => {
-          map[s.id] = s.full_name;
+          if (ids.includes(s.id)) map[s.id] = s.full_name;
         });
       }
       setStaffMap(map);
@@ -132,7 +129,7 @@ export default function Penalties() {
         <EmptyState
           icon={ShieldAlert}
           title="Not available"
-          description="Only owners and admins can view penalties."
+          description="Only owners, admins, and HR can view penalties."
         />
       </div>
     );
@@ -294,7 +291,7 @@ export default function Penalties() {
               ))}
             </Accordion>
 
-            <div className="mt-4 rounded-lg border border-info/30 bg-info/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
+             {!isHR && <div className="mt-4 rounded-lg border border-info/30 bg-info/5 p-3 text-xs text-muted-foreground flex items-start gap-2">
               <ExternalLink className="h-3.5 w-3.5 mt-0.5 shrink-0" />
               <span>
                 These amounts are automatically applied as <strong>Discipline Fine</strong> in the{' '}
@@ -307,7 +304,7 @@ export default function Penalties() {
                 </Link>
                 .
               </span>
-            </div>
+             </div>}
           </CardContent>
         </Card>
       )}

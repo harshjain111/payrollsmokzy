@@ -33,6 +33,8 @@ interface AuthContextType {
   canAccessSettlements: boolean;
   accountingMode: boolean;
   setAccountingMode: (mode: boolean) => void;
+  hrWorkforceMode: boolean;
+  setHrWorkforceMode: (mode: boolean) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -44,6 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [staffData, setStaffData] = useState<Staff | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [accountingMode, setAccountingMode] = useState(false);
+  const [hrWorkforceMode, setHrWorkforceMode] = useState(true);
 
   useEffect(() => {
     let initSettled = false;
@@ -182,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setAccountingMode(false);
+    setHrWorkforceMode(true);
   };
 
   const isOwner = userRole === 'owner';
@@ -253,6 +257,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     canAccessSettlements,
     accountingMode,
     setAccountingMode,
+    hrWorkforceMode,
+    setHrWorkforceMode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -4,10 +4,11 @@ import { AdminDashboard } from '@/components/dashboards/AdminDashboard';
 import { AccountantDashboard } from '@/components/dashboards/AccountantDashboard';
 import { StaffDashboard } from '@/components/dashboards/StaffDashboard';
 import { CADashboard } from '@/components/dashboards/CADashboard';
+import { HRDashboard } from '@/components/dashboards/HRDashboard';
 import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
-  const { userRole, isLoading, isAccountant, accountingMode } = useAuth();
+  const { userRole, isLoading, isAccountant, accountingMode, isHR, hrWorkforceMode, staffData } = useAuth();
 
   if (isLoading) {
     return (
@@ -22,6 +23,15 @@ export default function Dashboard() {
     return <StaffDashboard />;
   }
 
+  if (isHR && !hrWorkforceMode) {
+    return staffData ? <StaffDashboard /> : (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <h2 className="text-xl font-semibold">Staff profile not linked</h2>
+        <p className="mt-2 text-sm text-muted-foreground">Ask the Owner to link this HR login to an active staff record to use personal attendance and requests.</p>
+      </div>
+    );
+  }
+
   switch (userRole) {
     case 'owner':
       return <OwnerDashboard />;
@@ -34,7 +44,7 @@ export default function Dashboard() {
     case 'ca':
       return <CADashboard />;
     case 'hr':
-      return null;
+      return <HRDashboard />;
     default:
       return (
         <div className="text-center py-20">

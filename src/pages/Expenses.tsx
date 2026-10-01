@@ -40,7 +40,8 @@ export default function Expenses() {
     isStaff,
     staffData,
     accountingMode,
-    canApproveExpenses 
+    canApproveExpenses,
+    isHR,
   } = useAuth();
   
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -73,7 +74,7 @@ export default function Expenses() {
       // Staff always sees only their own expenses
       // Accountant in personal mode (My Account) sees only their own expenses
       // This ensures complete isolation between personal and role contexts
-      if (isStaff || (isAccountant && !accountingMode)) {
+      if (isStaff || isHR || (isAccountant && !accountingMode)) {
         if (staffData?.id) {
           query = query.eq('staff_id', staffData.id);
         } else {
@@ -150,7 +151,7 @@ export default function Expenses() {
   // Staff can create expenses for themselves
   // Owner, Admin can create expenses for any staff
   // Accountant can create expenses - in personal mode (My Account) for themselves, in Accounting mode for any staff
-  const canCreateExpense = isStaff || isOwner || isAdmin || isAccountant;
+  const canCreateExpense = (isStaff || isOwner || isAdmin || isAccountant || isHR) && Boolean(staffData?.id || isOwner || isAdmin || (isAccountant && accountingMode));
   
   // Only Owner and Admin can approve/reject (NOT Accountant)
   const canApprove = canApproveExpenses;
@@ -203,13 +204,13 @@ export default function Expenses() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="w-full justify-start overflow-x-auto flex-nowrap h-auto p-1">
-          <TabsTrigger value="all" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
-          {isStaff && <TabsTrigger value="draft" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Drafts</TabsTrigger>}
-          <TabsTrigger value="pending" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
-          <TabsTrigger value="approved" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Approved</TabsTrigger>
-          <TabsTrigger value="reimbursed" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Paid</TabsTrigger>
-          <TabsTrigger value="rejected" className="flex-shrink-0 text-xs sm:text-sm px-2 sm:px-3">Rejected</TabsTrigger>
+        <TabsList className="grid h-auto w-full grid-cols-3 gap-1 p-1 sm:grid-cols-6">
+          <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
+          {(isStaff || isHR) && <TabsTrigger value="draft" className="text-xs sm:text-sm">Drafts</TabsTrigger>}
+          <TabsTrigger value="pending" className="text-xs sm:text-sm">Pending</TabsTrigger>
+          <TabsTrigger value="approved" className="text-xs sm:text-sm">Approved</TabsTrigger>
+          <TabsTrigger value="reimbursed" className="text-xs sm:text-sm">Paid</TabsTrigger>
+          <TabsTrigger value="rejected" className="text-xs sm:text-sm">Rejected</TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4 sm:mt-6">

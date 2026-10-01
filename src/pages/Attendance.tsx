@@ -415,26 +415,26 @@ export default function Attendance() {
         <Card className="max-w-full min-w-0 overflow-hidden rounded-2xl border-0 shadow-card">
           <CardContent className="min-w-0 p-4 md:p-6 space-y-4">
             {/* Filter bar */}
-            <div className="flex flex-wrap items-end gap-3">
-              <div>
+            <div className="grid grid-cols-2 items-end gap-3 lg:flex lg:flex-wrap">
+              <div className="min-w-0">
                 <label className="text-xs text-muted-foreground">From</label>
                 <Input
                   type="date"
                   value={from}
                   onChange={(e) => setFrom(e.target.value)}
-                  className="w-[160px]"
+                  className="w-full lg:w-[160px]"
                 />
               </div>
-              <div>
+              <div className="min-w-0">
                 <label className="text-xs text-muted-foreground">To</label>
                 <Input
                   type="date"
                   value={to}
                   onChange={(e) => setTo(e.target.value)}
-                  className="w-[160px]"
+                  className="w-full lg:w-[160px]"
                 />
               </div>
-              <div className="w-[200px]">
+              <div className="col-span-2 w-full lg:col-span-1 lg:w-[200px]">
                 <label className="text-xs text-muted-foreground">Department</label>
                 <Select value={department} onValueChange={setDepartment}>
                   <SelectTrigger>
@@ -450,7 +450,7 @@ export default function Attendance() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="flex-1 min-w-[200px]">
+              <div className="col-span-2 min-w-0 flex-1 lg:col-span-1 lg:min-w-[200px]">
                 <label className="text-xs text-muted-foreground">Search</label>
                 <Input
                   placeholder="Name or Employee ID…"
@@ -458,13 +458,13 @@ export default function Attendance() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <Button variant="outline" onClick={fetchAll}>
+              <Button variant="outline" onClick={fetchAll} className="w-full lg:w-auto">
                 Refresh
               </Button>
-              <Button variant="outline" onClick={handleExportExcel} className="gap-2">
+              <Button variant="outline" onClick={handleExportExcel} className="w-full gap-2 lg:w-auto">
                 <FileSpreadsheet className="h-4 w-4" /> Export Excel
               </Button>
-              <Button variant="outline" onClick={handleExportPDF} className="gap-2">
+              <Button variant="outline" onClick={handleExportPDF} className="col-span-2 w-full gap-2 lg:col-span-1 lg:w-auto">
                 <FileText className="h-4 w-4" /> Export PDF
               </Button>
             </div>
