@@ -166,10 +166,11 @@ async function copyTable(src: Sql, tgt: Sql, schema: string, table: string, offs
            limit ${PAGE_SIZE} offset ${offset + read}) t`,
       );
       if (page.length) {
-        // ON CONFLICT DO NOTHING makes a retried request harmless.
+        // ON CONFLICT DO NOTHING makes a retried request harmless. The batch is sent as text and
+        // cast in SQL: declaring the parameter as json makes the driver JSON-encode the string again.
         const res = await tx.unsafe(
           `insert into ${fq} (${colList}) ${overriding}
-           select ${colList} from json_populate_recordset(null::${fq}, $1::json)
+           select ${colList} from json_populate_recordset(null::${fq}, $1::text::json)
            on conflict do nothing`,
           ['[' + page.join(',') + ']'],
         );
@@ -286,7 +287,7 @@ async function syncStorageOwners(src: Sql, tgt: Sql) {
       if (!page.length) break;
       const res = await tx.unsafe(
         `update storage.objects o set ${set}
-         from json_populate_recordset(null::storage.objects, $1::json) s
+         from json_populate_recordset(null::storage.objects, $1::text::json) s
          where o.bucket_id = s.bucket_id and o.name = s.name`,
         ['[' + page.join(',') + ']'],
       );
