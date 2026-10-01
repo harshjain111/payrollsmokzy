@@ -398,7 +398,7 @@ Build this with absolute accounting correctness, strict salary confidentiality, 
 ## Stack
 
 - **Frontend**: Vite + React + TypeScript + Tailwind + shadcn/ui, installable as a PWA.
-- **Backend**: [Supabase](https://supabase.com) (Postgres + RLS, Auth, Storage, Edge Functions). Project ref: `xshnuzoqeoqwarvmsgef`.
+- **Backend**: [Supabase](https://supabase.com) (Postgres + RLS, Auth, Storage, Edge Functions). Project ref: `jotpsrmsauypyycdkbhp`.
 - **Hosting**: [Vercel](https://vercel.com) (static build of `dist/`, see `vercel.json`).
 
 ## Development
@@ -434,7 +434,7 @@ Everything the app needs on the backend lives in `supabase/`:
 ```sh
 npm i -g supabase          # or: brew install supabase/tap/supabase
 supabase login
-supabase link --project-ref xshnuzoqeoqwarvmsgef
+supabase link --project-ref jotpsrmsauypyycdkbhp
 ```
 
 ### Database migrations
@@ -443,19 +443,35 @@ supabase link --project-ref xshnuzoqeoqwarvmsgef
 supabase db push
 ```
 
-The six `20260930…` migrations were originally applied through a different migration runner, so the
-live project already contains them. They are written to be idempotent (`IF NOT EXISTS`,
-`CREATE OR REPLACE`, `DROP POLICY IF EXISTS`), so re-running them is harmless. If `supabase db push`
-reports a mismatch between local and remote history, mark the already-applied versions without
-re-running them:
+On a brand-new project this applies every migration in order and the schema is complete.
 
-```sh
-supabase migration list
-supabase migration repair --status applied 20260930120000 20260930120100 20260930120200 20260930120300 20260930120400 20260930120500
-```
+### Moving data from the old Lovable Cloud project
 
-For a brand-new Supabase project, just create it, `supabase link` to it, run `supabase db push`,
-and point `.env` / Vercel at the new URL and publishable key.
+The original data (staff, ledgers, attendance, logins, uploaded photos) lives in the Lovable Cloud
+project `xshnuzoqeoqwarvmsgef`, whose database credentials Lovable does not expose. The
+`migrate-to-new-project` edge function runs inside that project, where it can reach the
+database, and copies everything into the new project:
+
+1. Merge to `main` so Lovable syncs the function and the Settings card. If Lovable does not
+   deploy the function on its own, ask Lovable's chat to "deploy the migrate-to-new-project
+   edge function".
+2. Open the app on Lovable, sign in as the owner, and go to **Settings → Move data to your own
+   Supabase project**.
+3. Enter the new project's URL, service role key and **Session pooler** connection string, press
+   **Check connection**, then **Start migration**.
+4. Every count in the verification list should show a green tick. Re-running is safe.
+
+It creates the schema, then copies auth users with their password hashes, every public table
+with triggers suspended, every storage file, and the original file owners. The old project
+is only read.
+
+Until the move is done, `.env` keeps pointing at the old project because Lovable still builds
+from this repo. Vercel uses its own environment variables, so it can point at the new project
+already. After the move, switch `.env` and `supabase/config.toml` to the new project and delete
+the function and the Settings card.
+
+If you ever have direct database access to both projects, `scripts/migrate-supabase/` does the
+same job from a terminal with `pg_dump` and `psql`.
 
 ### Edge Functions
 
@@ -499,9 +515,9 @@ Vercel domain and add it (plus `https://*-<team>.vercel.app/**` for preview depl
 
    | Variable | Value |
    | --- | --- |
-   | `VITE_SUPABASE_URL` | `https://xshnuzoqeoqwarvmsgef.supabase.co` |
+   | `VITE_SUPABASE_URL` | `https://jotpsrmsauypyycdkbhp.supabase.co` |
    | `VITE_SUPABASE_PUBLISHABLE_KEY` | the project's anon / publishable key |
-   | `VITE_SUPABASE_PROJECT_ID` | `xshnuzoqeoqwarvmsgef` |
+   | `VITE_SUPABASE_PROJECT_ID` | `jotpsrmsauypyycdkbhp` |
 
 3. Deploy. Every push to `main` becomes a production deployment; other branches get preview URLs.
 
