@@ -1,7 +1,14 @@
 # Migrating from the Lovable-managed Supabase project
 
 Moves everything from the old project (`xshnuzoqeoqwarvmsgef`, hosted by Lovable Cloud) into
-the new project you own (`jotpsrmsauypyycdkbhp`). Run the steps in order from the repo root.
+the new project you own (`jotpsrmsauypyycdkbhp`).
+
+**Lovable Cloud does not expose the old project's database password, so use the in-app route
+instead:** Settings → "Move data to your own Supabase project", backed by the
+`migrate-to-new-project` edge function (see the main README). The scripts below are the
+terminal equivalent for when you do have direct database access to both projects.
+
+Run the steps in order from the repo root.
 
 ## Prerequisites
 
