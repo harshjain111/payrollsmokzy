@@ -65,6 +65,8 @@ interface ApprovedRequest extends Omit<PaymentRequest, 'payout_type' | 'settleme
   staff: StaffPublic;
   payout_type?: string | null;
   settlement_id?: string | null;
+  /** Payment mode chosen when the salary was settled (salary payouts only). */
+  settlement?: { payment_mode: string | null } | null;
 }
 
 type PayoutItem = {
@@ -81,6 +83,7 @@ type PayoutItem = {
   referenceMonth?: string;
   settlementId?: string;
   approvedByUserName?: string | null;
+  preferredMode?: PaymentMode;
 };
 
 export default function Payouts() {
@@ -163,7 +166,8 @@ export default function Payouts() {
           .from('payment_requests')
           .select(`
             *,
-            staff:staff_id(*)
+            staff:staff_id(*),
+            settlement:settlement_id(payment_mode)
           `)
           .eq('status', 'approved')
           .eq('payout_type', 'salary')
@@ -386,7 +390,7 @@ export default function Payouts() {
 
   const openPayoutDialog = (item: PayoutItem) => {
     setSelectedItem(item);
-    setPaymentMode('cash');
+    setPaymentMode(item.preferredMode ?? 'cash');
     setPaidBy(null); // Will be set to current user by PaidBySelector
   };
 
@@ -450,6 +454,9 @@ export default function Payouts() {
           date: salary.approved_at || salary.created_at,
           settlementId: salary.settlement_id,
           approvedByUserName: salary.approved_by_user_name,
+          preferredMode: PAYMENT_MODES.some((m) => m.value === salary.settlement?.payment_mode)
+            ? (salary.settlement?.payment_mode as PaymentMode)
+            : undefined,
         });
       });
     }

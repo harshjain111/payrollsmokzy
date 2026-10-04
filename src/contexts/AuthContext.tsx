@@ -250,7 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canApproveExpenses = isOwner || isAdmin;
   
   // Settlement access - Owner ONLY
-  const canAccessSettlements = isOwner;
+  const canAccessSettlements = isOwner || isAdmin; // Owners and admins settle salaries (paying stays owner-only)
   const canCreateUsers = isOwner || isHR;
 
   const value = {
