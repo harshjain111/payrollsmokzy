@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/tooltip';
 import { AttendanceSession, formatMinutes } from '@/lib/attendance';
 import { SessionDetailsDrawer } from '@/components/attendance/SessionDetailsDrawer';
+import { EditAttendanceDialog, AttendanceEditTarget } from '@/components/attendance/EditAttendanceDialog';
 import { PenaltiesPanel } from '@/components/attendance/PenaltiesPanel';
 import { format, eachDayOfInterval, startOfMonth, parseISO } from 'date-fns';
 import {
@@ -108,6 +109,8 @@ function fmtTime(iso: string | null): string {
 export default function Attendance() {
   const { isOwner, isAdmin, isCA, isHR } = useAuth();
   const canView = isOwner || isAdmin || isCA || isHR;
+  // Owners and admins can correct attendance; CA and HR only view (enforced in the database too).
+  const canEdit = isOwner || isAdmin;
 
   const todayStr = format(new Date(), 'yyyy-MM-dd');
   const monthStart = format(startOfMonth(new Date()), 'yyyy-MM-dd');
@@ -124,6 +127,7 @@ export default function Attendance() {
 
   const [selected, setSelected] = useState<AttendanceSession | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<AttendanceEditTarget | null>(null);
 
   useEffect(() => {
     if (!canView) return;
@@ -487,7 +491,18 @@ export default function Attendance() {
                 setSelected(s);
                 setDrawerOpen(true);
               }}
+              onAddAttendance={
+                canEdit
+                  ? (st, date) =>
+                      setEditTarget({ staffId: st.id, staffName: st.full_name, workDate: date, session: null })
+                  : undefined
+              }
             />
+            {canEdit && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Tap a time to see or edit a record. Tap an empty or "A" day to add attendance someone missed.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -497,7 +512,21 @@ export default function Attendance() {
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
           session={selected}
+          canEdit={canEdit}
+          onEdit={(s) => {
+            const st = staff.find((m) => m.id === s.staff_id || (m.user_id && m.user_id === s.user_id));
+            setDrawerOpen(false);
+            setEditTarget({
+              staffId: s.staff_id ?? st?.id ?? '',
+              staffName: st?.full_name ?? 'Staff',
+              workDate: s.work_date,
+              session: s,
+            });
+          }}
+          onDeleted={fetchAll}
         />
+
+        <EditAttendanceDialog target={editTarget} onClose={() => setEditTarget(null)} onSaved={fetchAll} />
       </div>
     </TooltipProvider>
   );
@@ -513,9 +542,12 @@ interface MatrixProps {
   dates: string[];
   grid: Record<string, Record<string, DayCell>>;
   onSelectSession: (s: AttendanceSession) => void;
+  /** Present for owners/admins: add attendance on an empty or absent day. */
+  onAddAttendance?: (staff: StaffRow, date: string) => void;
 }
 
-function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: MatrixProps) {
+function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddAttendance }: MatrixProps) {
+  const today = format(new Date(), 'yyyy-MM-dd');
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(staff.length / PAGE_SIZE));
@@ -596,7 +628,8 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
                             : c.sessions.length > 0
                               ? 'bg-amber-50/40'
                               : '';
-                  const clickable = c.sessions.length > 0;
+                  const canAdd = !!onAddAttendance && c.sessions.length === 0 && d <= today;
+                  const clickable = c.sessions.length > 0 || canAdd;
                   return (
                     <TableCell key={d} className={`w-[110px] min-w-[110px] text-center text-xs ${cellBg}`}>
                       <Tooltip>
@@ -604,7 +637,10 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession }: Matr
                           <button
                             type="button"
                             disabled={!clickable}
-                            onClick={() => clickable && onSelectSession(c.sessions[0])}
+                            onClick={() => {
+                              if (c.sessions.length > 0) onSelectSession(c.sessions[0]);
+                              else if (canAdd) onAddAttendance?.(st, d);
+                            }}
                             className="w-full inline-flex flex-col items-center justify-center gap-0.5 disabled:cursor-default"
                           >
                             {c.status === 'Absent' ? (

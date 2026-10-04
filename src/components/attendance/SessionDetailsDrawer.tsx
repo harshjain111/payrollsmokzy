@@ -8,9 +8,12 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from 'sonner';
 import {
   AttendanceBreak,
   AttendanceSession,
+  deleteAttendanceRecord,
   formatMinutes,
   formatSessionTime,
   getSessionBreaks,
@@ -18,19 +21,31 @@ import {
   googleMapsLink,
 } from '@/lib/attendance';
 import { format } from 'date-fns';
-import { MapPin, ExternalLink, Loader2 } from 'lucide-react';
+import { MapPin, ExternalLink, Loader2, Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   session: AttendanceSession | null;
+  /** Owners and admins can correct or delete the record. */
+  canEdit?: boolean;
+  onEdit?: (session: AttendanceSession) => void;
+  onDeleted?: () => void;
 }
 
-export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
+export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onEdit, onDeleted }: Props) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleting, setDeleting] = useState(false);
   const [inUrl, setInUrl] = useState<string | null>(null);
   const [outUrl, setOutUrl] = useState<string | null>(null);
   const [breaks, setBreaks] = useState<AttendanceBreak[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setConfirmDelete(false);
+    setDeleteReason('');
+  }, [session]);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,6 +73,20 @@ export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
   }, [open, session]);
 
   if (!session) return null;
+
+  const remove = async () => {
+    setDeleting(true);
+    try {
+      await deleteAttendanceRecord(session.id, deleteReason.trim());
+      toast.success('Attendance record deleted');
+      onOpenChange(false);
+      onDeleted?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not delete');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const inMap = googleMapsLink(session.check_in_lat, session.check_in_lng);
   const outMap = googleMapsLink(session.check_out_lat, session.check_out_lng);
@@ -118,6 +147,61 @@ export function SessionDetailsDrawer({ open, onOpenChange, session }: Props) {
                 <p className="font-medium">{formatMinutes(session.total_break_minutes)}</p>
               </div>
             </div>
+
+            {(session.is_manual || session.edited_by_name) && (
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+                <p className="font-medium">
+                  {session.is_manual ? 'Added manually' : 'Edited'}
+                  {session.edited_by_name && ` by ${session.edited_by_name}`}
+                  {session.edited_at && ` on ${format(new Date(session.edited_at), 'dd MMM yyyy, hh:mm a')}`}
+                </p>
+                {session.edit_reason && <p className="text-muted-foreground">Reason: {session.edit_reason}</p>}
+              </div>
+            )}
+
+            {canEdit && !confirmDelete && (
+              <div className="flex gap-2">
+                <Button variant="outline" className="flex-1 gap-1" onClick={() => onEdit?.(session)}>
+                  <Pencil className="h-4 w-4" /> Edit times
+                </Button>
+                <Button
+                  variant="outline"
+                  className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  onClick={() => setConfirmDelete(true)}
+                >
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              </div>
+            )}
+            {canEdit && confirmDelete && (
+              <div className="space-y-2 rounded-lg border border-destructive/30 p-3">
+                <p className="text-sm font-medium">Delete this attendance record?</p>
+                <Textarea
+                  rows={2}
+                  placeholder="Why? (required) e.g. Duplicate record"
+                  value={deleteReason}
+                  onChange={(e) => setDeleteReason(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  A copy is kept in the audit log. Any penalty for this day stays; cancel it on the
+                  Penalties page if it no longer applies.
+                </p>
+                <div className="flex gap-2">
+                  <Button variant="ghost" className="flex-1" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                    Back
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    disabled={!deleteReason.trim() || deleting}
+                    onClick={remove}
+                  >
+                    {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete record
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Photos + maps */}
             <div className="grid grid-cols-2 gap-3">
