@@ -4,15 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   Table,
   TableBody,
@@ -24,6 +15,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
+import { PenaltyActionDialog, PenaltyAction } from './PenaltyActionDialog';
 import { format } from 'date-fns';
 import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle, UserX, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -35,7 +27,7 @@ interface Row extends DisciplineLogRow {
 }
 
 export function PenaltiesPanel() {
-  const { isOwner, isAdmin, user, staffData } = useAuth();
+  const { isOwner, isAdmin } = useAuth();
   const canManage = isOwner || isAdmin;
 
   const today = format(new Date(), 'yyyy-MM-dd');
@@ -51,9 +43,7 @@ export function PenaltiesPanel() {
   const [runningAbsentCheck, setRunningAbsentCheck] = useState(false);
 
   const [target, setTarget] = useState<Row | null>(null);
-  const [reason, setReason] = useState('');
-  const [working, setWorking] = useState(false);
-  const [mode, setMode] = useState<'cancel' | 'restore'>('cancel');
+  const [mode, setMode] = useState<PenaltyAction>('cancel');
 
   const load = async () => {
     if (!canManage) return;
@@ -167,90 +157,11 @@ export function PenaltiesPanel() {
 
   const openCancel = (r: Row) => {
     setTarget(r);
-    setReason('');
     setMode('cancel');
   };
   const openRestore = (r: Row) => {
     setTarget(r);
-    setReason('');
     setMode('restore');
-  };
-
-  const submit = async () => {
-    if (!target) return;
-    if (mode === 'cancel' && !reason.trim()) {
-      toast.error('Please enter a reason');
-      return;
-    }
-    setWorking(true);
-    try {
-      const actorName =
-        staffData?.full_name || user?.user_metadata?.full_name || user?.email || 'Unknown';
-      const payload =
-        mode === 'cancel'
-          ? {
-              is_cancelled: true,
-              cancelled_by: user?.id ?? null,
-              cancelled_by_name: actorName,
-              cancelled_at: new Date().toISOString(),
-              cancellation_reason: reason.trim(),
-            }
-          : {
-              is_cancelled: false,
-              cancelled_by: null,
-              cancelled_by_name: null,
-              cancelled_at: null,
-              cancellation_reason: null,
-            };
-      const { error } = await supabase
-        .from('attendance_discipline_log' as never)
-        .update(payload as never)
-        .eq('id', target.id);
-      if (error) throw error;
-
-      if (mode === 'cancel') {
-        const phone = (target.staff_phone || '').replace(/^\+/, '');
-        if (phone) {
-          try {
-            const { data: waData, error: waErr } = await supabase.functions.invoke(
-              'send-attendance-whatsapp',
-              {
-                body: {
-                  staff_name: target.staff_name,
-                  staff_phone: phone,
-                  staff_id: target.staff_id,
-                  event_type: 'penalty_waived',
-                  actual_time: new Date().toISOString(),
-                  scheduled_time: new Date().toISOString(),
-                  slab: 'penalty_waived',
-                  deduction_amount: Number(target.fine_amount) || 0,
-                  penalty_date: target.work_date,
-                },
-              },
-            );
-            if (waErr || (waData && waData.success === false)) {
-              toast.error('Penalty waived but WhatsApp notification failed');
-            } else {
-              toast.success(`Penalty waived — WhatsApp notification sent to ${target.staff_name}`);
-            }
-          } catch (e) {
-            console.error('WhatsApp waiver notify failed', e);
-            toast.error('Penalty waived but WhatsApp notification failed');
-          }
-        } else {
-          toast.success('Penalty cancelled');
-        }
-      } else {
-        toast.success('Penalty restored');
-      }
-      setTarget(null);
-      await load();
-    } catch (e) {
-      console.error('Penalty update failed', e);
-      toast.error(e instanceof Error ? e.message : 'Update failed');
-    } finally {
-      setWorking(false);
-    }
   };
 
   if (!canManage) return null;
@@ -461,51 +372,12 @@ export function PenaltiesPanel() {
         )}
       </CardContent>
 
-      <Dialog open={!!target} onOpenChange={(o) => !o && setTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>
-              {mode === 'cancel' ? 'Cancel penalty' : 'Restore penalty'}
-            </DialogTitle>
-            <DialogDescription>
-              {target && (
-                <span>
-                  {target.staff_name} • {format(new Date(target.work_date), 'dd MMM yyyy')} •
-                  ₹{Number(target.fine_amount).toFixed(0)}
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          {mode === 'cancel' ? (
-            <div className="space-y-2">
-              <Label className="text-xs">Reason (required)</Label>
-              <Textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Traffic jam acknowledged by manager"
-                rows={3}
-              />
-              <p className="text-xs text-muted-foreground">
-                The penalty will be excluded from this month's settlement. The record stays
-                visible for audit.
-              </p>
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              This will restore the penalty so it counts toward the salary deduction again.
-            </p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTarget(null)} disabled={working}>
-              Cancel
-            </Button>
-            <Button onClick={submit} disabled={working}>
-              {working && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {mode === 'cancel' ? 'Confirm cancellation' : 'Restore penalty'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <PenaltyActionDialog
+        target={target}
+        mode={mode}
+        onClose={() => setTarget(null)}
+        onDone={load}
+      />
     </Card>
   );
 }
