@@ -27,6 +27,11 @@ export interface AttendanceSession {
   updated_at: string;
   overtime_reminder_sent?: boolean;
   auto_closed?: boolean;
+  /** Added by an owner/admin instead of a real check-in. */
+  is_manual?: boolean;
+  edited_by_name?: string | null;
+  edited_at?: string | null;
+  edit_reason?: string | null;
 }
 
 export interface AttendanceBreak {
@@ -252,30 +257,14 @@ export async function checkOut(
 
   // Compute discipline fine (best-effort; non-blocking on failure)
   if (session.staff_id) {
-    try {
-      const { data: staffRow } = await supabase
-        .from('staff')
-        .select('id, monthly_salary, attendance_tracked')
-        .eq('id', session.staff_id)
-        .maybeSingle();
-      if (staffRow && (staffRow as { attendance_tracked?: boolean }).attendance_tracked !== false) {
-        const monthlySalary = Number((staffRow as { monthly_salary?: number }).monthly_salary || 0);
-        const wd = new Date(session.work_date + 'T00:00:00');
-        const daysInMonth = new Date(wd.getFullYear(), wd.getMonth() + 1, 0).getDate();
-        await computeAndLogDiscipline({
-          staffId: session.staff_id,
-          userId,
-          sessionId: session.id,
-          workDate: session.work_date,
-          checkInIso: session.check_in_at,
-          checkOutIso: checkOutAt.toISOString(),
-          monthlySalary,
-          daysInMonth,
-        });
-      }
-    } catch (e) {
-      console.error('Discipline compute failed', e);
-    }
+    await recomputeDisciplineForSession({
+      staffId: session.staff_id,
+      userId,
+      sessionId: session.id,
+      workDate: session.work_date,
+      checkInIso: session.check_in_at,
+      checkOutIso: checkOutAt.toISOString(),
+    });
   }
 
   if (session.staff_id) {
@@ -318,4 +307,67 @@ export function formatSessionTime(iso: string | null | undefined, workDate: stri
 export function googleMapsLink(lat: number | null, lng: number | null): string | null {
   if (lat == null || lng == null) return null;
   return `https://www.google.com/maps?q=${lat},${lng}`;
+}
+
+/**
+ * Recalculates the day's penalty from a session's check-in/check-out. Best effort: a failure
+ * is logged and never blocks the check-out or edit that triggered it.
+ */
+export async function recomputeDisciplineForSession(params: {
+  staffId: string;
+  userId: string;
+  sessionId: string;
+  workDate: string;
+  checkInIso: string;
+  checkOutIso: string;
+}): Promise<void> {
+  try {
+    const { data: staffRow } = await supabase
+      .from('staff')
+      .select('id, monthly_salary, attendance_tracked')
+      .eq('id', params.staffId)
+      .maybeSingle();
+    if (!staffRow || (staffRow as { attendance_tracked?: boolean }).attendance_tracked === false) return;
+    const monthlySalary = Number((staffRow as { monthly_salary?: number }).monthly_salary || 0);
+    const wd = new Date(params.workDate + 'T00:00:00');
+    const daysInMonth = new Date(wd.getFullYear(), wd.getMonth() + 1, 0).getDate();
+    await computeAndLogDiscipline({ ...params, monthlySalary, daysInMonth });
+  } catch (e) {
+    console.error('Discipline compute failed', e);
+  }
+}
+
+/** Owner/admin: add (sessionId null) or correct one attendance record. Returns the session id. */
+export async function saveAttendanceRecord(params: {
+  sessionId: string | null;
+  staffId: string;
+  workDate: string;
+  checkInIso: string;
+  checkOutIso: string | null;
+  breakMinutes: number;
+  reason: string;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc(
+    'save_attendance_record' as never,
+    {
+      _session_id: params.sessionId,
+      _staff_id: params.staffId,
+      _work_date: params.workDate,
+      _check_in: params.checkInIso,
+      _check_out: params.checkOutIso,
+      _break_minutes: params.breakMinutes,
+      _reason: params.reason,
+    } as never,
+  );
+  if (error) throw error;
+  return data as unknown as string;
+}
+
+/** Owner/admin: delete a wrong attendance record (kept in the audit log). */
+export async function deleteAttendanceRecord(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc(
+    'delete_attendance_record' as never,
+    { _session_id: sessionId, _reason: reason } as never,
+  );
+  if (error) throw error;
 }
