@@ -27,5 +27,3 @@ dist-ssr
 scripts/migrate-supabase/.env.migration
 scripts/migrate-supabase/.work/
 supabase/.temp/
-
-.vercel
