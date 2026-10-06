@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -24,7 +24,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2, RotateCcw } from 'lucide-react';
+import { Plus, Search, Users, MoreHorizontal, Eye, Edit, FileText, Trash2, RotateCcw, AlertCircle, RefreshCw, Loader2, X } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
 import { toast } from '@/hooks/use-toast';
@@ -43,9 +43,20 @@ import type { Staff } from '@/types/database';
 
 export default function StaffList() {
   const { canViewSalaries, isOwner, isAdmin, isAccountant, canEditStaff } = useAuth();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [staff, setStaff] = useState<Staff[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Dashboard deep link: /staff?salary=missing
+  const salaryMissingOnly = searchParams.get('salary') === 'missing';
+
+  const clearSalaryFilter = () => {
+    const next = new URLSearchParams(searchParams);
+    next.delete('salary');
+    setSearchParams(next, { replace: true });
+  };
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [view, setView] = useState<'active' | 'removed'>('active');
   
@@ -58,6 +69,7 @@ export default function StaffList() {
 
   const fetchStaff = async () => {
     try {
+      setLoadError(null);
       const { data, error } = await supabase
         .from('staff')
         .select('*')
@@ -67,6 +79,7 @@ export default function StaffList() {
       setStaff(data as Staff[] || []);
     } catch (error) {
       console.error('Error fetching staff:', error);
+      setLoadError((error as { message?: string } | null)?.message || 'Could not load staff.');
     } finally {
       setIsLoading(false);
     }
@@ -75,12 +88,17 @@ export default function StaffList() {
   const activeCount = staff.filter(s => s.is_active).length;
   const removedCount = staff.filter(s => !s.is_active).length;
 
+  const query = searchQuery.trim().toLowerCase();
+  const queryDigits = query.replace(/\D/g, '');
   const filteredStaff = staff
     .filter(s => (view === 'active' ? s.is_active : !s.is_active))
+    .filter(s => !salaryMissingOnly || !s.monthly_salary || Number(s.monthly_salary) === 0)
     .filter(s =>
-      s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.employee_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.email.toLowerCase().includes(searchQuery.toLowerCase())
+      !query ||
+      (s.full_name || '').toLowerCase().includes(query) ||
+      (s.employee_id || '').toLowerCase().includes(query) ||
+      (s.email || '').toLowerCase().includes(query) ||
+      (queryDigits.length > 0 && (s.phone || '').replace(/\D/g, '').includes(queryDigits))
     );
 
   const getInitials = (name: string) => {
@@ -153,13 +171,13 @@ export default function StaffList() {
         description="Manage your team members"
       >
         {canAddStaff && (
-          <Link to="/staff/new">
-            <Button className="text-sm sm:text-base px-3 sm:px-4">
+          <Button asChild className="text-sm sm:text-base px-3 sm:px-4">
+            <Link to="/staff/new">
               <Plus className="mr-1.5 sm:mr-2 h-4 w-4" />
               <span className="hidden sm:inline">Add Staff</span>
               <span className="sm:hidden">Add</span>
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         )}
       </PageHeader>
 
@@ -177,12 +195,21 @@ export default function StaffList() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search by name, ID, or email..."
+              placeholder="Search by name, ID, phone or email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10 text-sm sm:text-base"
             />
           </div>
+          {salaryMissingOnly && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm">
+              <span className="min-w-0">Showing staff with salary not set</span>
+              <Button variant="ghost" size="sm" className="h-8 shrink-0 gap-1" onClick={clearSalaryFilter}>
+                <X className="h-3.5 w-3.5" />
+                Show all
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -190,14 +217,39 @@ export default function StaffList() {
       {/* Staff List */}
       <Card>
         <CardContent className="p-0">
-          {filteredStaff.length === 0 && !isLoading ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading staff...
+            </div>
+          ) : loadError ? (
+            <EmptyState
+              icon={AlertCircle}
+              title="Couldn't load staff"
+              description="Check your internet connection and try again."
+              action={
+                <Button variant="outline" onClick={() => { setIsLoading(true); fetchStaff(); }}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry
+                </Button>
+              }
+            />
+          ) : filteredStaff.length === 0 ? (
             <EmptyState
               icon={Users}
               title="No staff found"
-              description={searchQuery ? "Try adjusting your search" : "Add your first team member"}
+              description={
+                searchQuery
+                  ? "Try adjusting your search"
+                  : salaryMissingOnly
+                    ? "Every active staff member has a salary set"
+                    : view === 'removed'
+                      ? "No removed staff"
+                      : "Add your first team member"
+              }
               action={
-                !searchQuery && canAddStaff
-                  ? <Link to="/staff/new"><Button>Add Staff</Button></Link>
+                !searchQuery && !salaryMissingOnly && view === 'active' && canAddStaff
+                  ? <Button asChild><Link to="/staff/new">Add Staff</Link></Button>
                   : undefined
               }
             />
@@ -206,7 +258,20 @@ export default function StaffList() {
               {/* Mobile Card View */}
               <div className="block lg:hidden divide-y">
                 {filteredStaff.map((member) => (
-                  <div key={member.id} className="p-3 sm:p-4 space-y-2">
+                  <div
+                    key={member.id}
+                    role="link"
+                    tabIndex={0}
+                    aria-label={`View ${member.full_name}`}
+                    onClick={() => navigate(`/staff/${member.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        navigate(`/staff/${member.id}`);
+                      }
+                    }}
+                    className="p-3 sm:p-4 space-y-2 cursor-pointer active:bg-secondary/40 hover:bg-secondary/20 transition-colors"
+                  >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                         <Avatar className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
@@ -221,11 +286,15 @@ export default function StaffList() {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+                      <div
+                        className="flex items-center gap-1 sm:gap-2 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      >
                         <StatusBadge status={member.is_active ? 'active' : 'inactive'} />
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                            <Button variant="ghost" size="icon" className="h-10 w-10" aria-label={`Actions for ${member.full_name}`}>
                               <MoreHorizontal className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
@@ -362,7 +431,7 @@ export default function StaffList() {
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label={`Actions for ${member.full_name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>

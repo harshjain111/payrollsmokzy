@@ -199,8 +199,9 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
             </div>
             {leftThisMonth && (
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Last working day</Label>
+                <Label htmlFor="last-working-day" className="text-xs text-muted-foreground">Last working day</Label>
                 <Input
+                  id="last-working-day"
                   type="date"
                   value={lastWorkingDate}
                   min={b.period_start}
@@ -244,6 +245,7 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
             {leaveChanged && (
               <Textarea
                 rows={2}
+                aria-label="Reason the leave days differ from records"
                 placeholder="Why are the leave days different? (required)"
                 value={leaveReason}
                 onChange={(e) => setLeaveReason(e.target.value)}
@@ -292,6 +294,7 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
               />
               {asNumber(bonus) > 0 && (
                 <Input
+                  aria-label="What the bonus is for"
                   placeholder="What is it for? (required)"
                   value={bonusNote}
                   onChange={(e) => setBonusNote(e.target.value)}
@@ -311,6 +314,7 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
               />
               {asNumber(otherDeduction) > 0 && (
                 <Input
+                  aria-label="Reason for the other deduction"
                   placeholder="e.g. damage, uniform (required)"
                   value={otherDeductionNote}
                   onChange={(e) => setOtherDeductionNote(e.target.value)}
@@ -356,9 +360,9 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
           {/* Payment */}
           <section className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
-              <Label>Pay by</Label>
+              <Label htmlFor="settle-pay-by">Pay by</Label>
               <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PayoutMode)}>
-                <SelectTrigger>
+                <SelectTrigger id="settle-pay-by">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

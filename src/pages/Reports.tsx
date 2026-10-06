@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -16,7 +16,7 @@ import {
   BarChart3, Download, CalendarIcon, FileSpreadsheet, FileText, Users, Wallet,
   ArrowUpRight, Receipt, FileDown, Scale, Sparkles, ListOrdered,
 } from 'lucide-react';
-import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
+import { format, startOfMonth, endOfMonth, subMonths, parse } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -34,12 +34,32 @@ type ReportType = 'expenses' | 'advances' | 'transactions' | 'ai_insights' | 'su
 
 interface DateRange { from: Date; to: Date; }
 
+const REPORT_TYPES: ReportType[] = ['expenses', 'advances', 'transactions', 'ai_insights', 'summary', 'trial_balance', 'ledger', 'salary', 'payment'];
+
+/** Map dashboard deep-link values (?type=salary-register etc.) to a report tab. */
+function reportFromParam(param: string | null, canSeeSalary: boolean): ReportType {
+  switch (param) {
+    case 'salary-register': return canSeeSalary ? 'salary' : 'summary';
+    case 'payment-register': return 'payment';
+    case 'advance-register': return 'advances';
+    case 'payroll-summary': return 'summary';
+    default:
+      if (param && (REPORT_TYPES as string[]).includes(param)) {
+        return param === 'salary' && !canSeeSalary ? 'summary' : (param as ReportType);
+      }
+      return 'expenses';
+  }
+}
+
 export default function Reports() {
   const navigate = useNavigate();
   const { isOwner, isCA, isAccountant, isAdmin, canViewSalaries } = useAuth();
   const canSeeSalaryReports = canViewSalaries;
 
-  const [activeReport, setActiveReport] = useState<ReportType>('expenses');
+  const [searchParams] = useSearchParams();
+  const [activeReport, setActiveReport] = useState<ReportType>(() =>
+    reportFromParam(searchParams.get('type'), canSeeSalaryReports),
+  );
   const [staff, setStaff] = useState<Staff[]>([]);
   const [selectedStaffId, setSelectedStaffId] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -47,6 +67,7 @@ export default function Reports() {
     from: startOfMonth(subMonths(new Date(), 1)),
     to: endOfMonth(new Date()),
   });
+  const tabsListRef = useRef<HTMLDivElement>(null);
   const [reportData, setReportData] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [summaryStats, setSummaryStats] = useState({
@@ -68,6 +89,12 @@ export default function Reports() {
       fetchReportData();
     }
   }, [activeReport, selectedStaffId, selectedMonth, dateRange]);
+
+  // Keep the selected tab visible in the horizontally scrolling tab row (e.g. after a deep link)
+  useEffect(() => {
+    const active = tabsListRef.current?.querySelector<HTMLElement>('[role="tab"][data-state="active"]');
+    active?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  }, [activeReport]);
 
   const fetchStaff = async () => {
     const { data } = await supabase.from('staff_public').select('*').order('full_name');
@@ -92,12 +119,18 @@ export default function Reports() {
   };
 
   const fetchSummaryReport = async () => {
+    // Real month bounds (a fixed "-31" is an invalid DATE for 30-day months and February)
+    const monthDate = parse(selectedMonth, 'yyyy-MM', new Date());
+    const monthStart = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+    const monthEnd = format(endOfMonth(monthDate), 'yyyy-MM-dd');
     const [staffData, settlements, advances, expenses] = await Promise.all([
       supabase.from('staff').select('id, monthly_salary').eq('is_active', true),
       supabase.from('salary_settlements').select('balance_payable').eq('settlement_month', selectedMonth).eq('status', 'settled'),
-      supabase.from('ledger_entries').select('debit, credit').eq('tag', 'advance').gte('entry_date', `${selectedMonth}-01`).lte('entry_date', `${selectedMonth}-31`),
-      supabase.from('expenses').select('amount').eq('status', 'reimbursed').gte('expense_date', `${selectedMonth}-01`).lte('expense_date', `${selectedMonth}-31`),
+      supabase.from('ledger_entries').select('debit, credit').eq('tag', 'advance').gte('entry_date', monthStart).lte('entry_date', monthEnd),
+      supabase.from('expenses').select('amount').eq('status', 'reimbursed').gte('expense_date', monthStart).lte('expense_date', monthEnd),
     ]);
+    const firstError = staffData.error || settlements.error || advances.error || expenses.error;
+    if (firstError) throw firstError;
 
     setSummaryStats({
       totalPayroll: staffData.data?.reduce((sum, s) => sum + Number(s.monthly_salary), 0) || 0,
@@ -171,7 +204,20 @@ export default function Reports() {
     const selectedStaffName = staff.find(s => s.id === selectedStaffId)?.full_name || 'All Staff';
     switch (activeReport) {
       case 'summary': exportSummaryPDF(summaryStats, selectedMonth); break;
-      case 'ledger': exportLedgerPDF(reportData, selectedStaffName, dateRange); break;
+      case 'ledger':
+        // Journal lines nest the entry fields; flatten to the shape exportLedgerPDF expects
+        exportLedgerPDF(
+          reportData.map((line) => ({
+            entry_date: line.journal_entry?.entry_date || line.created_at,
+            voucher_no: line.journal_entry?.reference_no || '',
+            description: line.journal_entry?.description || line.description || '',
+            debit: Number(line.debit) || 0,
+            credit: Number(line.credit) || 0,
+          })),
+          selectedStaffName,
+          dateRange,
+        );
+        break;
       case 'salary': exportSalaryRegisterPDF(reportData, selectedMonth, canViewSalaries); break;
       case 'payment': exportPaymentRegisterPDF(reportData, dateRange); break;
     }
@@ -185,7 +231,7 @@ export default function Reports() {
       <PageHeader title="Reports" description="Smart reports & AI-powered insights for decision-making">
         {needsFilters && (
           <div className="flex gap-2">
-            <Button size="sm" onClick={handlePDFExport} disabled={activeReport === 'summary' ? false : reportData.length === 0}>
+            <Button size="sm" onClick={handlePDFExport} disabled={activeReport === 'summary' ? false : reportData.length === 0} aria-label="Download PDF">
               <FileDown className="mr-1.5 h-4 w-4" /><span className="hidden sm:inline">PDF</span>
             </Button>
           </div>
@@ -194,37 +240,35 @@ export default function Reports() {
 
       <Tabs value={activeReport} onValueChange={v => setActiveReport(v as ReportType)}>
         <div className="min-w-0">
-          <TabsList className={cn(
-            "grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4",
-            canSeeSalaryReports ? "lg:grid-cols-9" : "lg:grid-cols-8"
-          )}>
-            <TabsTrigger value="expenses" className="min-w-0 gap-1 px-2">
+          {/* One horizontally scrollable row (TabsList scrolls) instead of a tall wrapped grid on phones */}
+          <TabsList ref={tabsListRef} className="h-auto w-full justify-start gap-1 sm:w-full">
+            <TabsTrigger value="expenses" className="shrink-0 gap-1 px-3">
               <Receipt className="h-4 w-4" /><span className="text-xs sm:text-sm">Expenses</span>
             </TabsTrigger>
-            <TabsTrigger value="advances" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="advances" className="shrink-0 gap-1 px-3">
               <ArrowUpRight className="h-4 w-4" /><span className="text-xs sm:text-sm">Advances</span>
             </TabsTrigger>
-            <TabsTrigger value="transactions" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="transactions" className="shrink-0 gap-1 px-3">
               <ListOrdered className="h-4 w-4" /><span className="text-xs sm:text-sm">Transactions</span>
             </TabsTrigger>
-            <TabsTrigger value="ai_insights" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="ai_insights" className="shrink-0 gap-1 px-3">
               <Sparkles className="h-4 w-4" /><span className="text-xs sm:text-sm">AI Insights</span>
             </TabsTrigger>
-            <TabsTrigger value="summary" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="summary" className="shrink-0 gap-1 px-3">
               <BarChart3 className="h-4 w-4" /><span className="text-xs sm:text-sm">Summary</span>
             </TabsTrigger>
-            <TabsTrigger value="trial_balance" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="trial_balance" className="shrink-0 gap-1 px-3">
               <Scale className="h-4 w-4" /><span className="text-xs sm:text-sm">Trial Balance</span>
             </TabsTrigger>
-            <TabsTrigger value="ledger" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="ledger" className="shrink-0 gap-1 px-3">
               <FileText className="h-4 w-4" /><span className="text-xs sm:text-sm">Ledger</span>
             </TabsTrigger>
             {canSeeSalaryReports && (
-              <TabsTrigger value="salary" className="min-w-0 gap-1 px-2">
+              <TabsTrigger value="salary" className="shrink-0 gap-1 px-3">
                 <Wallet className="h-4 w-4" /><span className="text-xs sm:text-sm">Salary</span>
               </TabsTrigger>
             )}
-            <TabsTrigger value="payment" className="min-w-0 gap-1 px-2">
+            <TabsTrigger value="payment" className="shrink-0 gap-1 px-3">
               <FileSpreadsheet className="h-4 w-4" /><span className="text-xs sm:text-sm">Payments</span>
             </TabsTrigger>
           </TabsList>
@@ -315,7 +359,7 @@ export default function Reports() {
             <CardContent>
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <>
-                <div className="divide-y md:hidden">{reportData.map((line: any) => <div key={line.id} className="space-y-2 py-4"><div className="flex justify-between gap-3"><span className="font-medium">{line.account?.name || line.account?.code}</span><span className="shrink-0 text-xs text-muted-foreground">{line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}</span></div><p className="break-words text-xs text-muted-foreground">{line.journal_entry?.description || line.description}</p><div className="flex justify-between gap-3 text-xs"><span className="font-mono">{line.journal_entry?.reference_no}</span><span>{Number(line.debit) > 0 ? <>Debit <Amount value={line.debit} /></> : <>Credit <Amount value={line.credit} /></>}</span></div></div>)}</div>
+                <div className="divide-y md:hidden">{reportData.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No entries found</p>}{reportData.map((line: any) => <div key={line.id} className="space-y-2 py-4"><div className="flex justify-between gap-3"><span className="font-medium">{line.account?.name || line.account?.code}</span><span className="shrink-0 text-xs text-muted-foreground">{line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}</span></div><p className="break-words text-xs text-muted-foreground">{line.journal_entry?.description || line.description}</p><div className="flex justify-between gap-3 text-xs"><span className="font-mono">{line.journal_entry?.reference_no}</span><span>{Number(line.debit) > 0 ? <>Debit <Amount value={line.debit} /></> : <>Credit <Amount value={line.credit} /></>}</span></div></div>)}</div>
                 <div className="hidden md:block"><Table>
                   <TableHeader><TableRow>
                     <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Account</TableHead>
@@ -348,7 +392,7 @@ export default function Reports() {
               <CardContent>
                 {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                   <>
-                  <div className="divide-y md:hidden">{reportData.map((settlement: any) => <div key={settlement.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><span className="font-medium">{settlement.staff?.full_name}</span><Amount value={settlement.balance_payable} /></div><div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground"><span>Base: ₹{Number(settlement.base_salary).toLocaleString('en-IN')}</span><span className="text-right">Leave: {settlement.leave_days} days</span><span>Deduction: ₹{Number(settlement.leave_deduction).toLocaleString('en-IN')}</span><span className="text-right">Advance: ₹{Number(settlement.advances_adjusted).toLocaleString('en-IN')}</span></div></div>)}</div>
+                  <div className="divide-y md:hidden">{reportData.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No settlements for this month</p>}{reportData.map((settlement: any) => <div key={settlement.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><span className="font-medium">{settlement.staff?.full_name}</span><Amount value={settlement.balance_payable} /></div><div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground"><span>Base: ₹{Number(settlement.base_salary).toLocaleString('en-IN')}</span><span className="text-right">Leave: {settlement.leave_days} days</span><span>Deduction: ₹{Number(settlement.leave_deduction).toLocaleString('en-IN')}</span><span className="text-right">Advance: ₹{Number(settlement.advances_adjusted).toLocaleString('en-IN')}</span></div></div>)}</div>
                   <div className="hidden md:block"><Table>
                     <TableHeader><TableRow>
                       <TableHead>Staff</TableHead><TableHead className="text-right">Base Salary</TableHead>
@@ -384,7 +428,7 @@ export default function Reports() {
             <CardContent>
               {isLoading ? <div className="flex justify-center py-8"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" /></div> : (
                 <>
-                <div className="divide-y md:hidden">{reportData.map((entry: any) => { const amount = (entry.lines || []).reduce((sum: number, line: any) => sum + (Number(line.debit) || 0), 0) / 2; return <div key={entry.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{entry.staff?.full_name || '-'}</p><p className="text-xs text-muted-foreground">{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</p></div><Amount value={amount} /></div><div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{entry.transaction_type?.replace(/_/g, ' ')}</span><span className="font-mono">{entry.reference_no}</span><span>{entry.paid_by_user_name || '-'}</span></div></div>; })}</div>
+                <div className="divide-y md:hidden">{reportData.length === 0 && <p className="py-8 text-center text-sm text-muted-foreground">No payments found</p>}{reportData.map((entry: any) => { const amount = (entry.lines || []).reduce((sum: number, line: any) => sum + (Number(line.debit) || 0), 0) / 2; return <div key={entry.id} className="space-y-2 py-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="truncate font-medium">{entry.staff?.full_name || '-'}</p><p className="text-xs text-muted-foreground">{entry.entry_date ? format(new Date(entry.entry_date), 'dd MMM yyyy') : '-'}</p></div><Amount value={amount} /></div><div className="flex flex-wrap justify-between gap-2 text-xs text-muted-foreground"><span>{entry.transaction_type?.replace(/_/g, ' ')}</span><span className="font-mono">{entry.reference_no}</span><span>{entry.paid_by_user_name || '-'}</span></div></div>; })}</div>
                 <div className="hidden md:block"><Table>
                   <TableHeader><TableRow>
                     <TableHead>Date</TableHead><TableHead>Ref No</TableHead><TableHead>Staff</TableHead>

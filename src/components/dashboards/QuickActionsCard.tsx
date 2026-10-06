@@ -50,11 +50,13 @@ export function QuickActionsCard({
       </CardHeader>
       <CardContent className="grid gap-2 sm:gap-3 px-4 sm:px-6">
         {actions.map((action) => (
-          <Link key={action.href} to={action.href}>
-            <Button
-              variant="outline"
-              className="w-full justify-start h-auto py-3 sm:py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all active:scale-[0.98]"
-            >
+          <Button
+            key={action.href}
+            asChild
+            variant="outline"
+            className="w-full min-w-0 justify-start whitespace-normal h-auto py-3 sm:py-4 rounded-xl border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all active:scale-[0.98]"
+          >
+            <Link to={action.href}>
               <div
                 className={cn(
                   'w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center mr-2 sm:mr-3 shrink-0',
@@ -64,7 +66,7 @@ export function QuickActionsCard({
                 <action.icon className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="text-left flex-1 min-w-0">
-                <p className="font-medium text-sm sm:text-base">{action.label}</p>
+                <p className="font-medium text-sm sm:text-base truncate">{action.label}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                   {action.description}
                 </p>
@@ -79,8 +81,8 @@ export function QuickActionsCard({
                   {action.badge}
                 </Badge>
               )}
-            </Button>
-          </Link>
+            </Link>
+          </Button>
         ))}
       </CardContent>
     </Card>

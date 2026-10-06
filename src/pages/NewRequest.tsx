@@ -118,8 +118,8 @@ export default function NewRequest() {
           if (approver.user_id !== user?.id) {
             await supabase.rpc('create_notification', {
               _user_id: approver.user_id,
-              _title: 'New Payment Request',
-              _message: `${staffName} has submitted a payment request of ₹${amount.toLocaleString('en-IN')} for "${reason.slice(0, 50)}${reason.length > 50 ? '...' : ''}"`,
+              _title: 'New Advance Request',
+              _message: `${staffName} has requested an advance of ₹${amount.toLocaleString('en-IN')} for "${reason.slice(0, 50)}${reason.length > 50 ? '...' : ''}"`,
               _type: 'info',
               _reference_type: 'payment_request',
               _reference_id: newRequest.id,
@@ -141,10 +141,10 @@ export default function NewRequest() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <PageHeader
-        title="New Payment Request"
-        description="Submit a request for payment or advance"
+        title="Request Advance"
+        description="Ask for an advance on your salary or a payment"
       >
-        <Button variant="outline" size="sm" onClick={() => navigate(-1)}>
+        <Button variant="outline" size="sm" onClick={() => navigate(-1)} aria-label="Go back">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -155,8 +155,8 @@ export default function NewRequest() {
           <CardTitle className="text-base sm:text-lg">Request Details</CardTitle>
           <CardDescription className="text-xs sm:text-sm">
             {isPersonalRequest 
-              ? 'Fill in the details for your payment request'
-              : 'Create a payment request on behalf of a staff member'
+              ? 'Fill in the details for your advance request'
+              : 'Create an advance request on behalf of a staff member'
             }
           </CardDescription>
         </CardHeader>
@@ -167,7 +167,7 @@ export default function NewRequest() {
               <div className="space-y-2">
                 <Label htmlFor="staff" className="text-sm">Staff Member *</Label>
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger className="h-11">
+                  <SelectTrigger id="staff" className="h-11">
                     <SelectValue placeholder="Select staff member" />
                   </SelectTrigger>
                   <SelectContent>
@@ -193,10 +193,11 @@ export default function NewRequest() {
             <div className="space-y-2">
               <Label htmlFor="amount" className="text-sm">Amount *</Label>
               <AmountInput
+                id="amount"
                 value={amount}
                 onChange={setAmount}
                 placeholder="Enter amount"
-                className="h-12 text-lg"
+                inputClassName="h-12 text-lg"
               />
             </div>
 

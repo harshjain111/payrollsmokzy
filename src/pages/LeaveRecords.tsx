@@ -24,11 +24,12 @@
  import { EmptyState } from '@/components/layout/EmptyState';
  import { CreateLeaveDialog } from '@/components/leave/CreateLeaveDialog';
  import { LeaveApprovalDialog } from '@/components/leave/LeaveApprovalDialog';
- import { Plus, Calendar, Search, Clock, CheckCircle, XCircle, CalendarX, CalendarMinus, Eye } from 'lucide-react';
+ import { Plus, Calendar, Search, Clock, CheckCircle, XCircle, CalendarX, CalendarMinus } from 'lucide-react';
  import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
  import type { LeaveRecord, LeaveStatus } from '@/types/leave';
  import { LEAVE_TYPE_CONFIG, LEAVE_STATUS_LABELS } from '@/types/leave';
  import { cn } from '@/lib/utils';
+ import { LoadError } from '@/components/attendance/LoadError';
  
  interface StaffOption {
    id: string;
@@ -41,6 +42,7 @@
    const [leaveRecords, setLeaveRecords] = useState<LeaveRecord[]>([]);
    const [staff, setStaff] = useState<StaffOption[]>([]);
    const [isLoading, setIsLoading] = useState(true);
+   const [loadError, setLoadError] = useState(false);
    const [showCreateDialog, setShowCreateDialog] = useState(false);
    const [showApprovalDialog, setShowApprovalDialog] = useState(false);
    const [selectedLeave, setSelectedLeave] = useState<LeaveRecord | null>(null);
@@ -53,13 +55,18 @@
  
    const isStaff = userRole === 'staff' || userRole === 'hr';
    const canApprove = userRole === 'owner' || userRole === 'admin' || userRole === 'accountant';
+   // Who may insert leave_records (RLS): owner/admin/accountant for anyone; a staff-linked user
+   // only their own pending request. CA is read-only.
+   const canCreate = canApprove || (isStaff && !!staffData?.id);
  
    useEffect(() => {
      fetchLeaveRecords();
      if (!isStaff) {
        fetchStaff();
      }
-   }, [selectedMonth, selectedStaffId, selectedStatus, userRole]);
+     // Status is filtered on the client so the summary tiles always count the whole month.
+     // eslint-disable-next-line react-hooks/exhaustive-deps
+   }, [selectedMonth, selectedStaffId, userRole]);
  
    const fetchStaff = async () => {
      try {
@@ -79,6 +86,7 @@
    const fetchLeaveRecords = async () => {
      try {
        setIsLoading(true);
+       setLoadError(false);
  
        const monthStart = startOfMonth(new Date(selectedMonth + '-01'));
        const monthEnd = endOfMonth(new Date(selectedMonth + '-01'));
@@ -101,22 +109,21 @@
          query = query.eq('staff_id', selectedStaffId);
        }
  
-       if (selectedStatus !== 'all') {
-         query = query.eq('status', selectedStatus as 'pending' | 'approved' | 'rejected');
-       }
- 
        const { data, error } = await query;
  
        if (error) throw error;
        setLeaveRecords((data as unknown as LeaveRecord[]) || []);
      } catch (error) {
        console.error('Error fetching leave records:', error);
+       setLeaveRecords([]);
+       setLoadError(true);
      } finally {
        setIsLoading(false);
      }
    };
  
    const filteredRecords = leaveRecords.filter((record) => {
+     if (selectedStatus !== 'all' && record.status !== selectedStatus) return false;
      if (searchQuery) {
        const search = searchQuery.toLowerCase();
        return (
@@ -128,7 +135,7 @@
      return true;
    });
  
-   // Stats
+   // Stats — from the whole month (all statuses), not the status-filtered list
    const pendingCount = leaveRecords.filter(r => r.status === 'pending').length;
    const approvedCount = leaveRecords.filter(r => r.status === 'approved').length;
    const unpaidPenaltyCount = leaveRecords.filter(r => 
@@ -136,7 +143,7 @@
    ).length;
    const totalDeductionDays = leaveRecords
      .filter(r => r.status === 'approved')
-     .reduce((sum, r) => sum + r.deduction_days, 0);
+     .reduce((sum, r) => sum + Number(r.deduction_days || 0), 0);
  
    const monthOptions = Array.from({ length: 12 }, (_, i) => {
      const date = subMonths(new Date(), i);
@@ -162,6 +169,10 @@
      }
    };
  
+   // Tapping the active tile again clears the filter.
+   const toggleStatus = (status: 'approved' | 'pending') =>
+     setSelectedStatus((current) => (current === status ? 'all' : status));
+ 
    const handleReviewClick = (record: LeaveRecord) => {
      setSelectedLeave(record);
      setShowApprovalDialog(true);
@@ -173,21 +184,23 @@
          title={isStaff ? 'My Leaves' : 'Leave Records'}
          description={isStaff ? 'Track your leave requests and approvals' : 'Manage staff leave and salary deductions'}
        >
-         <Button onClick={() => setShowCreateDialog(true)}>
-           <Plus className="mr-2 h-4 w-4" />
-           {isStaff ? 'Request Leave' : 'Record Leave'}
-         </Button>
+         {canCreate && (
+           <Button onClick={() => setShowCreateDialog(true)}>
+             <Plus className="mr-2 h-4 w-4" />
+             {isStaff ? 'Request Leave' : 'Record Leave'}
+           </Button>
+         )}
        </PageHeader>
  
        {/* Clickable Summary Tiles */}
-       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
          {/* Total Leaves */}
          <Card 
            className={cn(
              "cursor-pointer transition-all hover:shadow-md hover:border-primary/50",
              selectedStatus === 'approved' && "ring-2 ring-primary"
            )}
-           onClick={() => setSelectedStatus('approved')}
+           onClick={() => toggleStatus('approved')}
          >
            <CardHeader className="pb-2">
              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -205,7 +218,7 @@
          {!isStaff && (
            <Card 
              className="cursor-pointer transition-all hover:shadow-md hover:border-destructive/50"
-             onClick={() => setSelectedStatus('approved')}
+             onClick={() => toggleStatus('approved')}
            >
              <CardHeader className="pb-2">
                <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -223,7 +236,7 @@
          {/* Total Deduction Days */}
          <Card 
            className="cursor-pointer transition-all hover:shadow-md"
-           onClick={() => setSelectedStatus('approved')}
+           onClick={() => toggleStatus('approved')}
          >
            <CardHeader className="pb-2">
              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -246,7 +259,7 @@
              selectedStatus === 'pending' && "ring-2 ring-warning",
              pendingCount > 0 && "border-warning/50"
            )}
-           onClick={() => setSelectedStatus('pending')}
+           onClick={() => toggleStatus('pending')}
          >
            <CardHeader className="pb-2">
              <CardTitle className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
@@ -328,16 +341,20 @@
              <div className="flex items-center justify-center py-12">
                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
              </div>
+           ) : loadError ? (
+             <LoadError onRetry={fetchLeaveRecords} />
            ) : filteredRecords.length === 0 ? (
              <EmptyState
                icon={Calendar}
                title={isStaff ? "No leaves yet" : "No leave records"}
                description={isStaff ? 'Need time off? Submit a leave request.' : 'No records match the selected filters.'}
                action={
-                 <Button onClick={() => setShowCreateDialog(true)}>
-                   <Plus className="mr-2 h-4 w-4" />
-                   {isStaff ? 'Request Leave' : 'Record Leave'}
-                 </Button>
+                 canCreate ? (
+                   <Button onClick={() => setShowCreateDialog(true)}>
+                     <Plus className="mr-2 h-4 w-4" />
+                     {isStaff ? 'Request Leave' : 'Record Leave'}
+                   </Button>
+                 ) : undefined
                }
              />
            ) : (
@@ -452,9 +469,7 @@
                              Review
                            </Button>
                          ) : (
-                           <Button size="sm" variant="ghost">
-                             <Eye className="h-4 w-4" />
-                           </Button>
+                           <span className="text-xs text-muted-foreground">—</span>
                          )}
                        </TableCell>
                      </TableRow>

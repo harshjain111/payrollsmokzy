@@ -37,7 +37,7 @@ import {
   FileText,
   RefreshCw,
 } from 'lucide-react';
-import { format, subDays } from 'date-fns';
+import { endOfDay, format, startOfDay, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import type { AuditLog } from '@/types/database';
@@ -53,14 +53,23 @@ const MODULES = [
   { value: 'salary_settlements', label: 'Settlements' },
   { value: 'expenses', label: 'Expenses' },
   { value: 'payment_requests', label: 'Payment Requests' },
+  { value: 'attendance_sessions', label: 'Attendance' },
 ];
 
+// Each filter option matches both trigger-written actions and the named
+// actions written by attendance corrections (save/delete_attendance_record).
 const ACTIONS = [
-  { value: 'all', label: 'All Actions' },
-  { value: 'INSERT', label: 'Created' },
-  { value: 'UPDATE', label: 'Updated' },
-  { value: 'DELETE', label: 'Deleted' },
+  { value: 'all', label: 'All Actions', matches: [] as string[] },
+  { value: 'INSERT', label: 'Created', matches: ['INSERT', 'ATTENDANCE_ADDED'] },
+  { value: 'UPDATE', label: 'Updated', matches: ['UPDATE', 'ATTENDANCE_EDITED'] },
+  { value: 'DELETE', label: 'Deleted', matches: ['DELETE', 'ATTENDANCE_DELETED'] },
 ];
+
+const getReason = (log: AuditLog): string | null => {
+  const newData = log.new_data as Record<string, unknown> | null;
+  const reason = newData && typeof newData.reason === 'string' ? newData.reason.trim() : '';
+  return reason || null;
+};
 
 export default function AuditLogPage() {
   const navigate = useNavigate();
@@ -75,6 +84,8 @@ export default function AuditLogPage() {
     to: new Date(),
   });
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
+  // performed_by (auth user id) -> staff full name, when resolvable.
+  const [performerNames, setPerformerNames] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOwner && !isCA) {
@@ -96,8 +107,9 @@ export default function AuditLogPage() {
       let query = supabase
         .from('audit_log')
         .select('*')
-        .gte('performed_at', dateRange.from.toISOString())
-        .lte('performed_at', dateRange.to.toISOString())
+        .gte('performed_at', startOfDay(dateRange.from).toISOString())
+        // Include the whole "To" day, not just up to midnight.
+        .lte('performed_at', endOfDay(dateRange.to).toISOString())
         .order('performed_at', { ascending: false })
         .limit(500);
 
@@ -106,13 +118,29 @@ export default function AuditLogPage() {
       }
 
       if (selectedAction !== 'all') {
-        query = query.eq('action', selectedAction);
+        const matches = ACTIONS.find((a) => a.value === selectedAction)?.matches ?? [selectedAction];
+        query = query.in('action', matches);
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
-      setLogs(data as AuditLog[] || []);
+      const rows = (data as AuditLog[]) || [];
+      setLogs(rows);
+
+      // Best effort: resolve who performed each action from linked staff records.
+      const ids = Array.from(new Set(rows.map((r) => r.performed_by).filter((v): v is string => !!v)));
+      if (ids.length > 0) {
+        const { data: people } = await supabase
+          .from('staff')
+          .select('user_id, full_name')
+          .in('user_id', ids);
+        const names: Record<string, string> = {};
+        (people || []).forEach((p) => {
+          if (p.user_id) names[p.user_id] = p.full_name;
+        });
+        setPerformerNames(names);
+      }
     } catch (error) {
       console.error('Error fetching audit logs:', error);
       toast({
@@ -128,10 +156,13 @@ export default function AuditLogPage() {
   const getActionBadge = (action: string) => {
     switch (action) {
       case 'INSERT':
-        return <Badge className="bg-success/20 text-success border-success/30">Created</Badge>;
+      case 'ATTENDANCE_ADDED':
+        return <Badge className="bg-success/20 text-success border-success/30">{action === 'INSERT' ? 'Created' : 'Added'}</Badge>;
       case 'UPDATE':
-        return <Badge className="bg-warning/20 text-warning border-warning/30">Updated</Badge>;
+      case 'ATTENDANCE_EDITED':
+        return <Badge className="bg-warning/20 text-warning border-warning/30">{action === 'UPDATE' ? 'Updated' : 'Edited'}</Badge>;
       case 'DELETE':
+      case 'ATTENDANCE_DELETED':
         return <Badge className="bg-destructive/20 text-destructive border-destructive/30">Deleted</Badge>;
       default:
         return <Badge variant="secondary">{action}</Badge>;
@@ -148,17 +179,24 @@ export default function AuditLogPage() {
         return 'Expense';
       case 'payment_requests':
         return 'Request';
+      case 'attendance_sessions':
+        return 'Attendance';
       default:
         return tableName;
     }
   };
 
+  const getPerformer = (log: AuditLog) =>
+    log.performed_by ? performerNames[log.performed_by] ?? null : null;
+
   const formatChanges = (log: AuditLog) => {
-    if (log.action === 'INSERT') {
-      return 'New record created';
+    const reason = getReason(log);
+    const withReason = (text: string) => (reason ? `${text} — Reason: ${reason}` : text);
+    if (log.action === 'INSERT' || log.action === 'ATTENDANCE_ADDED') {
+      return withReason(log.action === 'ATTENDANCE_ADDED' ? 'Attendance record added' : 'New record created');
     }
-    if (log.action === 'DELETE') {
-      return 'Record deleted';
+    if (log.action === 'DELETE' || log.action === 'ATTENDANCE_DELETED') {
+      return withReason(log.action === 'ATTENDANCE_DELETED' ? 'Attendance record deleted' : 'Record deleted');
     }
     
     // For updates, show what changed
@@ -166,13 +204,14 @@ export default function AuditLogPage() {
     const newData = log.new_data as Record<string, unknown> || {};
     const changes: string[] = [];
     
+    const ignored = new Set(['updated_at', 'reason', 'edited_at', 'edited_by', 'edited_by_name', 'edit_reason']);
     Object.keys(newData).forEach(key => {
-      if (oldData[key] !== newData[key] && key !== 'updated_at') {
+      if (!ignored.has(key) && JSON.stringify(oldData[key]) !== JSON.stringify(newData[key])) {
         changes.push(key.replace(/_/g, ' '));
       }
     });
     
-    return changes.length > 0 ? `Changed: ${changes.slice(0, 3).join(', ')}${changes.length > 3 ? '...' : ''}` : 'No changes detected';
+    return withReason(changes.length > 0 ? `Changed: ${changes.slice(0, 3).join(', ')}${changes.length > 3 ? '...' : ''}` : 'No changes detected');
   };
 
   return (
@@ -181,7 +220,7 @@ export default function AuditLogPage() {
         title="Audit Log"
         description="Track all changes to financial records"
       >
-        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={isLoading}>
+        <Button variant="outline" size="sm" onClick={fetchLogs} disabled={isLoading} aria-label="Refresh">
           <RefreshCw className={cn("mr-1.5 h-4 w-4", isLoading && "animate-spin")} />
           <span className="hidden sm:inline">Refresh</span>
         </Button>
@@ -289,6 +328,7 @@ export default function AuditLogPage() {
                   <TableHead>Timestamp</TableHead>
                   <TableHead>Module</TableHead>
                   <TableHead>Action</TableHead>
+                  <TableHead>By</TableHead>
                   <TableHead>Changes</TableHead>
                   <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
@@ -303,7 +343,10 @@ export default function AuditLogPage() {
                       <Badge variant="outline">{getModuleLabel(log.table_name)}</Badge>
                     </TableCell>
                     <TableCell>{getActionBadge(log.action)}</TableCell>
-                    <TableCell className="max-w-[300px] truncate text-muted-foreground">
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {getPerformer(log) || '—'}
+                    </TableCell>
+                    <TableCell className="max-w-[300px] truncate text-muted-foreground" title={formatChanges(log)}>
                       {formatChanges(log)}
                     </TableCell>
                     <TableCell>
@@ -311,6 +354,7 @@ export default function AuditLogPage() {
                         variant="ghost"
                         size="sm"
                         onClick={() => setSelectedLog(log)}
+                        aria-label="View details"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -319,7 +363,7 @@ export default function AuditLogPage() {
                 ))}
                 {logs.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                       No audit logs found for the selected filters
                     </TableCell>
                   </TableRow>
@@ -364,15 +408,17 @@ export default function AuditLogPage() {
                       <p className="text-xs text-muted-foreground line-clamp-2">
                         {formatChanges(log)}
                       </p>
-                      <p className="text-[10px] text-muted-foreground">
+                      <p className="text-[11px] text-muted-foreground">
                         {format(new Date(log.performed_at), 'dd MMM yyyy, HH:mm')}
+                        {getPerformer(log) && ` · ${getPerformer(log)}`}
                       </p>
                     </div>
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="shrink-0 h-8 w-8 p-0"
+                      className="shrink-0 h-10 w-10 p-0"
                       onClick={() => setSelectedLog(log)}
+                      aria-label="View details"
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -409,7 +455,20 @@ export default function AuditLogPage() {
                   <p className="text-xs text-muted-foreground">Record ID</p>
                   <p className="font-mono text-[10px] sm:text-xs truncate">{selectedLog.record_id}</p>
                 </div>
+                {getPerformer(selectedLog) && (
+                  <div>
+                    <p className="text-xs text-muted-foreground">Performed by</p>
+                    <p className="font-medium text-xs sm:text-sm">{getPerformer(selectedLog)}</p>
+                  </div>
+                )}
               </div>
+
+              {getReason(selectedLog) && (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <p className="text-xs text-muted-foreground">Reason</p>
+                  <p className="font-medium break-words">{getReason(selectedLog)}</p>
+                </div>
+              )}
 
               {selectedLog.old_data && (
                 <div>

@@ -16,6 +16,17 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { PenaltyActionDialog, PenaltyAction } from './PenaltyActionDialog';
+import { LoadError } from './LoadError';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
 import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle, UserX, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -38,6 +49,8 @@ export function PenaltiesPanel() {
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [confirmAbsentCheck, setConfirmAbsentCheck] = useState(false);
   const [unscheduledStaff, setUnscheduledStaff] = useState<string[]>([]);
   const [absentToday, setAbsentToday] = useState(0);
   const [runningAbsentCheck, setRunningAbsentCheck] = useState(false);
@@ -48,6 +61,7 @@ export function PenaltiesPanel() {
   const load = async () => {
     if (!canManage) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const { data, error } = await supabase
         .from('attendance_discipline_log' as never)
@@ -80,6 +94,8 @@ export function PenaltiesPanel() {
     } catch (e) {
       console.error('Penalties load failed', e);
       toast.error('Failed to load penalties');
+      setRows([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -169,15 +185,15 @@ export function PenaltiesPanel() {
   return (
     <Card className="rounded-2xl border-0 shadow-card">
       <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <ShieldAlert className="h-5 w-5 text-primary" />
             <CardTitle>Manage Penalties</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Badge
               variant={absentToday > 0 ? 'destructive' : 'secondary'}
-              className="gap-1"
+              className="shrink-0 gap-1 whitespace-nowrap"
             >
               <UserX className="h-3.5 w-3.5" />
               {absentToday} absent today
@@ -185,7 +201,7 @@ export function PenaltiesPanel() {
             <Button
               size="sm"
               variant="outline"
-              onClick={runAbsentCheck}
+              onClick={() => setConfirmAbsentCheck(true)}
               disabled={runningAbsentCheck}
               className="gap-1"
             >
@@ -199,7 +215,7 @@ export function PenaltiesPanel() {
           </div>
         </div>
         <CardDescription>
-          Cancel any system-charged penalty for a staff member. Cancelled penalties won't be
+          Waive any system-charged penalty for a staff member. Waived penalties won't be
           deducted at salary settlement. The original entry stays for audit.
         </CardDescription>
       </CardHeader>
@@ -268,6 +284,8 @@ export function PenaltiesPanel() {
           <div className="flex items-center justify-center py-10 text-muted-foreground">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
           </div>
+        ) : loadError ? (
+          <LoadError onRetry={load} />
         ) : filtered.length === 0 ? (
           <p className="py-8 text-center text-sm text-muted-foreground">
             No penalties charged in this period.
@@ -282,10 +300,10 @@ export function PenaltiesPanel() {
                   <span className={row.is_cancelled ? 'shrink-0 text-sm text-muted-foreground line-through' : 'shrink-0 text-sm font-semibold text-destructive'}>₹{Number(row.fine_amount).toFixed(0)}</span>
                 </div>
                 <p className={row.is_cancelled ? 'break-words text-xs text-muted-foreground line-through' : 'break-words text-xs'}>{row.fine_reason || (row.is_absent ? row.absent_reason || 'Absent' : '—')}</p>
-                {row.is_cancelled && <p className="break-words text-[10px] text-success">Cancelled by {row.cancelled_by_name || 'system'} — {row.cancellation_reason}</p>}
+                {row.is_cancelled && <p className="break-words text-[10px] text-success">Waived by {row.cancelled_by_name || 'system'} — {row.cancellation_reason}</p>}
                 <div className="flex items-center justify-between gap-3">
-                  <Badge variant={row.is_cancelled ? 'secondary' : 'destructive'}>{row.is_cancelled ? 'Cancelled' : 'Active'}</Badge>
-                  <Button size="sm" variant="outline" onClick={() => row.is_cancelled ? openRestore(row) : openCancel(row)} className={!row.is_cancelled ? 'gap-1 border-destructive/30 text-destructive hover:bg-destructive/10' : 'gap-1'}>{row.is_cancelled ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}{row.is_cancelled ? 'Restore' : 'Cancel'}</Button>
+                  <Badge variant={row.is_cancelled ? 'secondary' : 'destructive'}>{row.is_cancelled ? 'Waived' : 'Active'}</Badge>
+                  <Button size="sm" variant="outline" onClick={() => row.is_cancelled ? openRestore(row) : openCancel(row)} className={!row.is_cancelled ? 'gap-1 border-destructive/30 text-destructive hover:bg-destructive/10' : 'gap-1'}>{row.is_cancelled ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}{row.is_cancelled ? 'Restore' : 'Waive'}</Button>
                 </div>
               </div>
             ))}
@@ -317,7 +335,7 @@ export function PenaltiesPanel() {
                       </span>
                       {r.is_cancelled && (
                         <p className="text-[10px] text-emerald-600 mt-0.5">
-                          Cancelled by {r.cancelled_by_name || 'system'} —{' '}
+                          Waived by {r.cancelled_by_name || 'system'} —{' '}
                           {r.cancellation_reason}
                         </p>
                       )}
@@ -336,7 +354,7 @@ export function PenaltiesPanel() {
                     <TableCell>
                       {r.is_cancelled ? (
                         <Badge variant="secondary" className="bg-emerald-500/15 text-emerald-700">
-                          Cancelled
+                          Waived
                         </Badge>
                       ) : (
                         <Badge variant="destructive">Active</Badge>
@@ -359,7 +377,7 @@ export function PenaltiesPanel() {
                           onClick={() => openCancel(r)}
                           className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
                         >
-                          <Ban className="h-3.5 w-3.5" /> Cancel
+                          <Ban className="h-3.5 w-3.5" /> Waive
                         </Button>
                       )}
                     </TableCell>
@@ -378,6 +396,31 @@ export function PenaltiesPanel() {
         onClose={() => setTarget(null)}
         onDone={load}
       />
+
+      <AlertDialog open={confirmAbsentCheck} onOpenChange={setConfirmAbsentCheck}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Run the absent check now?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every tracked staff member with a shift who has not checked in today (and is not on
+              approved leave) will be marked absent, charged the absent penalty, and sent a WhatsApp
+              message — including anyone whose shift has not started yet. This runs automatically
+              at 11:59 PM; only run it by hand if that check was missed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Back</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmAbsentCheck(false);
+                runAbsentCheck();
+              }}
+            >
+              Mark absent &amp; notify
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

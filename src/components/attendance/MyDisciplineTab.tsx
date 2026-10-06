@@ -7,32 +7,53 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { LoadError } from './LoadError';
 
 export function MyDisciplineTab() {
   const { staffData } = useAuth();
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
   const [rows, setRows] = useState<DisciplineLogRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!staffData?.id) return;
+    if (!staffData?.id) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     const start = month + '-01';
     const end = new Date(start);
     end.setMonth(end.getMonth() + 1);
     const endStr = end.toISOString().slice(0, 10);
     setLoading(true);
-    supabase
-      .from('attendance_discipline_log' as never)
-      .select('*')
-      .eq('staff_id', staffData.id)
-      .gte('work_date', start)
-      .lt('work_date', endStr)
-      .order('work_date', { ascending: false })
-      .then(({ data }) => {
-        setRows((data as DisciplineLogRow[]) ?? []);
-        setLoading(false);
-      });
-  }, [staffData?.id, month]);
+    setError(false);
+    (async () => {
+      try {
+        const { data, error: err } = await supabase
+          .from('attendance_discipline_log' as never)
+          .select('*')
+          .eq('staff_id', staffData.id)
+          .gte('work_date', start)
+          .lt('work_date', endStr)
+          .order('work_date', { ascending: false });
+        if (err) throw err;
+        if (!cancelled) setRows((data as DisciplineLogRow[]) ?? []);
+      } catch (e) {
+        console.error('Discipline load error', e);
+        if (!cancelled) {
+          setRows([]);
+          setError(true);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [staffData?.id, month, reloadKey]);
 
   const totals = useMemo(() => {
     return {
@@ -48,11 +69,22 @@ export function MyDisciplineTab() {
     };
   }, [rows]);
 
+  if (!staffData?.id) {
+    return (
+      <Card className="rounded-2xl border-0 shadow-card">
+        <CardContent className="py-8 text-center text-sm text-muted-foreground">
+          Discipline records are available for staff accounts.
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <label className="text-xs text-muted-foreground">Month</label>
+        <label htmlFor="discipline-month" className="text-xs text-muted-foreground">Month</label>
         <Input
+          id="discipline-month"
           type="month"
           value={month}
           onChange={(e) => setMonth(e.target.value)}
@@ -95,6 +127,8 @@ export function MyDisciplineTab() {
             <div className="flex items-center justify-center py-8 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
+          ) : error ? (
+            <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
           ) : rows.length === 0 ? (
             <p className="py-8 text-center text-muted-foreground text-sm">
               No discipline records this month. Keep it up!
@@ -104,7 +138,7 @@ export function MyDisciplineTab() {
               {rows.map((r) => (
                 <div key={r.id} className="py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-sm">
                         {format(new Date(r.work_date), 'dd MMM yyyy')}
                       </p>
@@ -125,7 +159,7 @@ export function MyDisciplineTab() {
                           variant="secondary"
                           className="text-[10px] bg-emerald-500/15 text-emerald-700"
                         >
-                          Cancelled
+                          Waived
                         </Badge>
                       )}
                       {r.is_absent && (

@@ -26,6 +26,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Shift, ShiftAssignment, fetchShifts, fetchAssignments } from '@/lib/discipline';
 import { toast } from 'sonner';
 import { Plus, Loader2, Clock } from 'lucide-react';
+import { LoadError } from '@/components/attendance/LoadError';
 
 interface StaffLite {
   id: string;
@@ -42,27 +43,38 @@ export default function Shifts() {
   const [assignments, setAssignments] = useState<ShiftAssignment[]>([]);
   const [staff, setStaff] = useState<StaffLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [savingShift, setSavingShift] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Shift | null>(null);
   const [name, setName] = useState('');
   const [checkIn, setCheckIn] = useState('16:00');
   const [checkOut, setCheckOut] = useState('02:00');
 
-  const load = async () => {
-    setLoading(true);
-    const [s, a, st] = await Promise.all([
-      fetchShifts(),
-      fetchAssignments(),
-      supabase
-        .from('staff')
-        .select('id, full_name, designation, attendance_tracked' as never)
-        .eq('is_active', true)
-        .order('full_name'),
-    ]);
-    setShifts(s);
-    setAssignments(a);
-    setStaff((st.data as unknown as StaffLite[]) ?? []);
-    setLoading(false);
+  /** quiet: reload after a save without swapping the list for a spinner (keeps input focus). */
+  const load = async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setLoadError(false);
+    try {
+      const [s, a, st] = await Promise.all([
+        fetchShifts(),
+        fetchAssignments(),
+        supabase
+          .from('staff')
+          .select('id, full_name, designation, attendance_tracked' as never)
+          .eq('is_active', true)
+          .order('full_name'),
+      ]);
+      if (st.error) throw st.error;
+      setShifts(s);
+      setAssignments(a);
+      setStaff((st.data as unknown as StaffLite[]) ?? []);
+    } catch (e) {
+      console.error('Shifts load failed', e);
+      setLoadError(true);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -93,21 +105,23 @@ export default function Shifts() {
   };
 
   const saveShift = async () => {
+    if (savingShift) return;
     if (!name.trim()) return toast.error('Shift name required');
-    const payload = { name, check_in_time: checkIn, check_out_time: checkOut } as never;
-    if (editing) {
-      const { error } = await supabase
-        .from('shifts' as never)
-        .update(payload)
-        .eq('id', editing.id);
-      if (error) return toast.error(error.message);
-    } else {
-      const { error } = await supabase.from('shifts' as never).insert(payload);
-      if (error) return toast.error(error.message);
+    const payload = { name: name.trim(), check_in_time: checkIn, check_out_time: checkOut } as never;
+    setSavingShift(true);
+    try {
+      const { error } = editing
+        ? await supabase.from('shifts' as never).update(payload).eq('id', editing.id)
+        : await supabase.from('shifts' as never).insert(payload);
+      if (error) throw error;
+      toast.success('Saved');
+      setDialogOpen(false);
+      load(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Could not save shift');
+    } finally {
+      setSavingShift(false);
     }
-    toast.success('Saved');
-    setDialogOpen(false);
-    load();
   };
 
   const assignShift = async (staffId: string, shiftId: string | null) => {
@@ -124,7 +138,7 @@ export default function Shifts() {
         .insert({ staff_id: staffId, shift_id: shiftId } as never);
       if (error) return toast.error(error.message);
     }
-    load();
+    load(true);
   };
 
   const setOverride = async (
@@ -133,18 +147,24 @@ export default function Shifts() {
     value: string,
   ) => {
     const existing = assignments.find((a) => a.staff_id === staffId);
+    // Inputs save on blur — skip when nothing actually changed.
+    const current = existing?.[field]?.slice(0, 5) ?? '';
+    if (value === current) return;
     const v = value ? value : null;
-    if (existing) {
-      await supabase
-        .from('staff_shift_assignments' as never)
-        .update({ [field]: v } as never)
-        .eq('id', existing.id);
-    } else {
-      await supabase
-        .from('staff_shift_assignments' as never)
-        .insert({ staff_id: staffId, [field]: v } as never);
+    const { error } = existing
+      ? await supabase
+          .from('staff_shift_assignments' as never)
+          .update({ [field]: v } as never)
+          .eq('id', existing.id)
+      : await supabase
+          .from('staff_shift_assignments' as never)
+          .insert({ staff_id: staffId, [field]: v } as never);
+    if (error) {
+      toast.error(error.message || 'Could not save override');
+      return;
     }
-    load();
+    toast.success(v ? 'Override saved' : 'Override cleared');
+    load(true);
   };
 
   const trackedStaff = staff.filter((s) => s.attendance_tracked);
@@ -178,8 +198,9 @@ export default function Shifts() {
                 </DialogHeader>
                 <div className="space-y-3">
                   <div>
-                    <Label>Name</Label>
+                    <Label htmlFor="shift-name">Name</Label>
                     <Input
+                      id="shift-name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Evening 4pm-2am"
@@ -187,16 +208,18 @@ export default function Shifts() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <Label>Check-in time</Label>
+                      <Label htmlFor="shift-check-in">Check-in time</Label>
                       <Input
+                        id="shift-check-in"
                         type="time"
                         value={checkIn}
                         onChange={(e) => setCheckIn(e.target.value)}
                       />
                     </div>
                     <div>
-                      <Label>Check-out time</Label>
+                      <Label htmlFor="shift-check-out">Check-out time</Label>
                       <Input
+                        id="shift-check-out"
                         type="time"
                         value={checkOut}
                         onChange={(e) => setCheckOut(e.target.value)}
@@ -209,10 +232,13 @@ export default function Shifts() {
                   </p>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={savingShift}>
                     Cancel
                   </Button>
-                  <Button onClick={saveShift}>Save</Button>
+                  <Button onClick={saveShift} disabled={savingShift}>
+                    {savingShift && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -222,6 +248,8 @@ export default function Shifts() {
             <div className="flex items-center justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
+          ) : loadError ? (
+            <LoadError message="Couldn't load shifts. Check your internet connection and try again." onRetry={() => load()} />
           ) : (
             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {shifts.map((s) => (
@@ -258,6 +286,14 @@ export default function Shifts() {
         <TabsContent value="grid" className="space-y-3">
           <Card className="rounded-2xl border-0 shadow-card">
             <CardContent className="p-0">
+              {loading ? (
+                <div className="flex items-center justify-center py-12 text-muted-foreground">
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
+                </div>
+              ) : loadError ? (
+                <LoadError message="Couldn't load staff shifts. Check your internet connection and try again." onRetry={() => load()} />
+              ) : (
+              <>
               <div className="divide-y md:hidden">
                 {trackedStaff.map((st) => {
                   const assignment = assignments.find((item) => item.staff_id === st.id);
@@ -268,9 +304,9 @@ export default function Shifts() {
                         <p className="truncate text-xs text-muted-foreground">{st.designation ?? '—'}</p>
                       </div>
                       <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Shift</Label>
+                        <Label htmlFor={`shift-${st.id}`} className="text-xs text-muted-foreground">Shift</Label>
                         <Select value={assignment?.shift_id ?? 'none'} onValueChange={(value) => assignShift(st.id, value === 'none' ? null : value)}>
-                          <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                          <SelectTrigger id={`shift-${st.id}`} className="w-full"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="none">— No shift —</SelectItem>
                             {shifts.map((shift) => <SelectItem key={shift.id} value={shift.id}>{shift.name}</SelectItem>)}
@@ -278,8 +314,8 @@ export default function Shifts() {
                         </Select>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Override in</Label><Input type="time" defaultValue={assignment?.override_check_in?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_in', event.target.value)} /></div>
-                        <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Override out</Label><Input type="time" defaultValue={assignment?.override_check_out?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_out', event.target.value)} /></div>
+                        <div className="space-y-1.5"><Label htmlFor={`ov-in-${st.id}`} className="text-xs text-muted-foreground">Override in</Label><Input id={`ov-in-${st.id}`} type="time" defaultValue={assignment?.override_check_in?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_in', event.target.value)} /></div>
+                        <div className="space-y-1.5"><Label htmlFor={`ov-out-${st.id}`} className="text-xs text-muted-foreground">Override out</Label><Input id={`ov-out-${st.id}`} type="time" defaultValue={assignment?.override_check_out?.slice(0, 5) ?? ''} onBlur={(event) => setOverride(st.id, 'override_check_out', event.target.value)} /></div>
                       </div>
                     </div>
                   );
@@ -314,7 +350,7 @@ export default function Shifts() {
                               assignShift(st.id, v === 'none' ? null : v)
                             }
                           >
-                            <SelectTrigger className="h-9 w-[180px]">
+                            <SelectTrigger className="h-9 w-[180px]" aria-label={`Shift for ${st.full_name}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -331,6 +367,7 @@ export default function Shifts() {
                           <Input
                             type="time"
                             defaultValue={a?.override_check_in?.slice(0, 5) ?? ''}
+                            aria-label={`Override check-in for ${st.full_name}`}
                             onBlur={(e) =>
                               setOverride(st.id, 'override_check_in', e.target.value)
                             }
@@ -341,6 +378,7 @@ export default function Shifts() {
                           <Input
                             type="time"
                             defaultValue={a?.override_check_out?.slice(0, 5) ?? ''}
+                            aria-label={`Override check-out for ${st.full_name}`}
                             onBlur={(e) =>
                               setOverride(st.id, 'override_check_out', e.target.value)
                             }
@@ -361,6 +399,8 @@ export default function Shifts() {
                 </tbody>
               </table>
               </div>
+              </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

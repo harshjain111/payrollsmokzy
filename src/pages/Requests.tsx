@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserDisplayName } from '@/lib/get-user-display-name';
@@ -25,10 +25,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, ClipboardList, Check, X, Loader2, ArrowRight, Ban } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, Loader2, ArrowRight, Ban, AlertCircle, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import type { PaymentRequest, StaffPublic } from '@/types/database';
@@ -52,20 +62,32 @@ export default function Requests() {
     isHR,
   } = useAuth();
   
+  const [searchParams] = useSearchParams();
   const [requests, setRequests] = useState<RequestWithStaff[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<RequestWithStaff | null>(null);
+  const [approveTarget, setApproveTarget] = useState<RequestWithStaff | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending');
+  // Dashboards deep-link with ?status=pending|approved|rejected|all (and ?escalated=true → pending queue)
+  const [activeTab, setActiveTab] = useState(() => {
+    const status = searchParams.get('status');
+    if (status && ['pending', 'approved', 'rejected', 'all'].includes(status)) return status;
+    return 'pending';
+  });
   const [cancelRequest, setCancelRequest] = useState<RequestWithStaff | null>(null);
+  // Ignore responses from an older fetch (e.g. after switching tabs quickly)
+  const fetchSeq = useRef(0);
 
   useEffect(() => {
     fetchRequests();
   }, [staffData?.id, activeTab, accountingMode]);
 
   const fetchRequests = async () => {
+    const seq = ++fetchSeq.current;
     setIsLoading(true);
+    setLoadError(false);
     try {
       let query = supabase
         .from('payment_requests')
@@ -102,11 +124,16 @@ export default function Requests() {
       const { data, error } = await query;
 
       if (error) throw error;
+      if (seq !== fetchSeq.current) return;
       setRequests(data as RequestWithStaff[] || []);
     } catch (error) {
       console.error('Error fetching requests:', error);
+      if (seq !== fetchSeq.current) return;
+      setRequests([]);
+      setLoadError(true);
+      toast.error('Could not load requests. Check your connection and try again.');
     } finally {
-      setIsLoading(false);
+      if (seq === fetchSeq.current) setIsLoading(false);
     }
   };
 
@@ -115,6 +142,7 @@ export default function Requests() {
     // But you CAN approve requests you created on behalf of others
     if (request.staff?.user_id === user?.id) {
       toast.error('You cannot approve requests for yourself');
+      setApproveTarget(null);
       return;
     }
 
@@ -122,7 +150,7 @@ export default function Requests() {
     try {
       const approverName = getUserDisplayName(user, staffData);
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('payment_requests')
         .update({
           status: 'approved',
@@ -130,9 +158,16 @@ export default function Requests() {
           approved_at: new Date().toISOString(),
           approved_by_user_name: approverName,
         })
-        .eq('id', request.id);
+        .eq('id', request.id)
+        .eq('status', 'pending')
+        .select('id');
 
       if (error) throw error;
+      if (!data || data.length === 0) {
+        toast.error('This request was already handled by someone else');
+        fetchRequests();
+        return;
+      }
 
       // Notify the staff member
       if (request.staff?.user_id) {
@@ -178,7 +213,7 @@ export default function Requests() {
       toast.error('Failed to approve request');
     } finally {
       setIsProcessing(false);
-      setSelectedRequest(null);
+      setApproveTarget(null);
     }
   };
 
@@ -241,7 +276,7 @@ export default function Requests() {
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
-        title="Request Advance"
+        title={canApprove || isOwner || isAdmin || (isAccountant && accountingMode) ? 'Advance Requests' : 'Request Advance'}
         description={
           canApprove
             ? "Review and approve advance requests"
@@ -270,7 +305,21 @@ export default function Requests() {
 
       <Card>
         <CardContent className="p-0">
-          {requests.length === 0 && !isLoading ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground" role="status">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading requests...
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 py-12 px-4 text-center">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+              <p className="text-sm text-muted-foreground">Could not load requests. Please check your connection.</p>
+              <Button variant="outline" size="sm" onClick={() => fetchRequests()}>
+                <RefreshCw className="mr-1.5 h-4 w-4" />
+                Retry
+              </Button>
+            </div>
+          ) : requests.length === 0 ? (
             <EmptyState
               icon={ClipboardList}
               title="No requests found"
@@ -314,18 +363,20 @@ export default function Requests() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-success hover:text-success h-8 w-8 sm:h-9 sm:w-9 p-0"
-                              onClick={() => handleApprove(request)}
+                              className="text-success hover:text-success h-9 w-9 p-0"
+                              onClick={() => setApproveTarget(request)}
                               disabled={isProcessing}
+                              aria-label={`Approve request from ${request.staff?.full_name ?? 'staff'}`}
                             >
                               <Check className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9 p-0"
+                              className="text-destructive hover:text-destructive h-9 w-9 p-0"
                               onClick={() => setSelectedRequest(request)}
                               disabled={isProcessing}
+                              aria-label={`Reject request from ${request.staff?.full_name ?? 'staff'}`}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -343,9 +394,10 @@ export default function Requests() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="text-destructive hover:text-destructive h-8 w-8 p-0"
+                            className="text-destructive hover:text-destructive h-9 w-9 p-0"
                             onClick={() => setCancelRequest(request)}
                             title="Cancel Approval"
+                            aria-label="Cancel approval"
                           >
                             <Ban className="h-4 w-4" />
                           </Button>
@@ -413,8 +465,9 @@ export default function Requests() {
                                   size="sm"
                                   variant="outline"
                                   className="text-success hover:text-success"
-                                  onClick={() => handleApprove(request)}
+                                  onClick={() => setApproveTarget(request)}
                                   disabled={isProcessing}
+                                  aria-label={`Approve request from ${request.staff?.full_name ?? 'staff'}`}
                                 >
                                   <Check className="h-4 w-4" />
                                 </Button>
@@ -424,6 +477,7 @@ export default function Requests() {
                                   className="text-destructive hover:text-destructive"
                                   onClick={() => setSelectedRequest(request)}
                                   disabled={isProcessing}
+                                  aria-label={`Reject request from ${request.staff?.full_name ?? 'staff'}`}
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -465,7 +519,14 @@ export default function Requests() {
       </Card>
 
       {/* Rejection Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      <Dialog
+        open={!!selectedRequest}
+        onOpenChange={(open) => {
+          if (open || isProcessing) return;
+          setSelectedRequest(null);
+          setRejectionReason('');
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Reject Request</DialogTitle>
@@ -475,8 +536,9 @@ export default function Requests() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Reason for rejection</Label>
+              <Label htmlFor="rejection-reason">Reason for rejection</Label>
               <Textarea
+                id="rejection-reason"
                 value={rejectionReason}
                 onChange={(e) => setRejectionReason(e.target.value)}
                 placeholder="Enter reason..."
@@ -487,7 +549,10 @@ export default function Requests() {
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setSelectedRequest(null)}
+              onClick={() => {
+                setSelectedRequest(null);
+                setRejectionReason('');
+              }}
               disabled={isProcessing}
             >
               Cancel
@@ -509,6 +574,49 @@ export default function Requests() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approve confirmation */}
+      <AlertDialog
+        open={!!approveTarget}
+        onOpenChange={(open) => {
+          if (!open && !isProcessing) setApproveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Approve this advance?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {approveTarget && (
+                <>
+                  Approve <span className="font-medium text-foreground">₹{approveTarget.amount.toLocaleString('en-IN')}</span> for{' '}
+                  <span className="font-medium text-foreground">{approveTarget.staff?.full_name || 'this staff member'}</span>?
+                  It will then be ready to pay in Payouts.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isProcessing}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isProcessing}
+              onClick={(e) => {
+                // Keep the dialog open (and the button disabled) until the approval finishes
+                e.preventDefault();
+                if (approveTarget && !isProcessing) handleApprove(approveTarget);
+              }}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Approving...
+                </>
+              ) : (
+                'Approve'
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Cancel Approval Dialog */}
       <CancelApprovalDialog

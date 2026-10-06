@@ -80,7 +80,7 @@ beforeEach(() => {
 });
 
 describe('DayPenaltiesView', () => {
-  it("loads today's penalties and shows cancel/restore for owners", async () => {
+  it("loads today's penalties and shows waive/restore for owners", async () => {
     render(<DayPenaltiesView canManage />);
 
     expect(await screen.findByText('Asha')).toBeInTheDocument();
@@ -88,16 +88,16 @@ describe('DayPenaltiesView', () => {
     expect(screen.queryByText('Chetan')).not.toBeInTheDocument();
     expect(mocks.logEq).toHaveBeenCalledWith('work_date', today);
     expect(screen.getByText(/Waived by Owner — Doctor visit/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Cancel penalty/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Waive penalty/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Restore/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next day' })).toBeDisabled();
   });
 
-  it('requires a reason, then cancels the penalty and notifies the staff member', async () => {
+  it('requires a reason, then waives the penalty and notifies the staff member', async () => {
     render(<DayPenaltiesView canManage />);
-    fireEvent.click(await screen.findByRole('button', { name: /Cancel penalty/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Waive penalty/ }));
 
-    const confirm = await screen.findByRole('button', { name: 'Confirm cancellation' });
+    const confirm = await screen.findByRole('button', { name: 'Confirm waiver' });
     fireEvent.click(confirm);
     expect(mocks.update).not.toHaveBeenCalled();
 
@@ -127,7 +127,7 @@ describe('DayPenaltiesView', () => {
     render(<DayPenaltiesView canManage={false} />);
 
     expect(await screen.findByText('Asha')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Cancel penalty/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Waive penalty/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Restore/ })).not.toBeInTheDocument();
     expect(mocks.rpc).toHaveBeenCalledWith('get_attendance_staff');
     expect(mocks.staffIn).not.toHaveBeenCalled();

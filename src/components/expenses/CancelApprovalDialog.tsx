@@ -160,8 +160,9 @@ export function CancelApprovalDialog({
           </div>
 
           <div className="space-y-2">
-            <Label>Reason for cancellation *</Label>
+            <Label htmlFor="cancel-approval-reason">Reason for cancellation *</Label>
             <Textarea
+              id="cancel-approval-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Why is this approval being cancelled?"

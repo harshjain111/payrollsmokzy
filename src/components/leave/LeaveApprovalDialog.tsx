@@ -101,11 +101,11 @@
 
         onSuccess();
        onOpenChange(false);
-     } catch (error: any) {
+     } catch (error) {
        console.error('Error approving leave:', error);
        toast({
          title: 'Error',
-         description: error.message || 'Failed to approve leave.',
+         description: (error as { message?: string })?.message || 'Failed to approve leave.',
          variant: 'destructive',
        });
      } finally {
@@ -158,11 +158,11 @@
 
         onSuccess();
        onOpenChange(false);
-     } catch (error: any) {
+     } catch (error) {
        console.error('Error rejecting leave:', error);
        toast({
          title: 'Error',
-         description: error.message || 'Failed to reject leave.',
+         description: (error as { message?: string })?.message || 'Failed to reject leave.',
          variant: 'destructive',
        });
      } finally {

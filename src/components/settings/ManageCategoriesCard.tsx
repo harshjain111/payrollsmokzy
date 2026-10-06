@@ -6,6 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Tags, Plus, Trash2, ToggleLeft, ToggleRight, Loader2 } from 'lucide-react';
 
 interface Category {
@@ -103,7 +114,7 @@ export function ManageCategoriesCard() {
             className="h-10 text-sm"
             onKeyDown={(e) => e.key === 'Enter' && addCategory()}
           />
-          <Button size="sm" onClick={addCategory} disabled={isAdding || !newName.trim()} className="shrink-0">
+          <Button size="sm" aria-label="Add" onClick={addCategory} disabled={isAdding || !newName.trim()} className="shrink-0">
             {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           </Button>
         </div>
@@ -120,12 +131,46 @@ export function ManageCategoriesCard() {
                   {!cat.is_active && <Badge variant="secondary" className="text-[10px]">Disabled</Badge>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => toggleActive(cat)} title={cat.is_active ? 'Disable' : 'Enable'}>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => toggleActive(cat)}
+                    title={cat.is_active ? 'Disable' : 'Enable'}
+                    aria-label={`${cat.is_active ? 'Disable' : 'Enable'} ${cat.name}`}
+                    aria-pressed={cat.is_active}
+                  >
                     {cat.is_active ? <ToggleRight className="h-4 w-4 text-primary" /> : <ToggleLeft className="h-4 w-4 text-muted-foreground" />}
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => deleteCategory(cat)}>
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 text-destructive hover:text-destructive"
+                        aria-label={`Delete ${cat.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete category?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          <strong>{cat.name}</strong> will be deleted. If it's already used by expenses, disable it instead.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteCategory(cat)}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        >
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             ))}

@@ -84,12 +84,16 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           <div className="flex-1 min-w-0 overflow-hidden">
             <p className={cn(
               'text-xs sm:text-sm font-medium',
+              // On phones the icon floats top-right; keep the title clear of it.
+              Icon && 'pr-9 sm:pr-0',
               isGradient ? 'text-white/80' : 'text-muted-foreground'
             )}>
               {title}
             </p>
             <p className={cn(
-              'mt-1 sm:mt-2 text-xl sm:text-2xl lg:text-3xl font-bold tabular-nums tracking-tight',
+              // Smaller on phones and never wrapped mid-number ("₹1,23,00 / 0")
+              // in the 2-column grid (~165px cards).
+              'mt-1 sm:mt-2 text-lg sm:text-2xl lg:text-3xl font-bold tabular-nums tracking-tight whitespace-nowrap',
               isGradient ? 'text-white' : 'text-foreground'
             )}>
               {value}
@@ -123,7 +127,8 @@ export const StatCard = React.forwardRef<HTMLDivElement, StatCardProps>(
           </div>
           {Icon && (
             <div className={cn(
-              'rounded-lg sm:rounded-xl p-2 sm:p-3 flex-shrink-0',
+              // Absolute on phones so the value can use the card's full width.
+              'absolute right-0 top-0 sm:static rounded-lg sm:rounded-xl p-2 sm:p-3 flex-shrink-0',
               isGradient ? 'bg-white/20' : colorStyles[color].icon
             )}>
               <Icon className="h-4 w-4 sm:h-5 sm:w-5" />

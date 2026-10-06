@@ -86,4 +86,19 @@ describe('EditAttendanceDialog', () => {
       expect.objectContaining({ sessionId: null, workDate: '2026-09-16', reason: 'Phone broken' }),
     ));
   });
+
+  it('does not show validation errors until something is edited', () => {
+    render(
+      <EditAttendanceDialog
+        target={{ staffId: 'staff-1', staffName: 'Ravi', workDate: '2026-09-15', session }}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />,
+    );
+    expect(screen.queryByText('Give a reason for the change.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeDisabled();
+
+    fireEvent.change(screen.getByLabelText('Break (minutes)'), { target: { value: '10' } });
+    expect(screen.getByText('Give a reason for the change.')).toBeInTheDocument();
+  });
 });

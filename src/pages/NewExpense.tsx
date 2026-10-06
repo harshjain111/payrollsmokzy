@@ -18,7 +18,7 @@ import {
 import { AmountInput } from '@/components/ui/amount';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Upload, ArrowLeft, Send, Save, Loader2 } from 'lucide-react';
+import { CalendarIcon, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -212,7 +212,7 @@ export default function NewExpense() {
     return paths.join(',');
   };
 
-  const handleSubmit = async (asDraft: boolean) => {
+  const handleSubmit = async () => {
     if (!selectedStaff) {
       toast({
         title: 'Error',
@@ -249,8 +249,16 @@ export default function NewExpense() {
         proofUrl = await uploadProofs();
       }
 
-      // Map custom categories back to 'other' enum for DB storage
+      // The expenses table only has the fixed category enum (no custom-category column),
+      // so custom categories are stored as 'other' with the category name kept in the
+      // description, e.g. "[Decor] Flowers for stage", so the choice isn't lost.
+      const customCategory = category.startsWith('custom:')
+        ? customCategories.find((c) => `custom:${c.id}` === category)
+        : undefined;
       const dbCategory: ExpenseCategory = category.startsWith('custom:') ? 'other' : category as ExpenseCategory;
+      const dbDescription = customCategory
+        ? `[${customCategory.name}] ${description.trim()}`
+        : description.trim();
 
       const { data: newExpense, error } = await supabase
         .from('expenses')
@@ -258,11 +266,11 @@ export default function NewExpense() {
           staff_id: selectedStaff,
           amount,
           category: dbCategory,
-          description: description.trim(),
+          description: dbDescription,
           expense_date: format(expenseDate, 'yyyy-MM-dd'),
           proof_url: proofUrl,
-          status: asDraft ? 'draft' as const : 'pending' as const,
-          submitted_at: asDraft ? null : new Date().toISOString(),
+          status: 'pending' as const,
+          submitted_at: new Date().toISOString(),
           created_by: user?.id,
           event_id: selectedEventId || null,
           club_id: selectedClubId || null,
@@ -278,7 +286,7 @@ export default function NewExpense() {
         : staffList.find(s => s.id === selectedStaff)?.full_name || 'Staff';
 
       // Notify Owner and Admin about new expense submission
-      if (!asDraft && newExpense) {
+      if (newExpense) {
         const { data: approvers } = await supabase
           .from('user_roles')
           .select('user_id')
@@ -301,10 +309,8 @@ export default function NewExpense() {
       }
 
       toast({
-        title: asDraft ? 'Expense saved as draft' : 'Expense submitted',
-        description: asDraft 
-          ? 'The expense has been saved. It can be submitted later.'
-          : 'The expense has been submitted for approval.',
+        title: 'Expense submitted',
+        description: 'The expense has been submitted for approval.',
       });
 
       navigate('/expenses');
@@ -329,7 +335,7 @@ export default function NewExpense() {
           : "Submit an expense request on behalf of a staff member"
         }
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate('/expenses')}>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/expenses')} aria-label="Back to expenses">
           <ArrowLeft className="mr-1.5 h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -351,7 +357,7 @@ export default function NewExpense() {
             <div className="space-y-2">
               <Label htmlFor="staff" className="text-sm">Staff Member *</Label>
               <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                <SelectTrigger className="h-11">
+                <SelectTrigger id="staff" className="h-11">
                   <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
                 <SelectContent>
@@ -377,10 +383,11 @@ export default function NewExpense() {
           <div className="space-y-2">
             <Label htmlFor="amount" className="text-sm">Amount *</Label>
             <AmountInput
+              id="amount"
               value={amount}
               onChange={setAmount}
               placeholder="0.00"
-              className="h-12 text-lg"
+              inputClassName="h-12 text-lg"
             />
           </div>
 
@@ -388,7 +395,7 @@ export default function NewExpense() {
           <div className="space-y-2">
             <Label htmlFor="category" className="text-sm">Category *</Label>
             <Select value={category} onValueChange={(v) => setCategory(v as ExpenseCategory)}>
-              <SelectTrigger className="h-11">
+              <SelectTrigger id="category" className="h-11">
                 <SelectValue placeholder="Select category" />
               </SelectTrigger>
               <SelectContent>
@@ -416,7 +423,7 @@ export default function NewExpense() {
           <div className="space-y-2">
             <Label htmlFor="club" className="text-sm">Club (Optional)</Label>
             <Select value={selectedClubId || 'none'} onValueChange={(v) => setSelectedClubId(v === 'none' ? '' : v)}>
-              <SelectTrigger className="h-11">
+              <SelectTrigger id="club" className="h-11">
                 <SelectValue placeholder="Select a club (optional)" />
               </SelectTrigger>
               <SelectContent>
@@ -439,10 +446,11 @@ export default function NewExpense() {
 
           {/* Expense Date */}
           <div className="space-y-2">
-            <Label className="text-sm">Expense Date *</Label>
+            <Label htmlFor="expense-date" className="text-sm">Expense Date *</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
+                  id="expense-date"
                   variant="outline"
                   className={cn(
                     'w-full justify-start text-left font-normal h-11',
@@ -470,7 +478,7 @@ export default function NewExpense() {
           <div className="space-y-2">
             <Label htmlFor="event" className="text-sm">Related Event (Optional)</Label>
             <Select value={selectedEventId || 'none'} onValueChange={(v) => setSelectedEventId(v === 'none' ? '' : v)}>
-              <SelectTrigger className="h-11">
+              <SelectTrigger id="event" className="h-11">
                 <SelectValue placeholder="Select an event (optional)" />
               </SelectTrigger>
               <SelectContent>
@@ -524,8 +532,9 @@ export default function NewExpense() {
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
                         onClick={() => removeFile(index)}
+                        aria-label={`Remove ${file.name}`}
                       >
                         ×
                       </Button>
@@ -541,19 +550,8 @@ export default function NewExpense() {
 
           {/* Actions */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2 sm:pt-4">
-            {isPersonalRequest && (
-              <Button
-                variant="outline"
-                onClick={() => handleSubmit(true)}
-                disabled={isSubmitting}
-                className="flex-1 h-11"
-              >
-                <Save className="mr-1.5 h-4 w-4" />
-                <span className="text-sm">Save as Draft</span>
-              </Button>
-            )}
             <Button
-              onClick={() => handleSubmit(false)}
+              onClick={() => handleSubmit()}
               disabled={isSubmitting}
               className="flex-1 h-11"
             >

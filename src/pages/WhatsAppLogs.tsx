@@ -278,6 +278,14 @@ export default function WhatsAppLogs() {
       {/* Table */}
       <Card>
         <CardContent className="p-0">
+          {loading && (
+            <div className="space-y-2 p-4 md:hidden">
+              {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-16 w-full" />)}
+            </div>
+          )}
+          {!loading && logs.length === 0 && (
+            <p className="py-10 text-center text-sm text-muted-foreground md:hidden">No notifications found.</p>
+          )}
           {!loading && logs.length > 0 && (
             <div className="divide-y md:hidden">
               {logs.map((row) => (

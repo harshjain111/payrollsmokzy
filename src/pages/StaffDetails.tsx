@@ -84,44 +84,26 @@ export default function StaffDetails() {
     try {
       setIsDeleting(true);
 
-      // Delete salary history first (configuration data, safe to delete)
-      await supabase
-        .from('salary_history')
-        .delete()
-        .eq('staff_id', staff.id);
-
-      // Delete user role if exists
-      if (staff.user_id) {
-        await supabase
-          .from('user_roles')
-          .delete()
-          .eq('user_id', staff.user_id);
-      }
-
-      // Delete staff record
+      // Soft remove (same as Staff list): deactivate to preserve salary history,
+      // login role and all financial records (advances, ledger, settlements).
       const { error } = await supabase
         .from('staff')
-        .delete()
+        .update({ is_active: false })
         .eq('id', staff.id);
 
-      if (error) {
-        if (error.message.includes('foreign key constraint')) {
-          throw new Error('Cannot delete staff with financial records (ledger entries, expenses, settlements). Please deactivate instead.');
-        }
-        throw error;
-      }
+      if (error) throw error;
 
       toast({
-        title: 'Staff Deleted',
-        description: `${staff.full_name} has been removed from the system.`,
+        title: 'Staff Removed',
+        description: `${staff.full_name} is hidden from active lists. History is preserved under Removed Staff.`,
       });
 
       navigate('/staff');
     } catch (error: any) {
-      console.error('Error deleting staff:', error);
+      console.error('Error removing staff:', error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to delete staff.',
+        description: error.message || 'Failed to remove staff.',
         variant: 'destructive',
       });
     } finally {
@@ -176,7 +158,7 @@ export default function StaffDetails() {
         description="View staff member information"
       >
         <div className="flex gap-2">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/staff')} className="gap-2">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/staff')} className="gap-2" aria-label="Back to staff list">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
@@ -188,20 +170,19 @@ export default function StaffDetails() {
               </Link>
             </Button>
           )}
-          {isOwner && (
+          {isOwner && staff.is_active && (
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <Button variant="destructive" size="sm">
                   <Trash2 className="h-4 w-4 mr-2" />
-                  Delete
+                  Remove
                 </Button>
               </AlertDialogTrigger>
-              <AlertDialogContent>
+              <AlertDialogContent className="max-w-[90vw] sm:max-w-lg">
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Staff Member</AlertDialogTitle>
+                  <AlertDialogTitle>Remove Staff</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete <strong>{staff.full_name}</strong>? 
-                    This action cannot be undone. Their login access will also be revoked.
+                    <strong>{staff.full_name}</strong> will be hidden from all active staff lists, dropdowns, and reports. All historical records (advances, ledger, settlements) are preserved and accessible under the <strong>Removed</strong> tab. You can restore them anytime.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -214,10 +195,10 @@ export default function StaffDetails() {
                     {isDeleting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Deleting...
+                        Removing...
                       </>
                     ) : (
-                      'Delete Staff'
+                      'Remove'
                     )}
                   </AlertDialogAction>
                 </AlertDialogFooter>

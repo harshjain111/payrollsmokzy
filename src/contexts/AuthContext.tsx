@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { AppRole, UserRole, Staff } from '@/types/database';
@@ -35,7 +35,33 @@ interface AuthContextType {
   setAccountingMode: (mode: boolean) => void;
   hrWorkforceMode: boolean;
   setHrWorkforceMode: (mode: boolean) => void;
+  /** True when the user's role/staff profile couldn't be loaded (network etc.). */
+  userDataError: boolean;
+  /** Retry loading role/staff profile without toggling global loading. */
+  retryUserData: () => Promise<void>;
 }
+
+const ACCOUNTING_MODE_KEY = 'smokzy.accountingMode';
+const HR_WORKFORCE_MODE_KEY = 'smokzy.hrWorkforceMode';
+
+const readStoredBoolean = (key: string, fallback: boolean) => {
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+  } catch {
+    // Storage unavailable (private mode etc.) — use the default.
+  }
+  return fallback;
+};
+
+const writeStoredBoolean = (key: string, value: boolean) => {
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Ignore storage failures; the mode still applies for this session.
+  }
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -45,8 +71,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userRole, setUserRole] = useState<AppRole | null>(null);
   const [staffData, setStaffData] = useState<Staff | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [accountingMode, setAccountingMode] = useState(false);
-  const [hrWorkforceMode, setHrWorkforceMode] = useState(true);
+  // Persisted so a reload keeps an accountant in Accounting (or HR in
+  // Workforce) instead of silently switching context on an accounting URL.
+  const [accountingMode, setAccountingModeState] = useState(() => readStoredBoolean(ACCOUNTING_MODE_KEY, false));
+  const [hrWorkforceMode, setHrWorkforceModeState] = useState(() => readStoredBoolean(HR_WORKFORCE_MODE_KEY, true));
+  const [userDataError, setUserDataError] = useState(false);
+  const setAccountingMode = useCallback((mode: boolean) => {
+    setAccountingModeState(mode);
+    writeStoredBoolean(ACCOUNTING_MODE_KEY, mode);
+  }, []);
+  const setHrWorkforceMode = useCallback((mode: boolean) => {
+    setHrWorkforceModeState(mode);
+    writeStoredBoolean(HR_WORKFORCE_MODE_KEY, mode);
+  }, []);
   const userDataRefreshInFlight = useRef(false);
   const lastUserDataRefreshAt = useRef(0);
 
@@ -81,6 +118,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           setUserRole(null);
           setStaffData(null);
+          setUserDataError(false);
           setIsLoading(false);
         }
       }
@@ -139,6 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         setUserRole(roleResult.data?.role as AppRole ?? null);
         setStaffData(staffResult.data ? staffResult.data as Staff : null);
+        setUserDataError(false);
         lastUserDataRefreshAt.current = Date.now();
         userDataRefreshInFlight.current = false;
         if (!background) setIsLoading(false);
@@ -151,7 +190,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     userDataRefreshInFlight.current = false;
-    if (!background) setIsLoading(false);
+    // A failed background refresh keeps the data we already have; a failed
+    // initial load is surfaced so the UI can offer Retry instead of
+    // pretending the user has no role.
+    if (!background) {
+      setUserDataError(true);
+      setIsLoading(false);
+    }
+  };
+
+  const retryUserData = async () => {
+    if (!user?.id) return;
+    await fetchUserData(user.id);
   };
 
   useEffect(() => {
@@ -285,6 +335,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setAccountingMode,
     hrWorkforceMode,
     setHrWorkforceMode,
+    userDataError,
+    retryUserData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

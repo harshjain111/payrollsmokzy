@@ -11,11 +11,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionStatus, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { CalendarClock, Loader2, AlertTriangle } from 'lucide-react';
 import { EmptyState } from '@/components/layout/EmptyState';
+import { LoadError } from './LoadError';
 
 export function MyAttendanceLogs() {
   const { user } = useAuth();
@@ -23,6 +24,8 @@ export function MyAttendanceLogs() {
   const [filter, setFilter] = useState<'all' | 'completed' | 'late'>('all');
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selected, setSelected] = useState<AttendanceSession | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -40,6 +43,7 @@ export function MyAttendanceLogs() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError(false);
       try {
         const monthStart = startOfMonth(new Date(selectedMonth + '-01'));
         const monthEnd = endOfMonth(new Date(selectedMonth + '-01'));
@@ -54,6 +58,7 @@ export function MyAttendanceLogs() {
         if (!cancelled) setSessions((data as AttendanceSession[]) ?? []);
       } catch (e) {
         console.error('Logs load error', e);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -62,7 +67,7 @@ export function MyAttendanceLogs() {
     return () => {
       cancelled = true;
     };
-  }, [user, selectedMonth]);
+  }, [user, selectedMonth, reloadKey]);
 
   const filtered = useMemo(() => {
     if (filter === 'completed') return sessions.filter((s) => s.status === 'completed');
@@ -76,7 +81,7 @@ export function MyAttendanceLogs() {
         <h2 className="text-base font-semibold">Daily Logs</h2>
         <div className="flex gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-40 h-9">
+            <SelectTrigger className="h-9 min-w-0 flex-1 md:w-40 md:flex-none">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -88,13 +93,13 @@ export function MyAttendanceLogs() {
             </SelectContent>
           </Select>
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <SelectTrigger className="w-36 h-9">
+            <SelectTrigger className="h-9 min-w-0 flex-1 md:w-44 md:flex-none">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="late">Late Checkout</SelectItem>
+              <SelectItem value="late">Forgot to check out</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -107,6 +112,8 @@ export function MyAttendanceLogs() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Loading logs…
             </div>
+          ) : error ? (
+            <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
           ) : filtered.length === 0 ? (
             <EmptyState
               icon={CalendarClock}
@@ -138,10 +145,12 @@ export function MyAttendanceLogs() {
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
-                      <Badge variant={s.status === 'completed' ? 'secondary' : 'default'}>{s.status}</Badge>
+                      <Badge variant={s.status === 'completed' ? 'secondary' : 'default'}>
+                        {formatSessionStatus(s.status)}
+                      </Badge>
                       {s.late_checkout && (
                         <Badge variant="destructive" className="text-[10px]">
-                          <AlertTriangle className="h-3 w-3 mr-1" /> Late
+                          <AlertTriangle className="h-3 w-3 mr-1" /> Forgot to check out
                         </Badge>
                       )}
                     </div>
@@ -187,11 +196,11 @@ export function MyAttendanceLogs() {
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <Badge variant={s.status === 'completed' ? 'secondary' : 'default'}>
-                              {s.status}
+                              {formatSessionStatus(s.status)}
                             </Badge>
                             {s.late_checkout && (
                               <Badge variant="destructive" className="text-[10px]">
-                                Late
+                                Forgot to check out
                               </Badge>
                             )}
                             {s.auto_closed && (

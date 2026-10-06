@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,8 +22,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock, RotateCcw } from 'lucide-react';
-import { format } from 'date-fns';
+import { FileText, Download, ArrowDownRight, ArrowUpRight, Scale, Lock, RotateCcw, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, parse } from 'date-fns';
+import { toast } from 'sonner';
+import { exportLedgerPDF } from '@/lib/pdf-export';
 import type { StaffPublic } from '@/types/database';
 import { RectificationDialog } from '@/components/ledger/RectificationDialog';
 
@@ -41,6 +43,7 @@ interface JournalLineWithDetails {
     reference_no: string;
     description: string;
     transaction_type: string;
+    reference_id: string | null;
     is_legacy: boolean;
     is_immutable: boolean;
     paid_by_user_name: string | null;
@@ -77,6 +80,7 @@ export default function Ledger() {
   );
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [rectificationTarget, setRectificationTarget] = useState<{
     journalEntryId: string;
@@ -142,12 +146,53 @@ export default function Ledger() {
     }
   }, [staffBalances, totals, selectedStaff]);
 
+  // Month filter is applied client-side on the journal entry date, so running balances
+  // stay true (they are computed over the full history before filtering).
+  const visibleLines = useMemo(
+    () =>
+      selectedMonth === 'all'
+        ? journalLines
+        : journalLines.filter((l) => l.journal_entry?.entry_date?.startsWith(selectedMonth)),
+    [journalLines, selectedMonth],
+  );
+  const periodTotals = useMemo(
+    () =>
+      visibleLines.reduce(
+        (acc, line) =>
+          line.staff_id && line.account
+            ? { debit: acc.debit + Number(line.debit), credit: acc.credit + Number(line.credit) }
+            : acc,
+        { debit: 0, credit: 0 },
+      ),
+    [visibleLines],
+  );
+
+  // Journal entries that have already been reversed (by a rectification or a cancellation)
+  const reversedEntryIds = useMemo(() => {
+    const ids = new Set<string>();
+    journalLines.forEach((l) => {
+      const je = l.journal_entry;
+      if (je?.reference_id && (je.transaction_type === 'rectification' || je.transaction_type === 'cancellation')) {
+        ids.add(je.reference_id);
+      }
+    });
+    return ids;
+  }, [journalLines]);
+
+  const canRectifyLine = (line: JournalLineWithDetails) => {
+    const je = line.journal_entry;
+    if (!isOwner || !je) return false;
+    if (je.transaction_type === 'rectification' || je.transaction_type === 'cancellation') return false;
+    return !reversedEntryIds.has(je.id);
+  };
+
   useEffect(() => {
     fetchData();
-  }, [selectedStaff, selectedMonth, staffData?.id, accountingMode]);
+  }, [selectedStaff, staffData?.id, accountingMode]);
 
   const fetchData = async () => {
     setIsLoading(true);
+    setLoadError(false);
     setValidationError(null);
     try {
       // Fetch staff list (for filter dropdown)
@@ -193,6 +238,7 @@ export default function Ledger() {
             reference_no,
             description,
             transaction_type,
+            reference_id,
             is_legacy,
             is_immutable,
             paid_by_user_name
@@ -309,6 +355,10 @@ export default function Ledger() {
       setJournalLines(linesWithBalance);
     } catch (error) {
       console.error('Error fetching ledger data:', error);
+      setJournalLines([]);
+      setStaffBalances([]);
+      setLoadError(true);
+      toast.error('Could not load the ledger. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
@@ -341,12 +391,13 @@ export default function Ledger() {
       'advance_paid': 'Advance Given',
       'advance_adjustment': 'Advance Adjusted',
       'rectification': 'Rectification',
+      'cancellation': 'Approval Cancelled',
     };
     return labels[type] || type;
   };
 
   const getTransactionTypeBadgeVariant = (type: string): 'default' | 'secondary' | 'outline' | 'destructive' => {
-    if (type === 'rectification') return 'destructive';
+    if (type === 'rectification' || type === 'cancellation') return 'destructive';
     if (type.includes('payout') || type.includes('paid')) return 'default';
     if (type.includes('settlement') || type.includes('approval')) return 'secondary';
     return 'outline';
@@ -380,6 +431,43 @@ export default function Ledger() {
     });
   };
 
+  const handleExport = () => {
+    if (visibleLines.length === 0) {
+      toast.error('Nothing to export for this selection');
+      return;
+    }
+    const firstDate = visibleLines[0]?.journal_entry?.entry_date;
+    const dateRange = selectedMonth !== 'all'
+      ? (() => {
+          const d = parse(selectedMonth, 'yyyy-MM', new Date());
+          return { from: startOfMonth(d), to: endOfMonth(d) };
+        })()
+      : { from: firstDate ? new Date(firstDate) : new Date(), to: new Date() };
+    const personal = isStaff || (isAccountant && !accountingMode);
+    const name = personal
+      ? staffData?.full_name || 'My Ledger'
+      : selectedStaff === 'all'
+      ? 'All Staff'
+      : selectedStaffName || 'Staff';
+    try {
+      exportLedgerPDF(
+        visibleLines.map((l) => ({
+          entry_date: l.journal_entry?.entry_date || l.created_at,
+          voucher_no: l.journal_entry?.reference_no || '',
+          description: l.description || l.journal_entry?.description || '',
+          debit: Number(l.debit),
+          credit: Number(l.credit),
+          balance: l.running_balance ?? 0,
+        })),
+        name,
+        dateRange,
+      );
+    } catch (error) {
+      console.error('Error exporting ledger:', error);
+      toast.error('Could not create the PDF');
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 pb-6">
       <PageHeader
@@ -392,7 +480,13 @@ export default function Ledger() {
             : "Staff-wise ledger entries"
         }
       >
-        <Button variant="outline" className="rounded-xl text-xs sm:text-sm px-2 sm:px-4">
+        <Button
+          variant="outline"
+          className="rounded-xl text-xs sm:text-sm px-2 sm:px-4"
+          onClick={handleExport}
+          disabled={isLoading || loadError}
+          aria-label="Export ledger as PDF"
+        >
           <Download className="mr-1 sm:mr-2 h-4 w-4" />
           <span className="hidden sm:inline">Export</span>
         </Button>
@@ -405,7 +499,7 @@ export default function Ledger() {
             {canFilterByStaff && (
               <div className="w-full sm:w-64">
                 <Select value={selectedStaff} onValueChange={setSelectedStaff}>
-                  <SelectTrigger className="rounded-xl text-sm">
+                  <SelectTrigger className="rounded-xl text-sm" aria-label="Filter by staff">
                     <SelectValue placeholder="Select staff" />
                   </SelectTrigger>
                   <SelectContent className="rounded-xl bg-popover">
@@ -421,7 +515,7 @@ export default function Ledger() {
             )}
             <div className="w-full sm:w-48">
               <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                <SelectTrigger className="rounded-xl text-sm">
+                <SelectTrigger className="rounded-xl text-sm" aria-label="Filter by month">
                   <SelectValue placeholder="Select month" />
                 </SelectTrigger>
                 <SelectContent className="rounded-xl bg-popover">
@@ -462,7 +556,7 @@ export default function Ledger() {
                 {selectedStaff === 'all' ? 'Staff Debits' : 'Debits'}
               </span>
               <span className="text-sm sm:text-xl font-bold font-mono">
-                ₹{totals.debit.toLocaleString('en-IN')}
+                ₹{periodTotals.debit.toLocaleString('en-IN')}
               </span>
             </div>
           </CardContent>
@@ -480,7 +574,7 @@ export default function Ledger() {
                 {selectedStaff === 'all' ? 'Staff Credits' : 'Credits'}
               </span>
               <span className="text-sm sm:text-xl font-bold font-mono">
-                ₹{totals.credit.toLocaleString('en-IN')}
+                ₹{periodTotals.credit.toLocaleString('en-IN')}
               </span>
             </div>
           </CardContent>
@@ -516,6 +610,11 @@ export default function Ledger() {
             <span className="text-success">✓ Ledger balanced - no outstanding</span>
           )}
         </div>
+        {selectedMonth !== 'all' && (
+          <p className="text-[10px] text-muted-foreground/70">
+            Debits and credits are for the selected month. The balance is as of today.
+          </p>
+        )}
         {selectedStaff === 'all' && (
           <p className="text-[10px] text-muted-foreground/70">
             Staff Sub-Ledger: Shows only staff receivables/payables. Bank & expense accounts excluded.
@@ -526,17 +625,35 @@ export default function Ledger() {
       {/* Ledger Table */}
       <Card className="rounded-2xl shadow-card border-0 overflow-hidden">
         <CardContent className="p-0">
-          {journalLines.length === 0 && !isLoading ? (
+          {isLoading && journalLines.length === 0 ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground" role="status">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Loading ledger...
+            </div>
+          ) : loadError ? (
+            <div className="flex flex-col items-center gap-3 py-12 px-4 text-center">
+              <AlertCircle className="h-8 w-8 text-destructive" />
+              <p className="text-sm text-muted-foreground">Could not load the ledger. Please check your connection.</p>
+              <Button variant="outline" size="sm" onClick={() => fetchData()}>
+                <RefreshCw className="mr-1.5 h-4 w-4" />
+                Retry
+              </Button>
+            </div>
+          ) : visibleLines.length === 0 ? (
             <EmptyState
               icon={FileText}
               title="No entries found"
-              description="Ledger entries will appear here once transactions are recorded"
+              description={
+                selectedMonth !== 'all'
+                  ? 'No ledger entries in this month'
+                  : 'Ledger entries will appear here once transactions are recorded'
+              }
             />
           ) : (
             <>
               {/* Mobile Card View */}
               <div className="block lg:hidden divide-y">
-                {journalLines.map((line) => (
+                {visibleLines.map((line) => (
                   <div key={line.id} className="p-3 sm:p-4 space-y-1.5 sm:space-y-2">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -583,8 +700,8 @@ export default function Ledger() {
                         </p>
                       </div>
                      </div>
-                    {/* Rectify button for owner on non-rectification entries */}
-                    {isOwner && line.journal_entry?.transaction_type !== 'rectification' && (
+                    {/* Rectify button for owner on entries that haven't been reversed */}
+                    {canRectifyLine(line) && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -617,7 +734,7 @@ export default function Ledger() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {journalLines.map((line) => (
+                    {visibleLines.map((line) => (
                       <TableRow key={line.id} className="group">
                         <TableCell className="whitespace-nowrap text-muted-foreground">
                           {line.journal_entry?.entry_date ? format(new Date(line.journal_entry.entry_date), 'dd MMM yyyy') : '-'}
@@ -677,11 +794,11 @@ export default function Ledger() {
                         </TableCell>
                         {isOwner && (
                           <TableCell>
-                            {line.journal_entry?.transaction_type !== 'rectification' && (
+                            {canRectifyLine(line) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="text-xs text-warning h-7 px-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="text-xs text-warning h-7 px-2"
                                 onClick={() => handleRectify(line)}
                               >
                                 <RotateCcw className="h-3 w-3 mr-1" />

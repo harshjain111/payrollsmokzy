@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/layout/PageHeader';
@@ -47,7 +47,12 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<string>('all');
+  const [searchParams] = useSearchParams();
+  // Dashboards deep-link with ?status=pending etc.
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    const status = searchParams.get('status');
+    return status && ['all', 'draft', 'pending', 'approved', 'reimbursed', 'rejected'].includes(status) ? status : 'all';
+  });
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -279,6 +284,7 @@ export default function Expenses() {
                             size="icon"
                             className="h-8 w-8 sm:h-9 sm:w-9"
                             onClick={() => handleViewDetails(expense)}
+                            aria-label="View expense details"
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
@@ -291,6 +297,7 @@ export default function Expenses() {
                                 size="icon"
                                 className="text-success hover:text-success h-8 w-8 sm:h-9 sm:w-9"
                                 onClick={() => handleApprove(expense)}
+                                aria-label="Approve expense"
                               >
                                 <Check className="h-4 w-4" />
                               </Button>
@@ -299,6 +306,7 @@ export default function Expenses() {
                                 size="icon"
                                 className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9"
                                 onClick={() => handleReject(expense)}
+                                aria-label="Reject expense"
                               >
                                 <X className="h-4 w-4" />
                               </Button>
@@ -323,6 +331,7 @@ export default function Expenses() {
                               className="text-destructive hover:text-destructive h-8 w-8 sm:h-9 sm:w-9"
                               onClick={() => handleCancelApproval(expense)}
                               title="Cancel Approval"
+                              aria-label="Cancel approval"
                             >
                               <Ban className="h-4 w-4" />
                             </Button>

@@ -11,20 +11,22 @@ import { EmptyState } from '@/components/layout/EmptyState';
 import { supabase } from '@/integrations/supabase/client';
 import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
 import { PenaltyAction, PenaltyActionDialog, PenaltyTarget } from './PenaltyActionDialog';
+import { LoadError } from './LoadError';
 
 interface Props {
-  /** Owners and admins can cancel or restore; everyone else (HR) only views. */
+  /** Owners and admins can waive or restore; everyone else (HR) only views. */
   canManage: boolean;
 }
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd');
 
-/** Every penalty charged on one day, with cancel/restore right on each row. */
+/** Every penalty charged on one day, with waive/restore right on each row. */
 export function DayPenaltiesView({ canManage }: Props) {
   const [date, setDate] = useState(todayStr());
   const [search, setSearch] = useState('');
   const [rows, setRows] = useState<PenaltyTarget[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
   const [target, setTarget] = useState<PenaltyTarget | null>(null);
   const [mode, setMode] = useState<PenaltyAction>('cancel');
 
@@ -32,6 +34,7 @@ export function DayPenaltiesView({ canManage }: Props) {
 
   const load = async () => {
     setLoading(true);
+    setError(false);
     try {
       const { data, error } = await supabase
         .from('attendance_discipline_log' as never)
@@ -74,6 +77,8 @@ export function DayPenaltiesView({ canManage }: Props) {
     } catch (e) {
       console.error('Day penalties load failed', e);
       toast.error('Failed to load penalties');
+      setRows([]);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -173,6 +178,8 @@ export function DayPenaltiesView({ canManage }: Props) {
         <div className="flex justify-center py-12 text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
         </div>
+      ) : error ? (
+        <LoadError onRetry={load} />
       ) : visible.length === 0 ? (
         <EmptyState
           icon={CalendarDays}
@@ -240,7 +247,7 @@ export function DayPenaltiesView({ canManage }: Props) {
                         className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
                         onClick={() => open(r, 'cancel')}
                       >
-                        <Ban className="h-3.5 w-3.5" /> Cancel penalty
+                        <Ban className="h-3.5 w-3.5" /> Waive penalty
                       </Button>
                     ))}
                 </div>

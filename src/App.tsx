@@ -137,8 +137,9 @@ const App = () => (
           <AuthProvider>
             <AppRoutes />
           </AuthProvider>
+          {/* Inside the router so it can stay off the sign-in screen. */}
+          <InstallPrompt />
         </BrowserRouter>
-        <InstallPrompt />
       </TooltipProvider>
     </LanguageProvider>
   </QueryClientProvider>

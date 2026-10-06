@@ -45,9 +45,12 @@ export function EditAttendanceDialog({ target, onClose, onSaved }: Props) {
   const [breakMinutes, setBreakMinutes] = useState('0');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  // Validation messages appear only once the user has changed something, not on open.
+  const [touched, setTouched] = useState(false);
 
   useEffect(() => {
     if (!target) return;
+    setTouched(false);
     const s = target.session;
     setCheckIn(s ? toLocalInput(s.check_in_at) : `${target.workDate}T10:00`);
     setCheckOut(s ? toLocalInput(s.check_out_at) : `${target.workDate}T19:00`);
@@ -73,7 +76,13 @@ export function EditAttendanceDialog({ target, onClose, onSaved }: Props) {
   }
   if (!reason.trim()) errors.push('Give a reason for the change.');
 
+  const edit = (set: (v: string) => void, value: string) => {
+    set(value);
+    setTouched(true);
+  };
+
   const save = async () => {
+    setTouched(true);
     if (!inIso || errors.length) return;
     setSaving(true);
     try {
@@ -121,11 +130,11 @@ export function EditAttendanceDialog({ target, onClose, onSaved }: Props) {
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor="att-in">Check-in</Label>
-              <Input id="att-in" type="datetime-local" value={checkIn} onChange={(e) => setCheckIn(e.target.value)} />
+              <Input id="att-in" type="datetime-local" value={checkIn} onChange={(e) => edit(setCheckIn, e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label htmlFor="att-out">Check-out</Label>
-              <Input id="att-out" type="datetime-local" value={checkOut} onChange={(e) => setCheckOut(e.target.value)} />
+              <Input id="att-out" type="datetime-local" value={checkOut} onChange={(e) => edit(setCheckOut, e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
@@ -136,7 +145,7 @@ export function EditAttendanceDialog({ target, onClose, onSaved }: Props) {
               inputMode="numeric"
               min={0}
               value={breakMinutes}
-              onChange={(e) => setBreakMinutes(e.target.value)}
+              onChange={(e) => edit(setBreakMinutes, e.target.value)}
             />
           </div>
           {span !== null && span > 0 && brk >= 0 && brk <= span && (
@@ -151,14 +160,14 @@ export function EditAttendanceDialog({ target, onClose, onSaved }: Props) {
               rows={2}
               placeholder={isAdd ? 'e.g. Phone was not working, confirmed by manager' : 'e.g. Forgot to check out'}
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={(e) => edit(setReason, e.target.value)}
             />
           </div>
           <p className="text-xs text-muted-foreground">
             The record will show who changed it and why, and the change is saved in the audit log.
             Late / early penalties for the day are recalculated.
           </p>
-          {errors.length > 0 && (checkIn || checkOut || reason) && (
+          {errors.length > 0 && touched && (
             <ul className="list-disc space-y-0.5 pl-4 text-xs text-destructive">
               {errors.map((e) => (
                 <li key={e}>{e}</li>

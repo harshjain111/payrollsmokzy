@@ -21,6 +21,7 @@ import {
 import { Amount } from '@/components/ui/amount';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DayPenaltiesView } from '@/components/attendance/DayPenaltiesView';
+import { LoadError } from '@/components/attendance/LoadError';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { supabase } from '@/integrations/supabase/client';
@@ -45,7 +46,7 @@ interface StaffSummary {
 export default function Penalties() {
   const { isOwner, isAdmin, isHR } = useAuth();
   const canView = isOwner || isAdmin || isHR;
-  // Owners and admins can cancel/restore; HR is read-only (also enforced by RLS).
+  // Owners and admins can waive/restore; HR is read-only (also enforced by RLS).
   const canManage = isOwner || isAdmin;
 
   const [month, setMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -53,10 +54,12 @@ export default function Penalties() {
   const [rows, setRows] = useState<DisciplineLogRow[]>([]);
   const [staffMap, setStaffMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
 
   const load = async () => {
     if (!canView) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const monthStart = format(startOfMonth(new Date(month + '-01')), 'yyyy-MM-dd');
       const monthEnd = format(endOfMonth(new Date(month + '-01')), 'yyyy-MM-dd');
@@ -82,6 +85,8 @@ export default function Penalties() {
       setRows(logs);
     } catch (e) {
       console.error('Penalties load failed', e);
+      setRows([]);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -140,7 +145,7 @@ export default function Penalties() {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
+    <div className="space-y-6">
       <PageHeader
         title="Penalties & Deductions"
         description="Every penalty for late check-in, early check-out and absence, day by day. Active penalties are deducted automatically at salary settlement."
@@ -190,6 +195,12 @@ export default function Penalties() {
             <div className="flex justify-center py-12 text-muted-foreground">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
             </div>
+          ) : loadError ? (
+            <Card className="rounded-2xl border-0 shadow-card">
+              <CardContent className="p-0">
+                <LoadError onRetry={load} />
+              </CardContent>
+            </Card>
           ) : summaries.length === 0 ? (
             <EmptyState
               icon={CalendarIcon}
@@ -313,7 +324,7 @@ export default function Penalties() {
                     <Link to="/settlements" className="text-primary hover:underline">
                       Settlements
                     </Link>{' '}
-                    page when you settle that month's salary. To cancel an individual penalty, open the{' '}
+                    page when you settle that month's salary. To waive an individual penalty, open the{' '}
                     <strong>Day-wise</strong> tab and pick its date.
                   </span>
                  </div>}

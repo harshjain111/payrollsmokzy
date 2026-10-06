@@ -7,6 +7,8 @@ interface AmountProps {
   showSign?: boolean;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
+  /** When true, don't apply the green/red/grey sign colours so the parent's colour shows through. */
+  neutral?: boolean;
 }
 
 export function Amount({ 
@@ -14,7 +16,8 @@ export function Amount({
   currency = '₹', 
   showSign = false,
   className,
-  size = 'md'
+  size = 'md',
+  neutral = false,
 }: AmountProps) {
   const isPositive = value > 0;
   const isNegative = value < 0;
@@ -36,9 +39,9 @@ export function Amount({
       className={cn(
         'font-mono tabular-nums font-medium',
         sizeClasses[size],
-        isPositive && 'text-success',
-        isNegative && 'text-destructive',
-        !isPositive && !isNegative && 'text-muted-foreground',
+        !neutral && isPositive && 'text-success',
+        !neutral && isNegative && 'text-destructive',
+        !neutral && !isPositive && !isNegative && 'text-muted-foreground',
         className
       )}
     >
@@ -49,27 +52,59 @@ export function Amount({
   );
 }
 
-interface AmountInputProps {
+interface AmountInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 'type' | 'className'> {
   value: number;
   onChange: (value: number) => void;
   currency?: string;
-  placeholder?: string;
+  /** Applied to the wrapper (kept for backwards compatibility). */
   className?: string;
-  disabled?: boolean;
+  inputClassName?: string;
 }
 
-export function AmountInput({ 
-  value, 
-  onChange, 
-  currency = '₹', 
-  placeholder = '0.00', 
-  className, 
-  disabled = false 
-}: AmountInputProps) {
+/**
+ * Keep only digits and a single decimal point, with at most 2 decimal places.
+ * Returns the cleaned text exactly as the user should see it (e.g. "12." stays "12.").
+ */
+export function sanitizeAmountText(raw: string): string {
+  const cleaned = raw.replace(/[^0-9.]/g, '');
+  const dot = cleaned.indexOf('.');
+  if (dot === -1) return cleaned;
+  const whole = cleaned.slice(0, dot);
+  const fraction = cleaned.slice(dot + 1).replace(/\./g, '').slice(0, 2);
+  return `${whole}.${fraction}`;
+}
+
+export function parseAmountText(text: string): number {
+  const n = parseFloat(text);
+  return Number.isFinite(n) ? n : 0;
+}
+
+export const AmountInput = React.forwardRef<HTMLInputElement, AmountInputProps>(function AmountInput(
+  {
+    value,
+    onChange,
+    currency = '₹',
+    placeholder = '0.00',
+    className,
+    inputClassName,
+    disabled = false,
+    ...inputProps
+  },
+  ref,
+) {
+  // Keep the raw text locally so intermediate states like "12." or "12.0" survive re-renders.
+  const [text, setText] = React.useState(() => (value > 0 ? String(value) : ''));
+
+  // Sync when the parent changes the value (e.g. form reset), but never clobber what the user typed.
+  React.useEffect(() => {
+    setText((prev) => (parseAmountText(prev) === value ? prev : value > 0 ? String(value) : ''));
+  }, [value]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const rawValue = e.target.value.replace(/[^0-9.]/g, '');
-    const numValue = parseFloat(rawValue) || 0;
-    onChange(numValue);
+    const next = sanitizeAmountText(e.target.value);
+    setText(next);
+    onChange(parseAmountText(next));
   };
 
   return (
@@ -78,9 +113,12 @@ export function AmountInput({
         {currency}
       </span>
       <input
+        {...inputProps}
+        ref={ref}
         type="text"
         inputMode="decimal"
-        value={value > 0 ? value.toString() : ''}
+        autoComplete="off"
+        value={text}
         onChange={handleChange}
         placeholder={placeholder}
         disabled={disabled}
@@ -89,9 +127,10 @@ export function AmountInput({
           'font-mono tabular-nums text-right',
           'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          'placeholder:text-muted-foreground'
+          'placeholder:text-muted-foreground',
+          inputClassName
         )}
       />
     </div>
   );
-}
+});

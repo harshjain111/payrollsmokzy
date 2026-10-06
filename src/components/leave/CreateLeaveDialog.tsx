@@ -163,11 +163,11 @@ import { CalendarIcon } from 'lucide-react';
        onSuccess();
        resetForm();
        onOpenChange(false);
-     } catch (error: any) {
+     } catch (error) {
        console.error('Error creating leave record:', error);
        toast({
          title: 'Error',
-         description: error.message || 'Failed to create leave record.',
+         description: (error as { message?: string })?.message || 'Failed to create leave record.',
          variant: 'destructive',
        });
      } finally {

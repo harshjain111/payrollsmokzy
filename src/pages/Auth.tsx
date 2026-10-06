@@ -9,14 +9,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Wallet, Eye, EyeOff, Loader2, Phone, WifiOff, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { digitsOnly, normalizePhone, phoneToEmail } from '@/lib/phone';
 
 const phoneSchema = z.string().min(10, 'Please enter a valid phone number').max(15, 'Phone number too long');
 const passwordSchema = z.string().min(6, 'Password must be at least 6 characters');
-
-const phoneToEmail = (phone: string) => {
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
-  return `${cleanPhone}@phone.smokzy.internal`;
-};
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SIGN_IN_TIMEOUT_MS = 12000;
@@ -83,7 +79,7 @@ export default function Auth() {
   // amplified the "logged out after a minute" bug on slow networks.
 
 
-  const formatPhoneInput = (value: string) => value.replace(/\D/g, '');
+  const formatPhoneInput = digitsOnly;
 
   useEffect(() => {
     if (!isLoading) return;
@@ -130,7 +126,9 @@ export default function Auth() {
       return;
     }
 
-    const cleanPhone = formatPhoneInput(loginPhone);
+    // Autofill often supplies "+91 98765 43210" — sign in with the 10-digit number.
+    const rawDigits = formatPhoneInput(loginPhone);
+    const cleanPhone = normalizePhone(loginPhone);
 
     try {
       phoneSchema.parse(cleanPhone);
@@ -143,8 +141,11 @@ export default function Auth() {
     }
 
     setIsLoading(true);
-    const pseudoEmail = phoneToEmail(cleanPhone);
+    let pseudoEmail = phoneToEmail(cleanPhone);
     let isAuthenticated = false;
+    // Legacy accounts may have been created with the country code included;
+    // if the 10-digit login is rejected, try the digits exactly as entered once.
+    let triedRawDigits = rawDigits === cleanPhone;
 
     try {
       // Attempt with one retry for transient network drops
@@ -172,6 +173,13 @@ export default function Auth() {
         }
 
         lastError = error;
+
+        if (!triedRawDigits && (error.message || '').includes('Invalid login credentials')) {
+          triedRawDigits = true;
+          pseudoEmail = phoneToEmail(rawDigits);
+          attempt -= 1;
+          continue;
+        }
 
         // Only retry on network errors, not auth errors
         const isNetworkErr = isLikelyNetworkError(error.message);
@@ -279,7 +287,8 @@ export default function Auth() {
                     value={loginPhone}
                     onChange={e => setLoginPhone(formatPhoneInput(e.target.value))}
                     required
-                    autoComplete="tel"
+                    inputMode="numeric"
+                    autoComplete="username"
                     className="pl-10"
                     maxLength={15}
                   />
@@ -305,6 +314,7 @@ export default function Auth() {
                     size="icon"
                     className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
                   </Button>

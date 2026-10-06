@@ -28,13 +28,13 @@ interface Props {
   target: PenaltyTarget | null;
   mode: PenaltyAction;
   onClose: () => void;
-  /** Called after a successful cancel or restore, e.g. to reload the list. */
+  /** Called after a successful waive or restore, e.g. to reload the list. */
   onDone: () => void | Promise<void>;
 }
 
 /**
- * Cancel (waive) or restore a single penalty. Shared by the Penalties page and
- * Attendance → Manage Penalties. A cancellation needs a reason, notifies the staff member
+ * Waive or restore a single penalty. Shared by the Penalties page and
+ * Attendance → Manage Penalties. A waiver needs a reason, notifies the staff member
  * on WhatsApp when a phone number is known, and is written to the audit log by a database
  * trigger. Only owners and admins can change penalties (enforced by RLS).
  */
@@ -109,7 +109,7 @@ export function PenaltyActionDialog({ target, mode, onClose, onDone }: Props) {
             toast.error('Penalty waived but WhatsApp notification failed');
           }
         } else {
-          toast.success('Penalty cancelled');
+          toast.success('Penalty waived');
         }
       } else {
         toast.success('Penalty restored');
@@ -128,7 +128,7 @@ export function PenaltyActionDialog({ target, mode, onClose, onDone }: Props) {
     <Dialog open={!!target} onOpenChange={(o) => !o && !working && onClose()}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{mode === 'cancel' ? 'Cancel penalty' : 'Restore penalty'}</DialogTitle>
+          <DialogTitle>{mode === 'cancel' ? 'Waive penalty' : 'Restore penalty'}</DialogTitle>
           <DialogDescription>
             {target && (
               <span>
@@ -140,8 +140,9 @@ export function PenaltyActionDialog({ target, mode, onClose, onDone }: Props) {
         </DialogHeader>
         {mode === 'cancel' ? (
           <div className="space-y-2">
-            <Label className="text-xs">Reason (required)</Label>
+            <Label htmlFor="penalty-reason" className="text-xs">Reason (required)</Label>
             <Textarea
+              id="penalty-reason"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="e.g. Traffic jam acknowledged by manager"
@@ -163,7 +164,7 @@ export function PenaltyActionDialog({ target, mode, onClose, onDone }: Props) {
           </Button>
           <Button onClick={submit} disabled={working}>
             {working && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {mode === 'cancel' ? 'Confirm cancellation' : 'Restore penalty'}
+            {mode === 'cancel' ? 'Confirm waiver' : 'Restore penalty'}
           </Button>
         </DialogFooter>
       </DialogContent>

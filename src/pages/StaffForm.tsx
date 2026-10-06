@@ -24,6 +24,19 @@ import { ArrowLeft, CalendarIcon, Save, UserPlus, Eye, EyeOff, Loader2, Phone, R
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { toast as sonnerToast } from 'sonner';
+import { digitsOnly, normalizePhone } from '@/lib/phone';
+
+type EditableRole = 'staff' | 'accountant' | 'admin';
+const EDITABLE_ROLES: EditableRole[] = ['staff', 'accountant', 'admin'];
+const ROLE_LABELS: Record<string, string> = {
+  owner: 'Owner',
+  admin: 'Admin',
+  accountant: 'Accountant',
+  staff: 'Staff',
+  hr: 'HR',
+  ca: 'CA',
+};
 
 export default function StaffForm() {
   const navigate = useNavigate();
@@ -50,7 +63,10 @@ export default function StaffForm() {
   const [email, setEmail] = useState('');
   const [department, setDepartment] = useState('');
   const [designation, setDesignation] = useState('');
-  const [role, setRole] = useState<'staff' | 'accountant' | 'admin'>('staff');
+  const [role, setRole] = useState<EditableRole>('staff');
+  // Role stored in user_roles when editing. Used so saving the staff record
+  // never silently rewrites (e.g. demotes) a role the editor didn't change.
+  const [originalRole, setOriginalRole] = useState<string | null>(null);
   const [monthlySalary, setMonthlySalary] = useState(0);
   const [dateOfJoining, setDateOfJoining] = useState<Date>(new Date());
   const [isActive, setIsActive] = useState(true);
@@ -122,10 +138,13 @@ export default function StaffForm() {
             .from('user_roles')
             .select('role')
             .eq('user_id', data.user_id)
-            .single();
+            .maybeSingle();
 
-          if (roleData && (roleData.role === 'staff' || roleData.role === 'accountant' || roleData.role === 'admin')) {
-            setRole(roleData.role);
+          if (roleData?.role) {
+            setOriginalRole(roleData.role);
+            if (EDITABLE_ROLES.includes(roleData.role as EditableRole)) {
+              setRole(roleData.role as EditableRole);
+            }
           }
         }
       }
@@ -148,9 +167,13 @@ export default function StaffForm() {
     return `${prefix}${timestamp}${random}`;
   };
 
-  const formatPhoneInput = (value: string) => {
-    return value.replace(/\D/g, '');
-  };
+  const formatPhoneInput = digitsOnly;
+
+  // Roles this editor may pick from the dropdown.
+  const selectableRoles: EditableRole[] = isOwner ? EDITABLE_ROLES : ['staff'];
+  // When editing a login whose role isn't one this editor can pick (HR, CA,
+  // Owner, or Admin/Accountant for a non-owner), show it read-only.
+  const roleLocked = isEditing && !!originalRole && !selectableRoles.includes(originalRole as EditableRole);
 
   const handleSubmit = async () => {
     // Validation
@@ -163,7 +186,7 @@ export default function StaffForm() {
       return;
     }
     if (!isEditing) {
-      const cleanPhone = formatPhoneInput(phone);
+      const cleanPhone = normalizePhone(phone);
       if (cleanPhone.length < 10) {
         toast({ title: 'Validation Error', description: 'Please enter a valid phone number (min 10 digits).', variant: 'destructive' });
         return;
@@ -216,16 +239,6 @@ export default function StaffForm() {
 
         if (staffError) throw staffError;
 
-        // Update role if user_id exists
-        if (existingUserId) {
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .update({ role: role })
-            .eq('user_id', existingUserId);
-
-          if (roleError) console.error('Role update error:', roleError);
-        }
-
         // If salary changed (and owner updated it), record in salary history
         if (salaryChanged && canSetSalary) {
           // Close previous salary history record
@@ -249,6 +262,21 @@ export default function StaffForm() {
           if (historyError) throw historyError;
         }
 
+        // Only touch user_roles when the editor actually changed the dropdown,
+        // and never for roles the dropdown can't represent.
+        if (existingUserId && !roleLocked && originalRole && role !== originalRole) {
+          const { error: roleError } = await supabase
+            .from('user_roles')
+            .update({ role: role })
+            .eq('user_id', existingUserId);
+
+          if (roleError) {
+            console.error('Role update error:', roleError);
+            sonnerToast.error(`Staff details saved, but the role could not be changed: ${roleError.message}`);
+            return;
+          }
+        }
+
         toast({ title: 'Staff Updated', description: `${fullName} has been updated successfully.` });
       } else {
         // Create new staff with auth user via edge function
@@ -266,7 +294,7 @@ export default function StaffForm() {
               'Authorization': `Bearer ${session.session?.access_token}`,
             },
             body: JSON.stringify({
-              phone: formatPhoneInput(phone),
+              phone: normalizePhone(phone),
               password: password,
               full_name: fullName.trim(),
               role: role,
@@ -313,7 +341,7 @@ export default function StaffForm() {
         toast({ 
           title: 'Staff Created', 
           description: canSetSalary 
-            ? `${fullName} has been added. They can login using phone: ${formatPhoneInput(phone)}` 
+            ? `${fullName} has been added. They can login using phone: ${normalizePhone(phone)}` 
             : `${fullName} has been added. Owner has been notified to set their salary.`
         });
       }
@@ -345,7 +373,7 @@ export default function StaffForm() {
         title={isEditing ? 'Edit Staff' : 'Add New Staff'}
         description={isEditing ? 'Update staff information' : 'Add a new team member with login credentials'}
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate('/staff')} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/staff')} className="gap-2" aria-label="Back to staff list">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -380,6 +408,7 @@ export default function StaffForm() {
                     <Input
                       id="phone"
                       type="tel"
+                      inputMode="numeric"
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                       placeholder="9876543210"
@@ -401,6 +430,7 @@ export default function StaffForm() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
                       className="pr-10"
+                      autoComplete="new-password"
                     />
                     <Button
                       type="button"
@@ -408,6 +438,7 @@ export default function StaffForm() {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -460,6 +491,7 @@ export default function StaffForm() {
                         size="icon"
                         onClick={() => setEmployeeId(generateEmployeeId())}
                         className="shrink-0"
+                        aria-label="Generate new employee ID"
                       >
                         <RefreshCw className="h-4 w-4" />
                       </Button>
@@ -559,9 +591,18 @@ export default function StaffForm() {
 
               <div className="space-y-2">
                 <Label>System Role *</Label>
+                {roleLocked ? (
+                  <>
+                    <Input value={ROLE_LABELS[originalRole ?? ''] ?? originalRole ?? ''} disabled readOnly />
+                    <p className="text-xs text-muted-foreground">
+                      This login's role can't be changed here. Saving this form keeps the current role.
+                    </p>
+                  </>
+                ) : (
+                <>
                 <Select 
                   value={role} 
-                  onValueChange={(v) => setRole(v as 'staff' | 'accountant' | 'admin')}
+                  onValueChange={(v) => setRole(v as EditableRole)}
                 >
                   <SelectTrigger className="bg-background">
                     <SelectValue placeholder="Select role" />
@@ -587,6 +628,8 @@ export default function StaffForm() {
                   <p className="text-xs text-warning">
                     Only Owner can assign Admin or Accountant roles. Staff can be upgraded later by Owner.
                   </p>
+                )}
+                </>
                 )}
               </div>
             </div>

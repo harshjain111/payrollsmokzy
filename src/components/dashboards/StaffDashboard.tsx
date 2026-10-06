@@ -20,7 +20,7 @@ import {
   CheckCircle2,
   XCircle,
   Banknote,
-  Loader2,
+  UserX,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { PaymentRequest, Expense } from '@/types/database';
@@ -33,6 +33,21 @@ type RecentItem = {
   created_at: string;
   description?: string;
 };
+
+/** Friendly state for a login that has no linked (active) staff record. */
+export function StaffProfileNotLinked({ roleLabel = 'login' }: { roleLabel?: string }) {
+  return (
+    <div className="mx-auto max-w-lg py-16 text-center">
+      <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-secondary">
+        <UserX className="h-7 w-7 text-muted-foreground" />
+      </div>
+      <h2 className="text-xl font-semibold">Staff profile not linked</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Ask the Owner to link this {roleLabel} to an active staff record to use personal attendance and requests.
+      </p>
+    </div>
+  );
+}
 
 export function StaffDashboard() {
   const navigate = useNavigate();
@@ -159,13 +174,7 @@ export function StaffDashboard() {
   };
 
   if (!staffData) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">{t('error_occurred')}</h2>
-        </div>
-      </div>
-    );
+    return <StaffProfileNotLinked />;
   }
 
   // Use balance loading state
@@ -177,7 +186,7 @@ export function StaffDashboard() {
 
   if (isLoading) {
     return (
-      <div className="p-4 space-y-4">
+      <div className="space-y-4">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-24 w-full" />
         <Skeleton className="h-24 w-full" />
@@ -188,19 +197,17 @@ export function StaffDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">{t('welcome')}</p>
-            <h1 className="text-xl font-bold">{staffData.full_name.split(' ')[0]}</h1>
-          </div>
-          <LanguageToggle />
+    <div className="mx-auto max-w-2xl">
+      {/* Header — in-flow (the app header is already sticky above it) */}
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{t('welcome')}</p>
+          <h1 className="truncate text-2xl font-bold tracking-tight text-foreground">{staffData.full_name.split(' ')[0]}</h1>
         </div>
+        <LanguageToggle />
       </div>
 
-      <div className="p-4 space-y-4 pb-8">
+      <div className="space-y-4 pb-8">
         {/* Attendance widget */}
         <AttendanceWidget />
 
@@ -214,8 +221,10 @@ export function StaffDashboard() {
                   <Wallet className="h-5 w-5 text-primary" />
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowSalary(!showSalary)}
-                  className="h-8 w-8 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
+                  aria-label={showSalary ? 'Hide salary' : 'Show salary'}
+                  className="h-10 w-10 rounded-full hover:bg-muted flex items-center justify-center transition-colors"
                 >
                   {showSalary ? (
                     <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -268,7 +277,7 @@ export function StaffDashboard() {
             size="lg"
           >
             <Wallet className="mr-3 h-6 w-6" />
-            💰 {t('request_advance')}
+            {t('request_advance')}
           </Button>
 
           <Button
@@ -278,7 +287,7 @@ export function StaffDashboard() {
             size="lg"
           >
             <Receipt className="mr-3 h-6 w-6" />
-            🧾 {t('request_expense')}
+            {t('request_expense')}
           </Button>
         </div>
 

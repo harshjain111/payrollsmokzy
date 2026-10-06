@@ -9,8 +9,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Camera, MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { CapturePayload } from '@/lib/attendance';
-import { toast } from '@/hooks/use-toast';
+import { CapturePayload, cameraErrorMessage, locationErrorMessage } from '@/lib/attendance';
+import { toast } from 'sonner';
 
 interface Props {
   open: boolean;
@@ -32,6 +32,10 @@ export function CaptureDialog({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Bumped whenever the camera / location request is abandoned (dialog closed or retried),
+  // so a getUserMedia or geolocation result that arrives late is discarded.
+  const cameraGen = useRef(0);
+  const locationGen = useRef(0);
 
   const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -42,54 +46,64 @@ export function CaptureDialog({
 
   const [submitting, setSubmitting] = useState(false);
 
-  const startCamera = async () => {
-    setCameraError(null);
-    setCameraReady(false);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
-        audio: false,
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-        setCameraReady(true);
-      }
-    } catch (e) {
-      console.error('Camera error', e);
-      setCameraError(
-        e instanceof Error ? e.message : 'Camera access denied. Please allow camera permission.',
-      );
-    }
-  };
-
   const stopCamera = () => {
+    cameraGen.current += 1;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setCameraReady(false);
   };
 
+  const startCamera = async () => {
+    stopCamera();
+    const gen = cameraGen.current;
+    setCameraError(null);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraError('This browser cannot open the camera. Open the app in Chrome, then tap Retry.');
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 720 } },
+        audio: false,
+      });
+      if (gen !== cameraGen.current) {
+        // Dialog closed (or Retry tapped) while the permission prompt was open.
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        if (gen === cameraGen.current) setCameraReady(true);
+      }
+    } catch (e) {
+      if (gen !== cameraGen.current) return;
+      console.error('Camera error', e);
+      setCameraError(cameraErrorMessage(e));
+    }
+  };
+
   const requestLocation = () => {
+    const gen = ++locationGen.current;
     setLocationError(null);
+    setCoords(null);
     setLocating(true);
     if (!navigator.geolocation) {
-      setLocationError('Geolocation not supported on this device');
+      setLocationError('This phone or browser cannot share location. Open the app in Chrome and try again.');
       setLocating(false);
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        if (gen !== locationGen.current) return;
         setCoords(pos);
         setLocating(false);
       },
       (err) => {
+        if (gen !== locationGen.current) return;
         console.error('Geolocation error', err);
-        setLocationError(
-          err.code === err.PERMISSION_DENIED
-            ? 'Location permission denied. Please enable it in your browser settings.'
-            : err.message || 'Could not get location',
-        );
+        setLocationError(locationErrorMessage(err.code));
         setLocating(false);
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
@@ -103,6 +117,7 @@ export function CaptureDialog({
     }
     return () => {
       stopCamera();
+      locationGen.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -138,10 +153,8 @@ export function CaptureDialog({
       onOpenChange(false);
     } catch (e) {
       console.error('Capture submit error', e);
-      toast({
-        title: 'Failed',
+      toast.error('Failed', {
         description: e instanceof Error ? e.message : 'Something went wrong',
-        variant: 'destructive',
       });
     } finally {
       setSubmitting(false);

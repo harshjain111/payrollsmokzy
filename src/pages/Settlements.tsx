@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { addMonths, format, parseISO, subMonths } from 'date-fns';
 import { ArrowLeft, CheckCircle2, ChevronLeft, ChevronRight, Loader2, ShieldX, Users } from 'lucide-react';
@@ -50,17 +50,24 @@ export default function Settlements() {
   const [settleRow, setSettleRow] = useState<PayrollRow | null>(null);
   const [detailsRow, setDetailsRow] = useState<PayrollRow | null>(null);
 
+  // Only the latest request may update the screen (switching months quickly must not
+  // show an older month's rows under the new month's title).
+  const loadSeq = useRef(0);
+
   const load = async (opts?: { openStaffId?: string | null }) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const data = await fetchPayrollMonth(month);
+      if (seq !== loadSeq.current) return;
       setRows(data);
       const target = opts?.openStaffId && data.find((r) => r.staff_id === opts.openStaffId);
       if (target) (target.settlement_id ? setDetailsRow : setSettleRow)(target);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       toast.error(e instanceof Error ? e.message : 'Could not load payroll');
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   };
 
@@ -68,6 +75,7 @@ export default function Settlements() {
     if (!canAccessSettlements) return;
     // Links like /settlements?staff=<id>&month=YYYY-MM open that person straight away.
     const staffParam = searchParams.get('staff');
+    setRows([]); // never show the previous month's rows/totals for the new month
     load({ openStaffId: staffParam });
     if (staffParam) {
       const next = new URLSearchParams(searchParams);
@@ -132,6 +140,7 @@ export default function Settlements() {
             </Button>
             <Input
               type="month"
+              aria-label="Month"
               value={month}
               max={thisMonth()}
               onChange={(e) => e.target.value && setMonth(e.target.value)}
@@ -149,19 +158,19 @@ export default function Settlements() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-xl bg-muted/50 p-2">
+            <div className="min-w-0 rounded-xl bg-muted/50 px-1 py-2 sm:p-2">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Settled</p>
-              <p className="text-lg font-bold">
+              <p className="whitespace-nowrap text-sm font-bold tabular-nums sm:text-lg">
                 {settledCount}/{rows.length}
               </p>
             </div>
-            <div className="rounded-xl bg-amber-500/10 p-2">
+            <div className="min-w-0 rounded-xl bg-amber-500/10 px-1 py-2 sm:p-2">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">To settle (est.)</p>
-              <p className="text-lg font-bold">{inr(pendingEstimate)}</p>
+              <p className="whitespace-nowrap text-sm font-bold tabular-nums sm:text-lg">{inr(pendingEstimate)}</p>
             </div>
-            <div className="rounded-xl bg-primary/10 p-2">
+            <div className="min-w-0 rounded-xl bg-primary/10 px-1 py-2 sm:p-2">
               <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Waiting to pay</p>
-              <p className="text-lg font-bold">{inr(awaitingPayment)}</p>
+              <p className="whitespace-nowrap text-sm font-bold tabular-nums sm:text-lg">{inr(awaitingPayment)}</p>
             </div>
           </div>
 

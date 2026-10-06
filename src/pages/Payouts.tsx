@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getUserDisplayName } from '@/lib/get-user-display-name';
@@ -92,7 +93,22 @@ export default function Payouts() {
   // Access check - Staff cannot execute payouts
   const canExecutePayout = isOwner || isAdmin || isAccountant;
   
-  const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'advances' | 'salary'>('all');
+  const [searchParams] = useSearchParams();
+  // Dashboards deep-link with ?type=expense|advance|salary
+  const [activeTab, setActiveTab] = useState<'all' | 'expenses' | 'advances' | 'salary'>(() => {
+    switch (searchParams.get('type')) {
+      case 'expense':
+      case 'expenses':
+        return 'expenses';
+      case 'advance':
+      case 'advances':
+        return 'advances';
+      case 'salary':
+        return 'salary';
+      default:
+        return 'all';
+    }
+  });
   const [approvedExpenses, setApprovedExpenses] = useState<ApprovedExpense[]>([]);
   const [approvedAdvances, setApprovedAdvances] = useState<ApprovedRequest[]>([]);
   const [pendingSalaries, setPendingSalaries] = useState<ApprovedRequest[]>([]);
@@ -105,6 +121,8 @@ export default function Payouts() {
   const [paidBy, setPaidBy] = useState<{ userId: string; userName: string } | null>(null);
   const [pettyCashBalance, setPettyCashBalance] = useState<number>(0);
   const [cancelItem, setCancelItem] = useState<PayoutItem | null>(null);
+  // Synchronous double-tap guard (state updates are async, a ref is not)
+  const processingRef = useRef(false);
 
   useEffect(() => {
     if (canExecutePayout) {
@@ -189,159 +207,221 @@ export default function Payouts() {
     }
   };
 
+  /**
+   * Undo the "paid" claim when the journal entry could not be written.
+   * Returns false when the undo itself did not go through (e.g. an accountant may
+   * mark an expense reimbursed but not move it back), so the caller can say so.
+   */
+  const releasePayoutClaim = async (item: PayoutItem): Promise<boolean> => {
+    const { data, error } = item.type === 'expense'
+      ? await supabase
+          .from('expenses')
+          .update({ status: 'approved', reimbursed_at: null, reimbursed_by: null, reimbursed_by_user_name: null })
+          .eq('id', item.id)
+          .eq('status', 'reimbursed')
+          .select('id')
+      : await supabase
+          .from('payment_requests')
+          .update({ paid_at: null, paid_by: null, paid_by_user_name: null })
+          .eq('id', item.id)
+          .select('id');
+    return !error && !!data && data.length > 0;
+  };
+
   const handleExecutePayout = async () => {
-    if (!selectedItem || !user) return;
+    if (!selectedItem || !user || processingRef.current) return;
+    processingRef.current = true;
+    const item = selectedItem;
 
     setIsProcessing(true);
     try {
       let journalEntryId: string;
+      const paidAt = new Date().toISOString();
       
       // Use selected paid_by or default to current user
       const paidByUserId = paidBy?.userId || user.id;
       const paidByUserName = paidBy?.userName || getUserDisplayName(user, staffData);
 
       // ========================================
-      // DOUBLE-ENTRY ACCOUNTING: PAYOUT ENTRIES
+      // STEP 1: CLAIM THE ITEM (guards against paying twice)
+      // ========================================
+      // Mark as paid only if it is still unpaid. If someone else (or a double tap)
+      // already paid it, 0 rows come back and we stop before any money entry is written.
+      let claimed = false;
+      if (item.type === 'expense') {
+        // NOTE: ledger_entry_id references legacy ledger_entries table - payouts are tracked via journal_entries
+        const { data, error: claimError } = await supabase
+          .from('expenses')
+          .update({
+            status: 'reimbursed',
+            reimbursed_at: paidAt,
+            reimbursed_by: paidByUserId,
+            reimbursed_by_user_name: paidByUserName,
+          })
+          .eq('id', item.id)
+          .eq('status', 'approved')
+          .select('id');
+        if (claimError) throw claimError;
+        claimed = !!data && data.length > 0;
+      } else {
+        const { data, error: claimError } = await supabase
+          .from('payment_requests')
+          .update({
+            paid_at: paidAt,
+            paid_by: paidByUserId,
+            paid_by_user_name: paidByUserName,
+          })
+          .eq('id', item.id)
+          .eq('status', 'approved')
+          .is('paid_at', null)
+          .select('id');
+        if (claimError) throw claimError;
+        claimed = !!data && data.length > 0;
+      }
+
+      if (!claimed) {
+        toast({
+          title: 'Already paid',
+          description: 'This item was already paid or is no longer approved. The list has been refreshed.',
+          variant: 'destructive',
+        });
+        setSelectedItem(null);
+        fetchApprovedItems();
+        return;
+      }
+
+      // ========================================
+      // STEP 2: DOUBLE-ENTRY ACCOUNTING: PAYOUT ENTRIES
       // ========================================
       // All payouts follow the same pattern:
       // - Debit: Staff Payable / Staff Advances (clear liability/reduce receivable)
       // - Credit: Bank/Cash (money goes out)
       // 
       // This ensures staff balance goes to ZERO after payout
+      try {
+        if (item.type === 'salary') {
+          // SALARY PAYOUT
+          // Debit: Staff Payable (clear the liability created during settlement)
+          // Credit: Bank/Cash (money out)
+          
+          // Extract month from description (format: "Salary for MMMM yyyy")
+          const monthMatch = item.description.match(/Salary for (.+)/);
+          const settlementMonth = monthMatch ? monthMatch[1] : format(new Date(), 'MMMM yyyy');
 
-      if (selectedItem.type === 'salary') {
-        // SALARY PAYOUT
-        // Debit: Staff Payable (clear the liability created during settlement)
-        // Credit: Bank/Cash (money out)
-        
-        // Extract month from description (format: "Salary for MMMM yyyy")
-        const monthMatch = selectedItem.description.match(/Salary for (.+)/);
-        const settlementMonth = monthMatch ? monthMatch[1] : format(new Date(), 'MMMM yyyy');
-
-        journalEntryId = await createSalaryPayoutEntry({
-          staffId: selectedItem.staffId,
-          staffName: selectedItem.staffName,
-          settlementMonth,
-          netPayable: selectedItem.amount,
-          paymentMode,
-          settlementId: selectedItem.settlementId || '',
-          paymentRequestId: selectedItem.id,
-          createdBy: user.id,
-          paidByUserId,
-          paidByUserName,
-        });
-
-        // Update salary settlement with payout journal entry
-        if (selectedItem.settlementId) {
-          await supabase
-            .from('salary_settlements')
-            .update({
-              paid_at: new Date().toISOString(),
-              paid_by: paidByUserId,
-              paid_by_user_name: paidByUserName,
-              payment_mode: paymentMode,
-              payout_journal_entry_id: journalEntryId,
-            })
-            .eq('id', selectedItem.settlementId);
+          journalEntryId = await createSalaryPayoutEntry({
+            staffId: item.staffId,
+            staffName: item.staffName,
+            settlementMonth,
+            netPayable: item.amount,
+            paymentMode,
+            settlementId: item.settlementId || '',
+            paymentRequestId: item.id,
+            createdBy: user.id,
+            paidByUserId,
+            paidByUserName,
+          });
+        } else if (item.type === 'advance') {
+          // ADVANCE PAYOUT
+          // Debit: Staff Advances (staff now owes us this amount)
+          // Credit: Bank/Cash (money out)
+          journalEntryId = await createAdvancePaidEntry({
+            staffId: item.staffId,
+            staffName: item.staffName,
+            amount: item.amount,
+            paymentMode,
+            paymentRequestId: item.id,
+            createdBy: user.id,
+            paidByUserId,
+            paidByUserName,
+          });
+        } else {
+          // EXPENSE PAYOUT
+          // Debit: Staff Payable (clear the liability created during approval)
+          // Credit: Bank/Cash (money out)
+          journalEntryId = await createExpensePayoutEntry({
+            staffId: item.staffId,
+            staffName: item.staffName,
+            expenseId: item.id,
+            amount: item.amount,
+            paymentMode,
+            createdBy: user.id,
+            paidByUserId,
+            paidByUserName,
+          });
         }
+      } catch (journalError) {
+        // No money entry was written, so put the item back in the "to pay" list
+        const released = await releasePayoutClaim(item);
+        if (!released) {
+          const reason = journalError instanceof Error ? journalError.message : 'unknown error';
+          throw new Error(
+            `The accounting entry could not be saved (${reason}) and this item is now marked as paid. ` +
+              'Do not pay it again — ask the owner to check it in Expenses / Advance Requests.',
+          );
+        }
+        throw journalError;
+      }
 
-      } else if (selectedItem.type === 'advance') {
-        // ADVANCE PAYOUT
-        // Debit: Staff Advances (staff now owes us this amount)
-        // Credit: Bank/Cash (money out)
-        
-        journalEntryId = await createAdvancePaidEntry({
-          staffId: selectedItem.staffId,
-          staffName: selectedItem.staffName,
-          amount: selectedItem.amount,
-          paymentMode,
-          paymentRequestId: selectedItem.id,
-          createdBy: user.id,
-          paidByUserId,
-          paidByUserName,
-        });
+      // ========================================
+      // STEP 3: FOLLOW-UP RECORDS (payment itself is already recorded)
+      // ========================================
+      const followUpProblems: string[] = [];
 
-      } else {
-        // EXPENSE PAYOUT
-        // Debit: Staff Payable (clear the liability created during approval)
-        // Credit: Bank/Cash (money out)
-        
-        journalEntryId = await createExpensePayoutEntry({
-          staffId: selectedItem.staffId,
-          staffName: selectedItem.staffName,
-          expenseId: selectedItem.id,
-          amount: selectedItem.amount,
-          paymentMode,
-          createdBy: user.id,
-          paidByUserId,
-          paidByUserName,
-        });
+      // Update salary settlement with payout journal entry
+      if (item.type === 'salary' && item.settlementId) {
+        const { error: settlementError } = await supabase
+          .from('salary_settlements')
+          .update({
+            paid_at: paidAt,
+            paid_by: paidByUserId,
+            paid_by_user_name: paidByUserName,
+            payment_mode: paymentMode,
+            payout_journal_entry_id: journalEntryId,
+          })
+          .eq('id', item.settlementId);
+        if (settlementError) {
+          console.error('Error marking settlement paid:', settlementError);
+          followUpProblems.push('the salary settlement could not be marked as paid');
+        }
       }
 
       // Record petty cash transaction if paid via petty cash
-      if (paymentMode === 'petty_cash' && user) {
-        const newPcBalance = pettyCashBalance - selectedItem.amount;
-        const pcType = selectedItem.type === 'expense' ? 'expense_payment' : 'advance_payment';
-        await (supabase.from as any)('petty_cash_transactions').insert({
+      if (paymentMode === 'petty_cash') {
+        const newPcBalance = pettyCashBalance - item.amount;
+        const pcType = item.type === 'expense' ? 'expense_payment' : 'advance_payment';
+        const { error: pettyCashError } = await (supabase.from as any)('petty_cash_transactions').insert({
           transaction_type: pcType,
-          amount: selectedItem.amount,
+          amount: item.amount,
           balance_after: newPcBalance,
-          reference_type: selectedItem.type === 'expense' ? 'expense' : 'payment_request',
-          reference_id: selectedItem.id,
-          notes: `${selectedItem.description} - ${selectedItem.staffName}`,
+          reference_type: item.type === 'expense' ? 'expense' : 'payment_request',
+          reference_id: item.id,
+          notes: `${item.description} - ${item.staffName}`,
           created_by: user.id,
         });
-        setPettyCashBalance(newPcBalance);
-      }
-
-      // NOTE: ledger_entry_id references legacy ledger_entries table
-      // Journal entries are tracked separately via journal_entry_id where applicable
-      if (selectedItem.type === 'expense') {
-        const { error: updateError } = await supabase
-          .from('expenses')
-          .update({
-            status: 'reimbursed',
-            reimbursed_at: new Date().toISOString(),
-            reimbursed_by: paidByUserId,
-            reimbursed_by_user_name: paidByUserName,
-            // Don't set ledger_entry_id - it references legacy ledger_entries table
-            // The payout is tracked via journal_entries
-          })
-          .eq('id', selectedItem.id);
-
-        if (updateError) throw updateError;
-      } else if (selectedItem.type === 'advance' || selectedItem.type === 'salary') {
-        // Mark payment request as paid
-        const { error: updateError } = await supabase
-          .from('payment_requests')
-          .update({
-            paid_at: new Date().toISOString(),
-            paid_by: paidByUserId,
-            paid_by_user_name: paidByUserName,
-            // Don't set ledger_entry_id - it references legacy ledger_entries table
-            // The payout is tracked via journal_entries
-          })
-          .eq('id', selectedItem.id);
-
-        if (updateError) throw updateError;
+        if (pettyCashError) {
+          console.error('Error recording petty cash transaction:', pettyCashError);
+          followUpProblems.push('the petty cash entry was not saved — please add it on the Petty Cash page');
+        } else {
+          setPettyCashBalance(newPcBalance);
+        }
       }
 
       // Notify the staff member
-      if (selectedItem.staffUserId) {
-        const typeLabel = selectedItem.type === 'expense' 
+      if (item.staffUserId) {
+        const typeLabel = item.type === 'expense' 
           ? 'Expense Reimbursed' 
-          : selectedItem.type === 'advance' 
+          : item.type === 'advance' 
             ? 'Advance Paid' 
             : 'Salary Paid';
         
-        const message = selectedItem.type === 'expense'
-          ? `Your expense of ₹${selectedItem.amount.toLocaleString('en-IN')} has been reimbursed.`
-          : selectedItem.type === 'advance'
-            ? `Your advance request of ₹${selectedItem.amount.toLocaleString('en-IN')} has been paid.`
-            : `Your salary of ₹${selectedItem.amount.toLocaleString('en-IN')} has been paid.`;
+        const message = item.type === 'expense'
+          ? `Your expense of ₹${item.amount.toLocaleString('en-IN')} has been reimbursed.`
+          : item.type === 'advance'
+            ? `Your advance request of ₹${item.amount.toLocaleString('en-IN')} has been paid.`
+            : `Your salary of ₹${item.amount.toLocaleString('en-IN')} has been paid.`;
 
         await supabase.rpc('create_notification', {
-          _user_id: selectedItem.staffUserId,
+          _user_id: item.staffUserId,
           _title: typeLabel,
           _message: message,
           _type: 'success',
@@ -352,17 +432,24 @@ export default function Payouts() {
 
       toast({
         title: 'Payout Successful',
-        description: `₹${selectedItem.amount.toLocaleString('en-IN')} paid to ${selectedItem.staffName}. Balance cleared.`,
+        description: `₹${item.amount.toLocaleString('en-IN')} paid to ${item.staffName}. Balance cleared.`,
       });
+      if (followUpProblems.length > 0) {
+        toast({
+          title: 'Payment saved, but something needs attention',
+          description: `The payment was recorded, but ${followUpProblems.join(' and ')}.`,
+          variant: 'destructive',
+        });
+      }
 
       // Sync payout to financial core (non-blocking)
       try {
         await supabase.functions.invoke('sync-to-financial', {
           body: {
-            staff_id: selectedItem.staffId,
-            staff_name: selectedItem.staffName,
-            payout_type: selectedItem.type,
-            amount: selectedItem.amount,
+            staff_id: item.staffId,
+            staff_name: item.staffName,
+            payout_type: item.type,
+            amount: item.amount,
             payment_mode: paymentMode,
             reference_number: journalEntryId,
             payout_date: format(new Date(), 'yyyy-MM-dd'),
@@ -384,6 +471,7 @@ export default function Payouts() {
         variant: 'destructive',
       });
     } finally {
+      processingRef.current = false;
       setIsProcessing(false);
     }
   };
@@ -584,7 +672,15 @@ export default function Payouts() {
             <EmptyState
               icon={CheckCircle2}
               title="No pending payouts"
-              description="All approved items have been paid. Check the Requests page to approve new items."
+              description={
+                activeTab === 'expenses'
+                  ? 'All approved expenses have been paid. Approve new expenses on the Expenses page.'
+                  : activeTab === 'advances'
+                  ? 'All approved advances have been paid. Approve new advances on the Advance Requests page.'
+                  : activeTab === 'salary'
+                  ? 'All settled salaries have been paid. Settle salaries on the Settlements page.'
+                  : 'Everything approved has been paid. Approved expenses, advances and settled salaries will show up here.'
+              }
             />
           ) : (
             <div className="grid gap-3 sm:gap-4">
@@ -648,6 +744,7 @@ export default function Payouts() {
                           )}
                           <Button 
                             onClick={() => openPayoutDialog(item)}
+                            disabled={isProcessing}
                             size="sm"
                             className="shrink-0 text-xs sm:text-sm h-8 sm:h-9 px-3 sm:px-4"
                           >
@@ -666,7 +763,7 @@ export default function Payouts() {
       </Tabs>
 
       {/* Payout Confirmation Dialog */}
-      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && setSelectedItem(null)}>
+      <Dialog open={!!selectedItem} onOpenChange={(open) => !open && !isProcessing && setSelectedItem(null)}>
         <DialogContent className="max-w-[90vw] sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg">Execute Payout</DialogTitle>
@@ -706,9 +803,9 @@ export default function Payouts() {
               </div>
 
               <div className="space-y-2">
-                <Label className="text-xs sm:text-sm">Payment Mode</Label>
-                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)}>
-                  <SelectTrigger className="text-sm">
+                <Label htmlFor="payout-mode" className="text-xs sm:text-sm">Payment Mode</Label>
+                <Select value={paymentMode} onValueChange={(v) => setPaymentMode(v as PaymentMode)} disabled={isProcessing}>
+                  <SelectTrigger id="payout-mode" className="text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-popover">

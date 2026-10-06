@@ -5,11 +5,13 @@ import { Loader2, Wallet } from 'lucide-react';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { user, userRole, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
 
   useEffect(() => {
     if (!isLoading) {
-      navigate(user ? (userRole === 'hr' ? '/attendance' : '/dashboard') : '/auth');
+      // Everyone (HR included — '/dashboard' is on the HR allow-list) lands on
+      // the dashboard, same as after login.
+      navigate(user ? '/dashboard' : '/auth');
       return;
     }
 
@@ -18,7 +20,7 @@ const Index = () => {
     }, 7000);
 
     return () => window.clearTimeout(timeoutId);
-  }, [user, userRole, isLoading, navigate]);
+  }, [user, isLoading, navigate]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">

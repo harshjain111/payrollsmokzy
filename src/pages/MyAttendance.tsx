@@ -10,6 +10,8 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function MyAttendance() {
   const { staffData } = useAuth();
   const tracked = (staffData as unknown as { attendance_tracked?: boolean })?.attendance_tracked !== false;
+  // Discipline records are per staff member; accounts without a staff link have none.
+  const showDiscipline = tracked && !!staffData?.id;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -18,10 +20,14 @@ export default function MyAttendance() {
       {tracked && <AttendanceWidget />}
 
       <Tabs defaultValue="summary" className="space-y-4">
-        <TabsList className="grid h-auto w-full grid-cols-2 gap-1 sm:grid-cols-4 md:w-auto md:inline-flex">
+        <TabsList
+          className={`grid h-auto w-full gap-1 md:w-auto md:inline-flex ${
+            showDiscipline ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+          }`}
+        >
           <TabsTrigger value="summary">Summary</TabsTrigger>
           <TabsTrigger value="logs">Daily Logs</TabsTrigger>
-          {tracked && <TabsTrigger value="discipline">Discipline</TabsTrigger>}
+          {showDiscipline && <TabsTrigger value="discipline">Discipline</TabsTrigger>}
           <TabsTrigger value="leave">Leave</TabsTrigger>
         </TabsList>
 
@@ -31,7 +37,7 @@ export default function MyAttendance() {
         <TabsContent value="logs" className="space-y-4">
           <MyAttendanceLogs />
         </TabsContent>
-        {tracked && (
+        {showDiscipline && (
           <TabsContent value="discipline" className="space-y-4">
             <MyDisciplineTab />
           </TabsContent>

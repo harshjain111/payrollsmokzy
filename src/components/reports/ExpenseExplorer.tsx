@@ -16,6 +16,7 @@ import { CalendarIcon, CheckCircle, Clock, XCircle, Eye, List, BarChart3, Users,
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { EXPENSE_CATEGORY_LABELS, EXPENSE_STATUS_LABELS, type ExpenseCategory, type ExpenseStatus } from '@/types/database';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { ExpenseProofLinks } from '@/components/expenses/ExpenseProofLinks';
 
 interface DateRange { from: Date; to: Date; }
 type DatePreset = 'last7' | 'last30' | 'thisMonth' | 'last3Months' | 'custom';
@@ -256,8 +257,8 @@ export function ExpenseExplorer() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Total</p><p className="text-lg font-bold"><Amount value={totals.total} className="text-foreground" /></p></CardHeader></Card>
-        <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Reimbursed</p><p className="text-lg font-bold text-emerald-600"><Amount value={totals.reimbursed} /></p></CardHeader></Card>
-        <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Pending</p><p className="text-lg font-bold text-amber-600"><Amount value={totals.pending} /></p></CardHeader></Card>
+        <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Reimbursed</p><p className="text-lg font-bold text-emerald-600"><Amount value={totals.reimbursed} neutral /></p></CardHeader></Card>
+        <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Pending</p><p className="text-lg font-bold text-amber-600"><Amount value={totals.pending} neutral /></p></CardHeader></Card>
         <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Approved</p><p className="text-lg font-bold"><Amount value={totals.approved} /></p></CardHeader></Card>
         <Card><CardHeader className="pb-2 p-3"><p className="text-xs text-muted-foreground">Count</p><p className="text-lg font-bold">{totals.count}</p></CardHeader></Card>
       </div>
@@ -348,7 +349,7 @@ export function ExpenseExplorer() {
                     <div key={item.category} className="space-y-1">
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">{item.name}</span>
-                        <span className="text-muted-foreground"><Amount value={item.value} size="sm" /> ({pct.toFixed(1)}%)</span>
+                        <span className="text-muted-foreground"><Amount value={item.value} size="sm" neutral /> ({pct.toFixed(1)}%)</span>
                       </div>
                       <Progress value={pct} className="h-2" />
                       <p className="text-xs text-muted-foreground">{item.count} transactions</p>
@@ -393,8 +394,8 @@ export function ExpenseExplorer() {
                       <TableRow key={i}>
                         <TableCell className="font-medium text-sm">{s.name}</TableCell>
                         <TableCell className="text-right"><Amount value={s.total} /></TableCell>
-                        <TableCell className="text-right text-emerald-600"><Amount value={s.reimbursed} /></TableCell>
-                        <TableCell className="text-right text-amber-600"><Amount value={s.pending} /></TableCell>
+                        <TableCell className="text-right text-emerald-600"><Amount value={s.reimbursed} neutral /></TableCell>
+                        <TableCell className="text-right text-amber-600"><Amount value={s.pending} neutral /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -477,7 +478,7 @@ export function ExpenseExplorer() {
               {selectedExpense.proof_url && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Receipt/Proof</p>
-                  <a href={selectedExpense.proof_url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary underline">View Attachment</a>
+                  <ExpenseProofLinks proofUrl={selectedExpense.proof_url} />
                 </div>
               )}
             </div>

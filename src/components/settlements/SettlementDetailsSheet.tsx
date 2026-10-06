@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Loader2, Undo2 } from 'lucide-react';
+import { AlertCircle, Loader2, RefreshCw, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
@@ -66,24 +66,42 @@ export function SettlementDetailsSheet({ row, month, onClose, onChanged }: Props
   const [undoing, setUndoing] = useState(false);
   const [showUndo, setShowUndo] = useState(false);
   const [reason, setReason] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     setRecord(null);
     setShowUndo(false);
     setReason('');
+    setLoadError(false);
+    setLoading(false);
     if (!row?.settlement_id) return;
+    let cancelled = false;
     setLoading(true);
     supabase
       .from('salary_settlements')
       .select('*')
       .eq('id', row.settlement_id)
       .maybeSingle()
-      .then(({ data, error }) => {
-        if (error) toast.error('Could not load the settlement');
-        setRecord(data as unknown as SettlementRecord | null);
-        setLoading(false);
-      });
-  }, [row]);
+      .then(
+        ({ data, error }) => {
+          if (cancelled) return;
+          if (error) toast.error('Could not load the settlement');
+          if (error || !data) setLoadError(true);
+          setRecord(data as unknown as SettlementRecord | null);
+          setLoading(false);
+        },
+        () => {
+          if (cancelled) return;
+          toast.error('Could not load the settlement');
+          setLoadError(true);
+          setLoading(false);
+        },
+      );
+    return () => {
+      cancelled = true;
+    };
+  }, [row, reloadKey]);
 
   if (!row) return null;
   const status = payrollStatus(row);
@@ -122,9 +140,19 @@ export function SettlementDetailsSheet({ row, month, onClose, onChanged }: Props
           </SheetDescription>
         </SheetHeader>
 
-        {loading || !record ? (
+        {loading ? (
           <div className="flex justify-center py-12 text-muted-foreground">
             <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : loadError || !record ? (
+          <div className="flex flex-col items-center gap-3 py-12 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive" />
+            <p className="text-sm text-muted-foreground">
+              Could not load this settlement. Please check your connection.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => setReloadKey((k) => k + 1)}>
+              <RefreshCw className="mr-1.5 h-4 w-4" /> Retry
+            </Button>
           </div>
         ) : (
           <div className="mt-4 space-y-4">
@@ -185,8 +213,9 @@ export function SettlementDetailsSheet({ row, month, onClose, onChanged }: Props
             )}
             {canUndo && showUndo && (
               <section className="space-y-2 rounded-xl border border-destructive/30 p-4">
-                <Label>Why undo? (required)</Label>
+                <Label htmlFor="undo-settlement-reason">Why undo? (required)</Label>
                 <Textarea
+                  id="undo-settlement-reason"
                   rows={2}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}

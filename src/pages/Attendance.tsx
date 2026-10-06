@@ -30,7 +30,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { AttendanceSession, formatMinutes } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from '@/components/attendance/SessionDetailsDrawer';
 import { EditAttendanceDialog, AttendanceEditTarget } from '@/components/attendance/EditAttendanceDialog';
 import { PenaltiesPanel } from '@/components/attendance/PenaltiesPanel';
@@ -44,6 +44,7 @@ import {
   FileSpreadsheet,
   FileText,
   AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { exportToPDF, downloadPDF } from '@/lib/pdf-export';
@@ -101,10 +102,7 @@ function statusBadge(status: Status, late?: boolean) {
   );
 }
 
-function fmtTime(iso: string | null): string {
-  if (!iso) return '—';
-  return format(new Date(iso), 'hh:mm a');
-}
+const fmtTime = (iso: string | null): string => formatTime(iso);
 
 export default function Attendance() {
   const { isOwner, isAdmin, isCA, isHR } = useAuth();
@@ -125,7 +123,10 @@ export default function Attendance() {
   const [leaveDates, setLeaveDates] = useState<Set<string>>(new Set()); // `${staffId}|${date}`
   const [loading, setLoading] = useState(true);
 
-  const [selected, setSelected] = useState<AttendanceSession | null>(null);
+  // All sessions of the tapped day cell; the drawer shows one at a time with previous/next.
+  const [selectedDay, setSelectedDay] = useState<AttendanceSession[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const selected = selectedDay[selectedIdx] ?? null;
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<AttendanceEditTarget | null>(null);
 
@@ -272,6 +273,10 @@ export default function Attendance() {
     };
   }, [sessions, filteredStaff, grid, todayStr]);
 
+  const staffFor = (s: AttendanceSession) =>
+    staff.find((m) => m.id === s.staff_id || (!!m.user_id && m.user_id === s.user_id));
+  const staffNameFor = (s: AttendanceSession) => staffFor(s)?.full_name;
+
   const periodLabel = `${format(parseISO(from), 'dd MMM yyyy')} – ${format(parseISO(to), 'dd MMM yyyy')}`;
 
   const handleExportExcel = () => {
@@ -302,7 +307,7 @@ export default function Attendance() {
       fmtTime(cell.lastOut),
       formatMinutes(cell.worked),
       formatMinutes(cell.brk),
-      cell.status + (cell.late ? ' (Late)' : ''),
+      cell.status + (cell.late ? ' (Forgot to check out)' : ''),
     ]);
     const ws1 = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailData]);
     XLSX.utils.book_append_sheet(wb, ws1, 'Daily Detail');
@@ -385,7 +390,7 @@ export default function Attendance() {
           description="Analytical attendance report with daily detail and date-matrix views."
         />
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-w-0">
+        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 min-w-0">
           <StatCard
             title="Checked In Today"
             value={stats.checkedIn}
@@ -462,24 +467,42 @@ export default function Attendance() {
                   onChange={(e) => setSearch(e.target.value)}
                 />
               </div>
-              <Button variant="outline" onClick={fetchAll} className="col-span-2 w-full lg:w-auto">
-                Refresh
-              </Button>
-              <Button variant="outline" onClick={handleExportExcel} className="col-span-2 w-full gap-2 lg:w-auto">
-                <FileSpreadsheet className="h-4 w-4" /> Export Excel
-              </Button>
-              <Button variant="outline" onClick={handleExportPDF} className="col-span-2 w-full gap-2 lg:col-span-1 lg:w-auto">
-                <FileText className="h-4 w-4" /> Export PDF
-              </Button>
+              <div className="col-span-2 grid grid-cols-3 gap-2 lg:col-span-1 lg:flex lg:gap-3">
+                <Button variant="outline" onClick={fetchAll} className="w-full gap-1.5 px-2 lg:w-auto lg:px-4">
+                  <RefreshCw className="h-4 w-4 lg:hidden" /> Refresh
+                </Button>
+                <Button variant="outline" onClick={handleExportExcel} className="w-full gap-1.5 px-2 lg:w-auto lg:gap-2 lg:px-4">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  <span className="lg:hidden">Excel</span>
+                  <span className="hidden lg:inline">Export Excel</span>
+                </Button>
+                <Button variant="outline" onClick={handleExportPDF} className="w-full gap-1.5 px-2 lg:w-auto lg:gap-2 lg:px-4">
+                  <FileText className="h-4 w-4" />
+                  <span className="lg:hidden">PDF</span>
+                  <span className="hidden lg:inline">Export PDF</span>
+                </Button>
+              </div>
             </div>
 
             {/* Legend */}
-            <div className="flex flex-wrap gap-2 text-xs">
-              {statusBadge('FD')} <span className="text-muted-foreground self-center">Full Day (≥8h)</span>
-              {statusBadge('HD')} <span className="text-muted-foreground self-center">Half Day (≥4h)</span>
-              {statusBadge('P')} <span className="text-muted-foreground self-center">Present (&lt;4h)</span>
-              {statusBadge('Absent')} <span className="text-muted-foreground self-center">No check-in</span>
-              {statusBadge('Leave')} <span className="text-muted-foreground self-center">Approved leave</span>
+            <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs">
+              {(
+                [
+                  ['FD', 'Full Day (≥8h)'],
+                  ['HD', 'Half Day (≥4h)'],
+                  ['P', 'Present (<4h)'],
+                  ['Absent', 'No check-in'],
+                  ['Leave', 'Approved leave'],
+                ] as const
+              ).map(([st, label]) => (
+                <span key={st} className="inline-flex items-center gap-1.5">
+                  {statusBadge(st)}
+                  <span className="text-muted-foreground">{label}</span>
+                </span>
+              ))}
+              <span className="inline-flex items-center gap-1 self-center text-muted-foreground">
+                <AlertTriangle className="h-3 w-3 text-amber-600" /> Forgot to check out
+              </span>
             </div>
 
             <AttendanceMatrix
@@ -487,8 +510,9 @@ export default function Attendance() {
               staff={filteredStaff}
               dates={dates}
               grid={grid}
-              onSelectSession={(s) => {
-                setSelected(s);
+              onSelectSessions={(list) => {
+                setSelectedDay(list);
+                setSelectedIdx(0);
                 setDrawerOpen(true);
               }}
               onAddAttendance={
@@ -512,9 +536,16 @@ export default function Attendance() {
           open={drawerOpen}
           onOpenChange={setDrawerOpen}
           session={selected}
+          staffName={selected ? staffNameFor(selected) : undefined}
+          position={{
+            index: selectedIdx,
+            total: selectedDay.length,
+            onPrev: () => setSelectedIdx((i) => Math.max(0, i - 1)),
+            onNext: () => setSelectedIdx((i) => Math.min(selectedDay.length - 1, i + 1)),
+          }}
           canEdit={canEdit}
           onEdit={(s) => {
-            const st = staff.find((m) => m.id === s.staff_id || (m.user_id && m.user_id === s.user_id));
+            const st = staffFor(s);
             setDrawerOpen(false);
             setEditTarget({
               staffId: s.staff_id ?? st?.id ?? '',
@@ -541,12 +572,13 @@ interface MatrixProps {
   staff: StaffRow[];
   dates: string[];
   grid: Record<string, Record<string, DayCell>>;
-  onSelectSession: (s: AttendanceSession) => void;
+  /** Called with every session of the tapped day (usually one). */
+  onSelectSessions: (sessions: AttendanceSession[]) => void;
   /** Present for owners/admins: add attendance on an empty or absent day. */
   onAddAttendance?: (staff: StaffRow, date: string) => void;
 }
 
-function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddAttendance }: MatrixProps) {
+function AttendanceMatrix({ loading, staff, dates, grid, onSelectSessions, onAddAttendance }: MatrixProps) {
   const today = format(new Date(), 'yyyy-MM-dd');
   const PAGE_SIZE = 10;
   const [page, setPage] = useState(1);
@@ -578,10 +610,14 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddA
         <Table className="min-w-max table-auto">
           <TableHeader>
             <TableRow className="bg-muted/40 hover:bg-muted/40">
-              <TableHead className="w-[150px] min-w-[150px] whitespace-nowrap">Employee ID</TableHead>
-              <TableHead className="w-[180px] min-w-[180px] whitespace-nowrap">Employee Name</TableHead>
-              <TableHead className="w-[150px] min-w-[150px] whitespace-nowrap">Department</TableHead>
-              <TableHead className="w-[160px] min-w-[160px] whitespace-nowrap">Designation</TableHead>
+              <TableHead className="hidden w-[150px] min-w-[150px] whitespace-nowrap md:table-cell">Employee ID</TableHead>
+              {/* Phones: name column stays pinned while the days scroll sideways. */}
+              <TableHead className="sticky left-0 z-10 w-[124px] min-w-[124px] bg-muted shadow-[1px_0_0_hsl(var(--border))] md:static md:w-[180px] md:min-w-[180px] md:bg-transparent md:shadow-none whitespace-nowrap">
+                <span className="md:hidden">Name</span>
+                <span className="hidden md:inline">Employee Name</span>
+              </TableHead>
+              <TableHead className="hidden w-[150px] min-w-[150px] whitespace-nowrap md:table-cell">Department</TableHead>
+              <TableHead className="hidden w-[160px] min-w-[160px] whitespace-nowrap md:table-cell">Designation</TableHead>
               {dates.map((d) => (
                 <TableHead key={d} className="w-[110px] min-w-[110px] text-center whitespace-nowrap">
                   <div className="font-semibold">{format(parseISO(d), 'dd-MM-yyyy')}</div>
@@ -595,16 +631,17 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddA
           <TableBody>
             {visible.map((st) => (
               <TableRow key={st.id} className="align-top">
-                <TableCell className="w-[150px] min-w-[150px] whitespace-nowrap font-medium">
+                <TableCell className="hidden w-[150px] min-w-[150px] whitespace-nowrap font-medium md:table-cell">
                   {st.employee_id}
                 </TableCell>
-                <TableCell className="w-[180px] min-w-[180px] whitespace-nowrap">
-                  {st.full_name}
+                <TableCell className="sticky left-0 z-10 w-[124px] min-w-[124px] bg-card shadow-[1px_0_0_hsl(var(--border))] md:static md:w-[180px] md:min-w-[180px] md:bg-transparent md:shadow-none md:whitespace-nowrap">
+                  <div className="break-words font-medium md:font-normal">{st.full_name}</div>
+                  <div className="text-xs text-muted-foreground md:hidden">{st.employee_id}</div>
                 </TableCell>
-                <TableCell className="w-[150px] min-w-[150px] whitespace-nowrap text-muted-foreground">
+                <TableCell className="hidden w-[150px] min-w-[150px] whitespace-nowrap text-muted-foreground md:table-cell">
                   {st.department ?? '—'}
                 </TableCell>
-                <TableCell className="w-[160px] min-w-[160px] whitespace-nowrap text-muted-foreground">
+                <TableCell className="hidden w-[160px] min-w-[160px] whitespace-nowrap text-muted-foreground md:table-cell">
                   {st.designation ?? '—'}
                 </TableCell>
                 {dates.map((d) => {
@@ -638,7 +675,7 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddA
                             type="button"
                             disabled={!clickable}
                             onClick={() => {
-                              if (c.sessions.length > 0) onSelectSession(c.sessions[0]);
+                              if (c.sessions.length > 0) onSelectSessions(c.sessions);
                               else if (canAdd) onAddAttendance?.(st, d);
                             }}
                             className="w-full inline-flex flex-col items-center justify-center gap-0.5 disabled:cursor-default"
@@ -662,13 +699,18 @@ function AttendanceMatrix({ loading, staff, dates, grid, onSelectSession, onAddA
                             {c.late && (
                               <AlertTriangle className="h-3 w-3 text-amber-600 mt-0.5" />
                             )}
+                            {c.sessions.length > 1 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {c.sessions.length} sessions
+                              </span>
+                            )}
                           </button>
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-xs">
                             <div className="font-semibold">
                               {c.status}
-                              {c.late && ' • Late'}
+                              {c.late && ' • Forgot to check out'}
                             </div>
                             {c.worked > 0 && <div>Worked: {formatMinutes(c.worked)}</div>}
                             {c.brk > 0 && <div>Break: {formatMinutes(c.brk)}</div>}

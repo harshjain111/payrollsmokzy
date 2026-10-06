@@ -299,6 +299,7 @@ export default function Settings() {
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       placeholder="••••••••"
                       className="h-10 sm:h-11 pr-10 text-sm"
+                      autoComplete="current-password"
                     />
                     <Button
                       type="button"
@@ -306,6 +307,7 @@ export default function Settings() {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      aria-label={showCurrentPassword ? 'Hide password' : 'Show password'}
                     >
                       {showCurrentPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -326,6 +328,7 @@ export default function Settings() {
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="••••••••"
                       className="h-10 sm:h-11 pr-10 text-sm"
+                      autoComplete="new-password"
                     />
                     <Button
                       type="button"
@@ -333,6 +336,7 @@ export default function Settings() {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowNewPassword(!showNewPassword)}
+                      aria-label={showNewPassword ? 'Hide password' : 'Show password'}
                     >
                       {showNewPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -354,6 +358,7 @@ export default function Settings() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="••••••••"
                       className="h-10 sm:h-11 pr-10 text-sm"
+                      autoComplete="new-password"
                     />
                     <Button
                       type="button"
@@ -361,6 +366,7 @@ export default function Settings() {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                     >
                       {showConfirmPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />

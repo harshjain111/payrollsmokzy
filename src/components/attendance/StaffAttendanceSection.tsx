@@ -3,8 +3,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { AttendanceSession, formatMinutes, formatSessionTime } from '@/lib/attendance';
+import { AttendanceSession, formatMinutes, formatSessionStatus, formatSessionTime } from '@/lib/attendance';
 import { SessionDetailsDrawer } from './SessionDetailsDrawer';
+import { LoadError } from './LoadError';
 import { format } from 'date-fns';
 import { CalendarClock, Loader2 } from 'lucide-react';
 
@@ -15,6 +16,8 @@ interface Props {
 export function StaffAttendanceSection({ staffId }: Props) {
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [selected, setSelected] = useState<AttendanceSession | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -22,6 +25,7 @@ export function StaffAttendanceSection({ staffId }: Props) {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError(false);
       try {
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
@@ -36,6 +40,7 @@ export function StaffAttendanceSection({ staffId }: Props) {
         if (!cancelled) setSessions((data as AttendanceSession[]) ?? []);
       } catch (e) {
         console.error('Staff attendance load error', e);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -44,7 +49,7 @@ export function StaffAttendanceSection({ staffId }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [staffId]);
+  }, [staffId, reloadKey]);
 
   return (
     <Card className="rounded-2xl border-0 shadow-card">
@@ -61,6 +66,8 @@ export function StaffAttendanceSection({ staffId }: Props) {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Loading…
           </div>
+        ) : error ? (
+          <LoadError className="py-6" onRetry={() => setReloadKey((k) => k + 1)} />
         ) : sessions.length === 0 ? (
           <p className="text-sm text-muted-foreground py-4">No attendance records yet.</p>
         ) : (
@@ -95,7 +102,7 @@ export function StaffAttendanceSection({ staffId }: Props) {
                       : 'default'
                   }
                 >
-                  {s.status}
+                  {formatSessionStatus(s.status)}
                 </Badge>
               </button>
             ))}

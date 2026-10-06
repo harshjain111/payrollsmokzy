@@ -11,8 +11,14 @@ interface PDFExportOptions {
   totals?: (string | number)[];
 }
 
+// jsPDF's built-in Helvetica can't draw "₹" (prints a garbage glyph), so spell it out.
+const pdfSafe = (v: string | number) => (typeof v === 'string' ? v.replace(/₹\s?/g, 'Rs. ') : v);
+
 export function exportToPDF(options: PDFExportOptions) {
-  const { title, subtitle, headers, data, dateRange, totals } = options;
+  const { title, subtitle, headers } = options;
+  const { dateRange } = options;
+  const data = options.data.map((row) => row.map(pdfSafe));
+  const totals = options.totals?.map(pdfSafe);
   
   const doc = new jsPDF('p', 'mm', 'a4');
   const pageWidth = doc.internal.pageSize.getWidth();
@@ -126,13 +132,16 @@ export function exportLedgerPDF(
   let runningBalance = openingBalance;
   
   const tableData = data.map(entry => {
-    runningBalance += (entry.credit || 0) - (entry.debit || 0);
+    // Callers that already know the true running balance (e.g. Ledger page) pass `balance`
+    runningBalance = typeof entry.balance === 'number'
+      ? entry.balance
+      : runningBalance + (Number(entry.credit) || 0) - (Number(entry.debit) || 0);
     return [
       format(new Date(entry.entry_date), 'dd/MM/yyyy'),
       entry.voucher_no,
       entry.description?.substring(0, 40) || '',
-      entry.debit > 0 ? `₹${entry.debit.toLocaleString('en-IN')}` : '-',
-      entry.credit > 0 ? `₹${entry.credit.toLocaleString('en-IN')}` : '-',
+      entry.debit > 0 ? `₹${Number(entry.debit).toLocaleString('en-IN')}` : '-',
+      entry.credit > 0 ? `₹${Number(entry.credit).toLocaleString('en-IN')}` : '-',
       `₹${runningBalance.toLocaleString('en-IN')}`,
     ];
   });

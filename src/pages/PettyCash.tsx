@@ -261,7 +261,7 @@ export default function PettyCash() {
               <span className="text-sm font-medium">Filters:</span>
             </div>
             <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-full sm:w-[160px] text-sm">
+              <SelectTrigger className="w-full sm:w-[160px] text-sm" aria-label="Filter by type">
                 <SelectValue placeholder="Type" />
               </SelectTrigger>
               <SelectContent className="bg-popover">
@@ -394,9 +394,11 @@ export default function PettyCash() {
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Amount (₹)</Label>
+              <Label htmlFor="topup-amount">Amount (₹)</Label>
               <Input
+                id="topup-amount"
                 type="number"
+                inputMode="decimal"
                 min="1"
                 placeholder="Enter amount"
                 value={topUpAmount}
@@ -405,9 +407,9 @@ export default function PettyCash() {
             </div>
 
             <div className="space-y-2">
-              <Label>Source</Label>
+              <Label htmlFor="topup-source">Source</Label>
               <Select value={topUpSource} onValueChange={setTopUpSource}>
-                <SelectTrigger>
+                <SelectTrigger id="topup-source">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-popover">
@@ -421,8 +423,9 @@ export default function PettyCash() {
             </div>
 
             <div className="space-y-2">
-              <Label>Notes (optional)</Label>
+              <Label htmlFor="topup-notes">Notes (optional)</Label>
               <Textarea
+                id="topup-notes"
                 placeholder="e.g. Weekly cash refill"
                 value={topUpNotes}
                 onChange={(e) => setTopUpNotes(e.target.value)}

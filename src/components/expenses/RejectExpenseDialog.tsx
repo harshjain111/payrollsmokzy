@@ -37,11 +37,12 @@ export function RejectExpenseDialog({
   const [reason, setReason] = useState('');
 
   const handleReject = async () => {
-    // Prevent self-rejection - cannot reject own expense submissions
-    if (expense.created_by === user?.id) {
+    // Same rule as approval: you cannot act on an expense where YOU are the beneficiary (staff).
+    // Owners/Admins CAN reject expenses they created on behalf of other staff.
+    if (expense.staff?.user_id === user?.id) {
       toast({
         title: 'Cannot reject',
-        description: 'You cannot reject your own expense submissions.',
+        description: 'You cannot reject expenses where you are the beneficiary.',
         variant: 'destructive',
       });
       onOpenChange(false);
@@ -62,7 +63,7 @@ export function RejectExpenseDialog({
 
       const approverName = getUserDisplayName(user, staffData);
 
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('expenses')
         .update({
           status: 'rejected',
@@ -71,9 +72,22 @@ export function RejectExpenseDialog({
           rejection_reason: reason.trim(),
           approved_by_user_name: approverName,
         })
-        .eq('id', expense.id);
+        .eq('id', expense.id)
+        .eq('status', 'pending')
+        .select('id');
 
       if (error) throw error;
+      if (!updated || updated.length === 0) {
+        toast({
+          title: 'Already handled',
+          description: 'This expense is no longer pending — someone may have already approved or rejected it.',
+          variant: 'destructive',
+        });
+        setReason('');
+        onOpenChange(false);
+        onSuccess();
+        return;
+      }
 
       // Notify the staff member about rejection
       if (expense.staff?.user_id) {
@@ -111,7 +125,14 @@ export function RejectExpenseDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (isSubmitting) return;
+        if (!next) setReason('');
+        onOpenChange(next);
+      }}
+    >
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Reject Expense</DialogTitle>

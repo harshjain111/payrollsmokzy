@@ -15,13 +15,15 @@ import {
   AttendanceSession,
   deleteAttendanceRecord,
   formatMinutes,
+  formatSessionStatus,
   formatSessionTime,
+  formatTime,
   getSessionBreaks,
   getSignedPhotoUrl,
   googleMapsLink,
 } from '@/lib/attendance';
-import { format } from 'date-fns';
-import { MapPin, ExternalLink, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ChevronLeft, ChevronRight, MapPin, ExternalLink, Loader2, Pencil, Trash2 } from 'lucide-react';
 
 interface Props {
   open: boolean;
@@ -31,9 +33,22 @@ interface Props {
   canEdit?: boolean;
   onEdit?: (session: AttendanceSession) => void;
   onDeleted?: () => void;
+  /** Shown in the header so the viewer knows whose record this is. */
+  staffName?: string;
+  /** When a day has several sessions: which one is shown, with previous/next. */
+  position?: { index: number; total: number; onPrev: () => void; onNext: () => void };
 }
 
-export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onEdit, onDeleted }: Props) {
+export function SessionDetailsDrawer({
+  open,
+  onOpenChange,
+  session,
+  canEdit,
+  onEdit,
+  onDeleted,
+  staffName,
+  position,
+}: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -95,24 +110,46 @@ export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onE
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>
-            Session — {format(new Date(session.work_date), 'EEE, dd MMM yyyy')}
+          <SheetTitle className="pr-6">
+            {staffName ? `${staffName} · ` : 'Session · '}
+            {format(parseISO(session.work_date), 'EEE, dd MMM yyyy')}
           </SheetTitle>
-          <SheetDescription>
-            <Badge variant={session.status === 'completed' ? 'secondary' : 'default'}>
-              {session.status}
-            </Badge>
-            {session.late_checkout && (
-              <Badge variant="destructive" className="ml-2">
-                Late check-out
+          <SheetDescription asChild>
+            <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
+              <Badge variant={session.status === 'completed' ? 'secondary' : 'default'}>
+                {formatSessionStatus(session.status)}
               </Badge>
-            )}
-            {session.auto_closed && (
-              <Badge variant="outline" className="ml-2">
-                Auto-closed
-              </Badge>
-            )}
+              {session.late_checkout && <Badge variant="destructive">Forgot to check out</Badge>}
+              {session.auto_closed && <Badge variant="outline">Auto-closed</Badge>}
+            </div>
           </SheetDescription>
+          {position && position.total > 1 && (
+            <div className="flex items-center justify-between gap-2 rounded-lg border px-2 py-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={position.onPrev}
+                disabled={position.index === 0}
+                aria-label="Previous session"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <span className="text-sm">
+                Session {position.index + 1} of {position.total} this day
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={position.onNext}
+                disabled={position.index >= position.total - 1}
+                aria-label="Next session"
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
+          )}
         </SheetHeader>
 
         {loading ? (
@@ -153,7 +190,7 @@ export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onE
                 <p className="font-medium">
                   {session.is_manual ? 'Added manually' : 'Edited'}
                   {session.edited_by_name && ` by ${session.edited_by_name}`}
-                  {session.edited_at && ` on ${format(new Date(session.edited_at), 'dd MMM yyyy, hh:mm a')}`}
+                  {session.edited_at && ` on ${format(new Date(session.edited_at), 'dd MMM yyyy, h:mm a')}`}
                 </p>
                 {session.edit_reason && <p className="text-muted-foreground">Reason: {session.edit_reason}</p>}
               </div>
@@ -183,7 +220,7 @@ export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onE
                   onChange={(e) => setDeleteReason(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground">
-                  A copy is kept in the audit log. Any penalty for this day stays; cancel it on the
+                  A copy is kept in the audit log. Any penalty for this day stays; waive it on the
                   Penalties page if it no longer applies.
                 </p>
                 <div className="flex gap-2">
@@ -272,8 +309,7 @@ export function SessionDetailsDrawer({ open, onOpenChange, session, canEdit, onE
                       <div>
                         <p className="font-medium">Break {i + 1}</p>
                         <p className="text-xs text-muted-foreground">
-                          {format(new Date(b.start_at), 'hh:mm a')} –{' '}
-                          {b.end_at ? format(new Date(b.end_at), 'hh:mm a') : 'ongoing'}
+                          {formatTime(b.start_at)} – {b.end_at ? formatTime(b.end_at) : 'ongoing'}
                         </p>
                       </div>
                       <Badge variant="secondary">{formatMinutes(b.duration_minutes)}</Badge>

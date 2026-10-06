@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,7 +31,8 @@ import {
   Wallet,
   TrendingUp,
   CreditCard,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import { format, subMonths } from 'date-fns';
 import type { Staff, SalarySettlement } from '@/types/database';
@@ -49,6 +51,8 @@ export default function SalariesAdvances() {
   
   const [staff, setStaff] = useState<StaffWithFinancials[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const fetchSeq = useRef(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'settled' | 'paid'>('all');
   const [selectedMonth, setSelectedMonth] = useState<string>(format(subMonths(new Date(), 1), 'yyyy-MM'));
@@ -58,8 +62,10 @@ export default function SalariesAdvances() {
   }, [selectedMonth]);
 
   const fetchStaffWithFinancials = async () => {
+    const seq = ++fetchSeq.current;
     try {
       setIsLoading(true);
+      setLoadError(false);
 
       // Fetch all active staff
       const { data: staffData, error: staffError } = await supabase
@@ -131,11 +137,16 @@ export default function SalariesAdvances() {
         })
       );
 
+      if (seq !== fetchSeq.current) return;
       setStaff(enrichedStaff);
     } catch (error) {
       console.error('Error fetching staff:', error);
+      if (seq !== fetchSeq.current) return;
+      setStaff([]);
+      setLoadError(true);
+      toast.error('Could not load staff. Check your connection and try again.');
     } finally {
-      setIsLoading(false);
+      if (seq === fetchSeq.current) setIsLoading(false);
     }
   };
 
@@ -241,7 +252,7 @@ export default function SalariesAdvances() {
         
         <div className="flex gap-2">
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectTrigger className="w-full sm:w-[140px]" aria-label="Month">
               <SelectValue placeholder="Month" />
             </SelectTrigger>
             <SelectContent>
@@ -254,13 +265,13 @@ export default function SalariesAdvances() {
           </Select>
 
           <Select value={filterStatus} onValueChange={(v) => setFilterStatus(v as typeof filterStatus)}>
-            <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectTrigger className="w-full sm:w-[160px]" aria-label="Filter by status">
               <SelectValue placeholder="Filter" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="settled">Payout</SelectItem>
+              <SelectItem value="settled">Settled, not paid</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
             </SelectContent>
           </Select>
@@ -280,6 +291,17 @@ export default function SalariesAdvances() {
             </Card>
           ))}
         </div>
+      ) : loadError ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center gap-3 py-12 text-center text-muted-foreground">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+            <p>Could not load staff. Please check your connection.</p>
+            <Button variant="outline" size="sm" onClick={() => fetchStaffWithFinancials()}>
+              <RefreshCw className="mr-1.5 h-4 w-4" />
+              Retry
+            </Button>
+          </CardContent>
+        </Card>
       ) : filteredStaff.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
@@ -448,6 +470,8 @@ function StaffTile({
             size="sm" 
             variant="ghost"
             onClick={() => navigate(`/staff/${staff.id}`)}
+            aria-label={`View history for ${staff.full_name}`}
+            title="View history"
           >
             <History className="h-3.5 w-3.5" />
           </Button>

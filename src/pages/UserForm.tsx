@@ -19,6 +19,7 @@ import { ArrowLeft, Save, UserPlus, Eye, EyeOff, Loader2, Phone, Mail, AlertCirc
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { AppRole } from '@/types/database';
+import { digitsOnly, normalizePhone } from '@/lib/phone';
 
 interface AvailableStaff {
   id: string;
@@ -121,9 +122,7 @@ export default function UserForm() {
     }
   };
 
-  const formatPhoneInput = (value: string) => {
-    return value.replace(/\D/g, '');
-  };
+  const formatPhoneInput = digitsOnly;
 
   const handleSubmit = async () => {
     if (isHR && (isEditing || role !== 'staff')) {
@@ -138,7 +137,7 @@ export default function UserForm() {
     }
     
     if (!isEditing) {
-      const cleanPhone = formatPhoneInput(phone);
+      const cleanPhone = normalizePhone(phone);
       if (cleanPhone.length < 10) {
         toast({ title: 'Validation Error', description: 'Please enter a valid phone number (min 10 digits).', variant: 'destructive' });
         return;
@@ -178,7 +177,7 @@ export default function UserForm() {
               'Authorization': `Bearer ${session.session?.access_token}`,
             },
             body: JSON.stringify({
-              phone: formatPhoneInput(phone),
+              phone: normalizePhone(phone),
               password: password,
               full_name: fullName.trim(),
               email: email.trim() || null,
@@ -197,7 +196,7 @@ export default function UserForm() {
 
         toast({ 
           title: 'User Created', 
-          description: `${fullName} can now login using phone: ${formatPhoneInput(phone)}`
+          description: `${fullName} can now login using phone: ${normalizePhone(phone)}`
         });
       }
 
@@ -228,7 +227,7 @@ export default function UserForm() {
         title={isEditing ? 'Edit User' : isHR ? 'Create Staff User' : 'Add New User'}
         description={isEditing ? 'Update user role' : isHR ? 'Create a Staff login account' : 'Create a new user account with login credentials'}
       >
-        <Button variant="ghost" size="sm" onClick={() => navigate(isHR ? '/attendance' : '/users')} className="gap-2">
+        <Button variant="ghost" size="sm" onClick={() => navigate(isHR ? '/attendance' : '/users')} className="gap-2" aria-label="Back">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>
@@ -237,8 +236,18 @@ export default function UserForm() {
       <Alert>
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          <strong>User vs Staff:</strong> This form creates a login account only. 
-          To add an employee to payroll, use "Add Staff" instead.
+          {isHR ? (
+            <>
+              <strong>Staff login:</strong> This form creates a login account only. Link it to the
+              employee's staff record below so their dashboard and attendance work. If the employee isn't
+              listed, ask the Owner or Admin to add them to payroll first.
+            </>
+          ) : (
+            <>
+              <strong>User vs Staff:</strong> This form creates a login account only.
+              To add an employee to payroll, use "Add Staff" (Staff page) instead.
+            </>
+          )}
         </AlertDescription>
       </Alert>
 
@@ -261,6 +270,7 @@ export default function UserForm() {
                     <Input
                       id="phone"
                       type="tel"
+                      inputMode="numeric"
                       value={phone}
                       onChange={(e) => setPhone(formatPhoneInput(e.target.value))}
                       placeholder="9876543210"
@@ -282,6 +292,7 @@ export default function UserForm() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="Minimum 6 characters"
                       className="pr-10"
+                      autoComplete="new-password"
                     />
                     <Button
                       type="button"
@@ -289,6 +300,7 @@ export default function UserForm() {
                       size="icon"
                       className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
                       onClick={() => setShowPassword(!showPassword)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
                       {showPassword ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
@@ -383,7 +395,9 @@ export default function UserForm() {
             {/* Personal self-service requires a linked staff record. */}
             {(role === 'staff' || role === 'hr') && !isEditing && availableStaff.length > 0 && (
               <div className="space-y-2 pt-4 border-t">
-                <Label htmlFor="linkedStaff">Link to Existing Staff Record (Optional)</Label>
+                <Label htmlFor="linkedStaff">
+                  Link to Existing Staff Record {role === 'staff' ? '(Recommended)' : '(Optional)'}
+                </Label>
                 <Select 
                   value={linkedStaffId || 'none'} 
                   onValueChange={(v) => setLinkedStaffId(v === 'none' ? null : v)}
@@ -404,6 +418,19 @@ export default function UserForm() {
                   Link this user to an existing staff record that doesn't have a login yet.
                 </p>
               </div>
+            )}
+
+            {role === 'staff' && !isEditing && !linkedStaffId && (
+              <Alert className="border-warning bg-warning/10">
+                <AlertCircle className="h-4 w-4 text-warning" />
+                <AlertDescription className="text-warning">
+                  {availableStaff.length > 0
+                    ? 'No staff record linked. Without one, this person\'s dashboard, attendance and requests won\'t work. Pick their staff record above.'
+                    : isHR
+                      ? 'No unlinked staff records found. Without a linked staff record, this person\'s dashboard, attendance and requests won\'t work. Ask the Owner or Admin to add them as staff.'
+                      : 'No unlinked staff records found. Without a linked staff record, this person\'s dashboard, attendance and requests won\'t work. Use "Add Staff" instead — it creates the staff record and login together.'}
+                </AlertDescription>
+              </Alert>
             )}
           </CardContent>
         </Card>

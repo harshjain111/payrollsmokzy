@@ -10,11 +10,13 @@ import { Calendar, Plus, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-rea
 import { format } from 'date-fns';
 import type { LeaveRecord, LeaveStatus } from '@/types/leave';
 import { cn } from '@/lib/utils';
+import { LoadError } from './LoadError';
 
 export function MyLeaveSection() {
   const { staffData } = useAuth();
   const [leaves, setLeaves] = useState<LeaveRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
 
   const fetchLeaves = async () => {
@@ -23,6 +25,7 @@ export function MyLeaveSection() {
       return;
     }
     setLoading(true);
+    setError(false);
     try {
       const { data, error } = await supabase
         .from('leave_records')
@@ -34,6 +37,7 @@ export function MyLeaveSection() {
       setLeaves((data as unknown as LeaveRecord[]) ?? []);
     } catch (e) {
       console.error('Leaves load error', e);
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -80,6 +84,8 @@ export function MyLeaveSection() {
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               Loading…
             </div>
+          ) : error ? (
+            <LoadError onRetry={fetchLeaves} />
           ) : leaves.length === 0 ? (
             <EmptyState
               icon={Calendar}

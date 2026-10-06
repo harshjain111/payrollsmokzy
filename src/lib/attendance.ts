@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { computeAndLogDiscipline } from '@/lib/discipline';
 import { notifyCheckinWhatsapp, notifyCheckoutWhatsapp } from '@/lib/attendance-whatsapp';
@@ -82,14 +83,26 @@ export async function getCurrentSession(userId: string): Promise<AttendanceSessi
   return (data as AttendanceSession | null) ?? null;
 }
 
-export async function getTodayCompletedSession(userId: string): Promise<AttendanceSession | null> {
+/**
+ * How long a finished shift keeps showing as "Shift completed" after check-out. Long enough to
+ * cover a night shift ending after midnight, short enough that the next day's shift (typically
+ * 14-15h after the last check-out) gets the big Check In button again.
+ */
+const RECENT_COMPLETED_HOURS = 12;
+
+/**
+ * The latest completed session checked out within the last 12 hours. Uses check-out time,
+ * not work_date, so a night shift that ended after midnight still shows as completed.
+ */
+export async function getRecentCompletedSession(userId: string): Promise<AttendanceSession | null> {
+  const since = new Date(Date.now() - RECENT_COMPLETED_HOURS * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from('attendance_sessions' as never)
     .select('*')
     .eq('user_id', userId)
-    .eq('work_date', localDateString())
     .eq('status', 'completed')
-    .order('check_in_at', { ascending: false })
+    .gte('check_out_at', since)
+    .order('check_out_at', { ascending: false })
     .limit(1)
     .maybeSingle();
   if (error) throw error;
@@ -106,20 +119,45 @@ export async function getSessionBreaks(sessionId: string): Promise<AttendanceBre
   return (data as AttendanceBreak[]) ?? [];
 }
 
+/** Thrown by checkIn when the user already has an open session (unique index violation). */
+export class AlreadyCheckedInError extends Error {
+  constructor() {
+    super('You are already checked in');
+    this.name = 'AlreadyCheckedInError';
+  }
+}
+
+function newSessionId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  // Older Android WebViews: RFC 4122 v4 from getRandomValues.
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+
 export async function checkIn(
   userId: string,
   staffId: string | null,
   payload: CapturePayload,
 ): Promise<AttendanceSession> {
-  // Insert row first to get id, with placeholder photo url
+  // Upload the selfie first, into a folder named after a client-generated session id, then
+  // create the row with the real photo path in one insert. A failed or slow upload therefore
+  // never leaves an open session behind that would block the next attempt.
+  const sessionId = newSessionId();
+  const path = await uploadPhoto(userId, sessionId, 'checkin', payload.photoBlob);
   const { data: inserted, error: insertErr } = await supabase
     .from('attendance_sessions' as never)
     .insert({
+      id: sessionId,
       user_id: userId,
       staff_id: staffId,
       work_date: localDateString(),
       check_in_at: new Date().toISOString(),
-      check_in_photo_url: 'pending',
+      check_in_photo_url: path,
       check_in_lat: payload.lat,
       check_in_lng: payload.lng,
       check_in_accuracy: payload.accuracy,
@@ -127,24 +165,17 @@ export async function checkIn(
     } as never)
     .select('*')
     .single();
-  if (insertErr) throw insertErr;
-  const session = inserted as AttendanceSession;
-
-  const path = await uploadPhoto(userId, session.id, 'checkin', payload.photoBlob);
-  const { data: updated, error: updErr } = await supabase
-    .from('attendance_sessions' as never)
-    .update({ check_in_photo_url: path } as never)
-    .eq('id', session.id)
-    .select('*')
-    .single();
-  if (updErr) throw updErr;
-  const result = updated as AttendanceSession;
+  if (insertErr) {
+    // attendance_sessions_one_open_per_user: a session is already open for this user.
+    if ((insertErr as { code?: string }).code === '23505') throw new AlreadyCheckedInError();
+    throw insertErr;
+  }
+  const result = inserted as AttendanceSession;
   if (result.staff_id) {
     notifyCheckinWhatsapp(result.staff_id, result.check_in_at, result.work_date);
   }
   return result;
 }
-
 
 export async function startBreak(sessionId: string): Promise<void> {
   const { error: insErr } = await supabase
@@ -289,6 +320,20 @@ export function formatMinutes(min: number | null | undefined): string {
   return `${h}h ${m}m`;
 }
 
+/** Clock time in the app's one style, e.g. "9:05 AM". */
+export function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return format(new Date(iso), 'h:mm a');
+}
+
+/** Plain-language label for a session status. */
+export function formatSessionStatus(status: AttendanceStatus | string): string {
+  if (status === 'active') return 'On shift';
+  if (status === 'on_break') return 'On break';
+  if (status === 'completed') return 'Completed';
+  return status;
+}
+
 /**
  * Formats a session timestamp, appending the date suffix (e.g. ", 20 May") when
  * the timestamp falls on a different calendar day than the session's work_date.
@@ -297,11 +342,41 @@ export function formatMinutes(min: number | null | undefined): string {
 export function formatSessionTime(iso: string | null | undefined, workDate: string): string {
   if (!iso) return '—';
   const d = new Date(iso);
-  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  const timeStr = d.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit', hour12: true });
-  if (ymd === workDate) return timeStr;
-  const dateStr = d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-  return `${timeStr}, ${dateStr}`;
+  const timeStr = formatTime(iso);
+  if (format(d, 'yyyy-MM-dd') === workDate) return timeStr;
+  return `${timeStr}, ${format(d, 'd MMM')}`;
+}
+
+/** Plain-language guidance for a getUserMedia failure. */
+export function cameraErrorMessage(e: unknown): string {
+  const name = e && typeof e === 'object' && 'name' in e ? String((e as { name: unknown }).name) : '';
+  switch (name) {
+    case 'NotAllowedError':
+    case 'SecurityError':
+      return 'Camera permission is blocked. Tap the lock icon in the address bar → Permissions → allow Camera, then tap Retry.';
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'No camera was found on this phone. Check-in needs a front camera — try another phone, or ask your manager.';
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'The camera is busy in another app (for example a video call or WhatsApp). Close that app, then tap Retry.';
+    default:
+      return 'Could not start the camera. Close other apps that use the camera, then tap Retry.';
+  }
+}
+
+/** Plain-language guidance for a geolocation failure. */
+export function locationErrorMessage(code: number): string {
+  switch (code) {
+    case 1: // PERMISSION_DENIED
+      return 'Location permission is blocked. Tap the lock icon in the address bar → Permissions → allow Location, then tap Retry location.';
+    case 2: // POSITION_UNAVAILABLE
+      return 'Your phone could not find your location. Turn on Location (GPS) in your phone settings, then tap Retry location.';
+    case 3: // TIMEOUT
+      return 'Finding your location took too long. Move near a window or step outside, then tap Retry location.';
+    default:
+      return 'Could not get your location. Turn on Location (GPS), then tap Retry location.';
+  }
 }
 
 export function googleMapsLink(lat: number | null, lng: number | null): string | null {

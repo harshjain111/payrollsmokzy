@@ -13,6 +13,7 @@ import { AttendanceSession, formatMinutes } from '@/lib/attendance';
 import { format, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
 import { CheckCircle2, Clock, Coffee, AlertTriangle, CalendarMinus, TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LoadError } from './LoadError';
 
 interface LeaveLite {
   leave_date: string;
@@ -26,6 +27,8 @@ export function MyAttendanceSummary() {
   const [sessions, setSessions] = useState<AttendanceSession[]>([]);
   const [leaves, setLeaves] = useState<LeaveLite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const monthOptions = useMemo(
     () =>
@@ -44,6 +47,7 @@ export function MyAttendanceSummary() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setError(false);
       try {
         const fromStr = format(monthStart, 'yyyy-MM-dd');
         const toStr = format(monthEnd, 'yyyy-MM-dd');
@@ -74,6 +78,7 @@ export function MyAttendanceSummary() {
         setLeaves((lvData as LeaveLite[]) ?? []);
       } catch (e) {
         console.error('Summary load error', e);
+        if (!cancelled) setError(true);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -82,7 +87,7 @@ export function MyAttendanceSummary() {
     return () => {
       cancelled = true;
     };
-  }, [user, staffData?.id, monthStart, monthEnd]);
+  }, [user, staffData?.id, monthStart, monthEnd, reloadKey]);
 
   const stats = useMemo(() => {
     const completed = sessions.filter((s) => s.status === 'completed');
@@ -90,9 +95,9 @@ export function MyAttendanceSummary() {
     const breakMinutes = completed.reduce((sum, s) => sum + (s.total_break_minutes ?? 0), 0);
     const lateCount = completed.filter((s) => s.late_checkout).length;
     const presentDays = new Set(completed.map((s) => s.work_date)).size;
-    const leaveDays = leaves
-      .filter((l) => l.status === 'approved')
-      .reduce((sum, l) => sum + Number(l.deduction_days || 0), 0);
+    // One leave record = one day off. (deduction_days is the salary impact: 0 for paid leave,
+    // 2 for a penalty leave — not the number of days away.)
+    const leaveDays = leaves.filter((l) => l.status === 'approved').length;
     const avg = presentDays > 0 ? Math.round(totalMinutes / presentDays) : 0;
     return { presentDays, totalMinutes, breakMinutes, lateCount, leaveDays, avg };
   }, [sessions, leaves]);
@@ -130,6 +135,12 @@ export function MyAttendanceSummary() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           Loading summary…
         </div>
+      ) : error ? (
+        <Card className="rounded-2xl border-0 shadow-card">
+          <CardContent className="p-0">
+            <LoadError onRetry={() => setReloadKey((k) => k + 1)} />
+          </CardContent>
+        </Card>
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -137,7 +148,7 @@ export function MyAttendanceSummary() {
             <StatTile icon={Clock} label="Hours Worked" value={formatMinutes(stats.totalMinutes)} accent="text-primary" />
             <StatTile icon={TrendingUp} label="Avg / Day" value={formatMinutes(stats.avg)} accent="text-indigo-600" />
             <StatTile icon={Coffee} label="Break Total" value={formatMinutes(stats.breakMinutes)} accent="text-amber-600" />
-            <StatTile icon={AlertTriangle} label="Late Outs" value={String(stats.lateCount)} accent="text-orange-600" />
+            <StatTile icon={AlertTriangle} label="Missed check-outs" value={String(stats.lateCount)} accent="text-orange-600" />
             <StatTile icon={CalendarMinus} label="Leave Days" value={String(stats.leaveDays)} accent="text-rose-600" />
           </div>
 

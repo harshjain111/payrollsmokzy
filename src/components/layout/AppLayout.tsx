@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationCounts } from '@/hooks/useNotificationCounts';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -24,7 +23,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-  SidebarTrigger,
   SidebarInset,
   SidebarGroup,
   SidebarGroupLabel,
@@ -42,6 +40,8 @@ import {
   FileText,
   CreditCard,
   ClipboardList,
+  CalendarClock,
+  Menu,
   BarChart3,
   Settings,
   LogOut,
@@ -96,6 +96,7 @@ function getNavSections(
         items: [
           { title: 'Users', href: '/users', icon: Users },
           { title: 'Staff', href: '/staff', icon: Briefcase },
+          { title: 'Shifts', href: '/shifts', icon: CalendarClock },
         ],
       },
       {
@@ -103,7 +104,7 @@ function getNavSections(
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
           { 
-            title: 'Request Advance', 
+            title: 'Advance Requests', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
@@ -129,14 +130,13 @@ function getNavSections(
           { title: 'Salaries & Advances', href: '/salaries-advances', icon: Wallet },
           { title: 'Leave Records', href: '/leave-records', icon: CalendarDays },
           { title: 'Penalties', href: '/penalties', icon: ShieldAlert },
-          { title: 'Settlements', href: '/settlements', icon: Calculator },
+          { title: 'Salary Settlement', href: '/settlements', icon: Calculator },
         ],
       },
       {
         title: 'Reports',
         items: [
           { title: 'Attendance', href: '/attendance', icon: Clock },
-          { title: 'Shifts', href: '/shifts', icon: Briefcase },
           { title: 'WhatsApp Logs', href: '/whatsapp-logs', icon: MessageSquare },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
           { title: 'Audit Log', href: '/audit-log', icon: History },
@@ -163,6 +163,7 @@ function getNavSections(
         title: 'Management',
         items: [
           { title: 'Staff', href: '/staff', icon: Briefcase },
+          { title: 'Shifts', href: '/shifts', icon: CalendarClock },
         ],
       },
       {
@@ -170,7 +171,7 @@ function getNavSections(
         items: [
           { title: 'Ledger', href: '/ledger', icon: FileText },
           { 
-            title: 'Request Advance', 
+            title: 'Advance Requests', 
             href: '/requests', 
             icon: ClipboardList,
             badge: counts.pendingRequests,
@@ -197,7 +198,6 @@ function getNavSections(
         title: 'Reports',
         items: [
           { title: 'Attendance', href: '/attendance', icon: Clock },
-          { title: 'Shifts', href: '/shifts', icon: Briefcase },
           { title: 'WhatsApp Logs', href: '/whatsapp-logs', icon: MessageSquare },
           { title: 'Reports', href: '/reports', icon: BarChart3 },
         ],
@@ -236,7 +236,7 @@ function getNavSections(
           items: [
             { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
             { title: 'Staff', href: '/staff', icon: Briefcase },
-            { title: 'Request Advance', href: '/requests', icon: ClipboardList },
+            { title: 'Advance Requests', href: '/requests', icon: ClipboardList },
             { 
               title: 'Expenses', 
               href: '/expenses', 
@@ -331,13 +331,15 @@ function NotificationBadge({ count }: { count: number }) {
   );
 }
 
-function AppSidebar() {
+type NavCounts = { pendingRequests: number; pendingExpenses: number; approvedExpenses: number };
+
+function AppSidebar({ counts }: { counts: NavCounts }) {
   const { userRole, staffData, signOut, isAccountant, isHR, accountingMode, setAccountingMode, hrWorkforceMode, setHrWorkforceMode, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const { state, setOpenMobile, isMobile } = useSidebar();
-  const isCollapsed = state === 'collapsed';
-  const counts = useNotificationCounts();
+  // The mobile drawer is always full width, whatever the desktop collapse state.
+  const isCollapsed = state === 'collapsed' && !isMobile;
 
   // Auto-close sidebar on mobile when route changes
   useEffect(() => {
@@ -346,7 +348,7 @@ function AppSidebar() {
     }
   }, [location.pathname, isMobile, setOpenMobile]);
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts.counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts);
 
   const handleSignOut = async () => {
     await signOut();
@@ -367,8 +369,8 @@ function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-r-0">
-      {/* Header */}
-      <SidebarHeader className="p-3 pb-2">
+      {/* Header (top safe-area padding for the iPhone drawer; 0 elsewhere) */}
+      <SidebarHeader className="p-3 pb-2 pt-[calc(0.75rem+env(safe-area-inset-top))]">
         <div className={cn(
           "flex items-center gap-3 transition-all duration-200",
           isCollapsed && "justify-center"
@@ -473,7 +475,7 @@ function AppSidebar() {
         {navSections.map((section, sectionIdx) => (
           <SidebarGroup key={sectionIdx} className="py-1">
             {section.title && !isCollapsed && (
-              <SidebarGroupLabel className="text-[10px] font-semibold text-sidebar-muted/70 uppercase tracking-wider px-3 mb-1">
+              <SidebarGroupLabel className="text-[11px] font-semibold text-sidebar-foreground/70 uppercase tracking-wider px-3 mb-1">
                 {section.title}
               </SidebarGroupLabel>
             )}
@@ -539,7 +541,7 @@ function AppSidebar() {
       </SidebarContent>
 
       {/* Footer - User menu */}
-      <SidebarFooter className="p-2 mt-auto">
+      <SidebarFooter className="p-2 mt-auto pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className={cn(
@@ -568,15 +570,12 @@ function AppSidebar() {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" side="top" className="w-48 rounded-lg">
             <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
-            {!isHR && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
-                  <Settings className="mr-2 h-3.5 w-3.5" />
-                  Settings
-                </DropdownMenuItem>
-              </>
-            )}
+            <DropdownMenuSeparator />
+            {/* Everyone (HR included) needs Settings to change their password. */}
+            <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 h-3.5 w-3.5" />
+              Settings
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm">
               <LogOut className="mr-2 h-3.5 w-3.5" />
@@ -589,15 +588,14 @@ function AppSidebar() {
   );
 }
 
-function AppHeader() {
+function AppHeader({ counts }: { counts: NavCounts }) {
   const { user, staffData, userRole, isAccountant, isHR, accountingMode, hrWorkforceMode, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const { state, toggleSidebar } = useSidebar();
+  const { state, toggleSidebar, isMobile } = useSidebar();
   const isCollapsed = state === 'collapsed';
-  const counts = useNotificationCounts();
 
-  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts.counts);
+  const navSections = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts);
   const allItems = navSections.flatMap(s => s.items);
 
   const getInitials = (name: string) => {
@@ -616,6 +614,17 @@ function AppHeader() {
     location.pathname === item.href || 
     (item.href !== '/dashboard' && location.pathname.startsWith(item.href))
   );
+  // Pages reachable without a matching nav item (e.g. Settings from the
+  // account menu for HR) still get a sensible title.
+  const fallbackTitles: Record<string, string> = {
+    '/settings': 'Settings',
+    '/users/new': 'Create User',
+    '/requests/new': 'Request Advance',
+    '/expenses/new': 'New Expense',
+    '/my-attendance': 'My Attendance',
+    '/penalties': 'Penalties',
+  };
+  const pageTitle = currentNavItem?.title || fallbackTitles[location.pathname] || 'Dashboard';
 
   // Add context indicator for accountant
   const contextLabel = isAccountant
@@ -630,25 +639,30 @@ function AppHeader() {
   };
 
   return (
-    <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border/50 bg-card/80 backdrop-blur-xl px-4 lg:px-6">
-      <div className="flex items-center gap-3">
+    // Top padding keeps the bar clear of the iPhone status bar/notch when
+    // installed (status-bar-style black-translucent); env() is 0 elsewhere.
+    <header className="sticky top-0 z-40 flex h-[calc(3.5rem+env(safe-area-inset-top))] items-center justify-between gap-2 border-b border-border/50 bg-card/80 backdrop-blur-xl px-3 pt-[env(safe-area-inset-top)] sm:px-4 lg:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 rounded-lg"
+          className="h-10 w-10 shrink-0 rounded-lg sm:h-8 sm:w-8"
           onClick={toggleSidebar}
+          aria-label={isMobile ? 'Open menu' : 'Toggle sidebar'}
         >
-          {isCollapsed ? (
+          {isMobile ? (
+            <Menu className="h-5 w-5" />
+          ) : isCollapsed ? (
             <PanelLeft className="h-4 w-4" />
           ) : (
             <PanelLeftClose className="h-4 w-4" />
           )}
         </Button>
-        <div className="hidden sm:block min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="text-base font-semibold text-foreground flex items-center min-w-0">
-            {<span className="truncate block">{currentNavItem?.title || 'Dashboard'} </span>}
+            <span className="truncate">{pageTitle}</span>
             {contextLabel && (
-              <span className="ml-2 text-xs font-normal text-muted-foreground">
+              <span className="ml-2 shrink-0 text-xs font-normal text-muted-foreground">
                 {contextLabel}
               </span>
             )}
@@ -656,7 +670,7 @@ function AppHeader() {
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
+      <div className="flex shrink-0 items-center gap-3">
         {!isHR && <NotificationBell />}
         <div className="hidden sm:flex items-center gap-3">
           <div className="h-6 w-px bg-border" />
@@ -677,18 +691,10 @@ function AppHeader() {
             <DropdownMenuContent align="end" className="w-48 rounded-lg">
               <DropdownMenuLabel className="text-xs">My Account</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              {!isHR && (
-                <>
-                  <DropdownMenuItem className="rounded-md text-sm cursor-pointer">
-                    <User className="mr-2 h-3.5 w-3.5" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
-                    <Settings className="mr-2 h-3.5 w-3.5" />
-                    Settings
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuItem className="rounded-md text-sm cursor-pointer" onClick={() => navigate('/settings')}>
+                <Settings className="mr-2 h-3.5 w-3.5" />
+                Settings
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={handleSignOut} className="text-destructive rounded-md text-sm cursor-pointer">
                 <LogOut className="mr-2 h-3.5 w-3.5" />
@@ -703,13 +709,17 @@ function AppHeader() {
 }
 
 export function AppLayout({ children }: { children: React.ReactNode }) {
+  // Mounted once here (not per sidebar/header) so counts are fetched and
+  // subscribed to only once.
+  const { counts } = useNotificationCounts();
+
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="min-h-screen flex w-full overflow-x-hidden">
-        <AppSidebar />
+        <AppSidebar counts={counts} />
         <SidebarInset className="flex min-w-0 flex-col flex-1 overflow-x-hidden">
-          <AppHeader />
-          <main className="flex-1 min-w-0 overflow-x-hidden p-3 sm:p-6 animate-fade-in">
+          <AppHeader counts={counts} />
+          <main className="flex-1 min-w-0 overflow-x-hidden p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] animate-fade-in">
             {children}
           </main>
         </SidebarInset>
