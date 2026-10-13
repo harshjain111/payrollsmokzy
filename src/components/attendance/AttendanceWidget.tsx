@@ -50,7 +50,7 @@ function formatElapsed(fromIso: string, now: number): string {
 }
 
 export function AttendanceWidget() {
-  const { user, staffData } = useAuth();
+  const { user, staffData, isLoading: authLoading } = useAuth();
   const { session, recentCompleted, isLoading, error, refresh } = useCurrentAttendanceSession(user?.id);
   const [showCheckIn, setShowCheckIn] = useState(false);
   const [showCheckOut, setShowCheckOut] = useState(false);
@@ -82,7 +82,7 @@ export function AttendanceWidget() {
   }, [session?.id, session?.status]);
 
   const handleCheckIn = async (payload: CapturePayload) => {
-    if (!user) return;
+    if (!user) throw new Error('Please sign in again before checking in.');
     try {
       await checkIn(user.id, staffData?.id ?? null, payload);
       toast.success('Checked in', { description: 'Have a great shift!' });
@@ -95,17 +95,17 @@ export function AttendanceWidget() {
       throw e;
     } finally {
       // Always re-sync, so a failed attempt never leaves the card out of date.
-      void refresh();
+      await refresh();
     }
   };
 
   const handleCheckOut = async (payload: CapturePayload) => {
-    if (!user || !session) return;
+    if (!user || !session) throw new Error('Your attendance could not be loaded. Close this window and retry.');
     try {
       await checkOut(user.id, session, payload);
       toast.success('Checked out', { description: 'Session saved successfully.' });
     } finally {
-      void refresh();
+      await refresh();
     }
   };
 
@@ -154,7 +154,7 @@ export function AttendanceWidget() {
   const tracked = (staffData as unknown as { attendance_tracked?: boolean })?.attendance_tracked !== false;
   if (!tracked) return null;
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <Card className="rounded-2xl shadow-card border-0">
         <CardContent className="p-6 flex items-center justify-center text-muted-foreground">

@@ -14,6 +14,7 @@ vi.mock('@/integrations/supabase/client', () => {
   const query = {
     select: vi.fn(() => query),
     eq: vi.fn(() => query),
+    in: vi.fn(() => query),
     gte: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
@@ -44,6 +45,7 @@ vi.mock('@/lib/attendance-whatsapp', () => ({
 
 import {
   AlreadyCheckedInError,
+  attendanceErrorMessage,
   cameraErrorMessage,
   checkIn,
   formatSessionStatus,
@@ -58,6 +60,7 @@ const payload = { photoBlob: new Blob(['x']), lat: 1, lng: 2, accuracy: 5 };
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.calls.length = 0;
+  mocks.maybeSingle.mockResolvedValue({ data: null, error: null });
   mocks.upload.mockImplementation(async () => {
     mocks.calls.push('upload');
     return { error: null };
@@ -80,7 +83,7 @@ describe('checkIn', () => {
 
   it('does not create a session when the upload fails', async () => {
     mocks.upload.mockResolvedValue({ error: new Error('network') });
-    await expect(checkIn('user-1', null, payload)).rejects.toThrow('network');
+    await expect(checkIn('user-1', null, payload)).rejects.toThrow('Photo could not be saved');
     expect(mocks.insert).not.toHaveBeenCalled();
   });
 
@@ -90,6 +93,27 @@ describe('checkIn', () => {
       error: { code: '23505', message: 'duplicate key value violates unique constraint' },
     });
     await expect(checkIn('user-1', null, payload)).rejects.toBeInstanceOf(AlreadyCheckedInError);
+  });
+
+  it('does not upload or insert again when a shift is already open', async () => {
+    mocks.maybeSingle.mockResolvedValue({ data: { id: 'existing', status: 'active' }, error: null });
+    await expect(checkIn('user-1', null, payload)).rejects.toBeInstanceOf(AlreadyCheckedInError);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.insert).not.toHaveBeenCalled();
+  });
+
+  it('uses insert-only photo uploads and exposes plain-object save errors', async () => {
+    mocks.single.mockResolvedValue({ data: null, error: { code: '42501', message: 'Permission denied' } });
+    await expect(checkIn('user-1', null, payload)).rejects.toThrow('Check-in could not be saved. Permission denied');
+    expect(mocks.upload.mock.calls[0][2]).toMatchObject({ upsert: false });
+  });
+});
+
+describe('attendance error messages', () => {
+  it('preserves plain-object messages rather than hiding them', () => {
+    expect(attendanceErrorMessage({ message: 'Permission denied' })).toBe('Permission denied');
+    expect(attendanceErrorMessage({ message: 'JWT expired' })).toMatch(/Sign in again/);
+    expect(attendanceErrorMessage(new TypeError('Failed to fetch'))).toMatch(/connection was interrupted/);
   });
 });
 

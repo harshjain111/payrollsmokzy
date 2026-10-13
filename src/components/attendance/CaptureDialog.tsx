@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Camera, MapPin, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { CapturePayload, cameraErrorMessage, locationErrorMessage } from '@/lib/attendance';
+import { CapturePayload, attendanceErrorMessage, cameraErrorMessage, locationErrorMessage } from '@/lib/attendance';
 import { toast } from 'sonner';
 
 interface Props {
@@ -45,6 +45,8 @@ export function CaptureDialog({
   const [locating, setLocating] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
+  const submissionLock = useRef(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const stopCamera = () => {
     cameraGen.current += 1;
@@ -112,6 +114,7 @@ export function CaptureDialog({
 
   useEffect(() => {
     if (open) {
+      setSubmitError(null);
       startCamera();
       requestLocation();
     }
@@ -123,13 +126,16 @@ export function CaptureDialog({
   }, [open]);
 
   const handleSubmit = async () => {
-    if (!videoRef.current || !canvasRef.current || !coords) return;
+    if (submissionLock.current || !videoRef.current || !canvasRef.current || !coords) return;
+    submissionLock.current = true;
+    setSubmitError(null);
     setSubmitting(true);
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const w = video.videoWidth;
       const h = video.videoHeight;
+      if (!w || !h) throw new Error('The camera is not ready. Wait for the picture, then retry.');
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
@@ -153,10 +159,13 @@ export function CaptureDialog({
       onOpenChange(false);
     } catch (e) {
       console.error('Capture submit error', e);
+      const message = attendanceErrorMessage(e);
+      setSubmitError(message);
       toast.error('Failed', {
-        description: e instanceof Error ? e.message : 'Something went wrong',
+        description: message,
       });
     } finally {
+      submissionLock.current = false;
       setSubmitting(false);
     }
   };
@@ -235,6 +244,11 @@ export function CaptureDialog({
               )}
             </div>
           </div>
+          {submitError && (
+            <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+              {submitError}
+            </p>
+          )}
         </div>
 
         <DialogFooter>
