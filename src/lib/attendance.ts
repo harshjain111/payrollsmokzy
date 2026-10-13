@@ -52,6 +52,20 @@ export interface CapturePayload {
 
 const BUCKET = 'attendance-photos';
 
+/** SDK failures may be plain objects rather than JavaScript Error instances. */
+export function attendanceErrorMessage(error: unknown): string {
+  const message = error && typeof error === 'object' && 'message' in error
+    ? String(error.message)
+    : typeof error === 'string' ? error : '';
+  if (/jwt|token.*expired|not authenticated|session.*expired/i.test(message)) {
+    return 'Your sign-in has expired. Sign in again, then retry your attendance.';
+  }
+  if (/failed to fetch|network|load failed|timeout|timed out/i.test(message)) {
+    return 'The connection was interrupted. Check your internet and retry; your attendance will be checked before saving.';
+  }
+  return message || 'Could not save attendance. Please retry or contact your manager.';
+}
+
 function localDateString(d: Date = new Date()): string {
   // YYYY-MM-DD in local timezone
   const yr = d.getFullYear();
@@ -64,9 +78,10 @@ async function uploadPhoto(userId: string, sessionId: string, kind: 'checkin' | 
   const path = `${userId}/${sessionId}/${kind}-${Date.now()}.jpg`;
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     contentType: 'image/jpeg',
-    upsert: true,
+    // Every capture has a fresh path. Upserts unnecessarily require UPDATE permission.
+    upsert: false,
   });
-  if (error) throw error;
+  if (error) throw new Error(`Photo could not be saved. ${attendanceErrorMessage(error)}`);
   return path;
 }
 
@@ -144,6 +159,9 @@ export async function checkIn(
   staffId: string | null,
   payload: CapturePayload,
 ): Promise<AttendanceSession> {
+  // Re-check the server before uploading: the card may be stale on another device.
+  const existing = await getCurrentSession(userId);
+  if (existing) throw new AlreadyCheckedInError();
   // Upload the selfie first, into a folder named after a client-generated session id, then
   // create the row with the real photo path in one insert. A failed or slow upload therefore
   // never leaves an open session behind that would block the next attempt.
@@ -168,7 +186,7 @@ export async function checkIn(
   if (insertErr) {
     // attendance_sessions_one_open_per_user: a session is already open for this user.
     if ((insertErr as { code?: string }).code === '23505') throw new AlreadyCheckedInError();
-    throw insertErr;
+    throw new Error(`Check-in could not be saved. ${attendanceErrorMessage(insertErr)}`);
   }
   const result = inserted as AttendanceSession;
   if (result.staff_id) {
