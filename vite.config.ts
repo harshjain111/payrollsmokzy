@@ -51,14 +51,8 @@ export default defineConfig(() => ({
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "supabase-api",
-              expiration: {
-                maxEntries: 50,
-                maxAgeSeconds: 300,
-              },
-            },
+            // Attendance and auth must never fall back to a cached open/closed shift.
+            handler: "NetworkOnly",
           },
         ],
       },

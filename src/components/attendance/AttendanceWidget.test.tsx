@@ -38,6 +38,13 @@ beforeEach(() => {
 });
 
 describe('AttendanceWidget', () => {
+  it('keeps the active shift available when recent history fails', async () => {
+    mocks.getCurrentSession.mockResolvedValue(active);
+    mocks.getRecentCompletedSession.mockRejectedValue(new Error('history unavailable'));
+    render(<AttendanceWidget />);
+    expect(await screen.findByRole('button', { name: /Check Out/ })).toBeInTheDocument();
+    expect(screen.queryByText("Couldn't load your attendance")).not.toBeInTheDocument();
+  });
   it('shows an error with Retry instead of Check In when loading fails', async () => {
     mocks.getCurrentSession.mockRejectedValueOnce(new Error('offline'));
     render(<AttendanceWidget />);

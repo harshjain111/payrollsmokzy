@@ -127,14 +127,19 @@ export function CaptureDialog({
 
   const handleSubmit = async () => {
     if (submissionLock.current || !videoRef.current || !canvasRef.current || !coords) return;
+    if (!navigator.onLine) {
+      setSubmitError('You are offline. Reconnect to the internet, then retry attendance.');
+      return;
+    }
     submissionLock.current = true;
     setSubmitError(null);
     setSubmitting(true);
     try {
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const w = video.videoWidth;
-      const h = video.videoHeight;
+      const scale = Math.min(1, 720 / Math.max(video.videoWidth, video.videoHeight));
+      const w = Math.round(video.videoWidth * scale);
+      const h = Math.round(video.videoHeight * scale);
       if (!w || !h) throw new Error('The camera is not ready. Wait for the picture, then retry.');
       canvas.width = w;
       canvas.height = h;

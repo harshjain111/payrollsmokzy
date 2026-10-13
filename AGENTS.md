@@ -7,3 +7,5 @@
 - Salary settlement is server-side: `settle_salary` / `undo_salary_settlement` / `get_payroll_month` (owner or admin) recompute every amount atomically; the client only sends choices. Payouts stay owner-only.
 - Attendance corrections go through `save_attendance_record` / `delete_attendance_record` (owner or admin, reason required, stamped and written to audit_log, blocked for settled months); HR and CA stay read-only.
 - Attendance capture rechecks open sessions before insert-only photo uploads and displays SDK object errors; this prevents stale-card repeat submissions without weakening storage permissions.
+- Attendance retries only transient reads and fresh-path photo uploads; uncertain writes reconcile by session ID and checkout updates only open sessions, preventing duplicate punches after lost responses.
+- PWA caches app assets only; authenticated API requests are network-only so stale cached attendance cannot be mistaken for a confirmed server state.
