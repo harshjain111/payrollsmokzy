@@ -52,6 +52,30 @@ export interface CapturePayload {
 
 const BUCKET = 'attendance-photos';
 
+function isTransientAttendanceError(error: unknown): boolean {
+  const value = error && typeof error === 'object' ? error as { message?: string; status?: number; statusCode?: number } : {};
+  const status = Number(value.status ?? value.statusCode);
+  return status === 408 || status === 429 || status >= 500 || /failed to fetch|network|load failed|timeout|timed out/i.test(value.message ?? String(error));
+}
+
+/** Retry only reads and fresh-path uploads, never blindly repeat an attendance write. */
+async function retryAttendanceRead<T>(read: () => Promise<T>): Promise<T> {
+  try { return await read(); } catch (error) {
+    if (!isTransientAttendanceError(error)) throw error;
+    await new Promise(resolve => setTimeout(resolve, 500));
+    return read();
+  }
+}
+
+async function getSessionById(userId: string, sessionId: string): Promise<AttendanceSession | null> {
+  return retryAttendanceRead(async () => {
+    const { data, error } = await supabase.from('attendance_sessions' as never)
+      .select('*').eq('user_id', userId).eq('id', sessionId).maybeSingle();
+    if (error) throw error;
+    return data as AttendanceSession | null;
+  });
+}
+
 /** SDK failures may be plain objects rather than JavaScript Error instances. */
 export function attendanceErrorMessage(error: unknown): string {
   const message = error && typeof error === 'object' && 'message' in error
@@ -75,17 +99,21 @@ function localDateString(d: Date = new Date()): string {
 }
 
 async function uploadPhoto(userId: string, sessionId: string, kind: 'checkin' | 'checkout', blob: Blob): Promise<string> {
-  const path = `${userId}/${sessionId}/${kind}-${Date.now()}.jpg`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
-    contentType: 'image/jpeg',
-    // Every capture has a fresh path. Upserts unnecessarily require UPDATE permission.
-    upsert: false,
+  return retryAttendanceRead(async () => {
+    const path = `${userId}/${sessionId}/${kind}-${Date.now()}.jpg`;
+    const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
+      contentType: 'image/jpeg',
+      upsert: false,
+    });
+    if (error) throw error;
+    return path;
+  }).catch(error => {
+    throw new Error(`Photo could not be saved. ${attendanceErrorMessage(error)}`);
   });
-  if (error) throw new Error(`Photo could not be saved. ${attendanceErrorMessage(error)}`);
-  return path;
 }
 
 export async function getCurrentSession(userId: string): Promise<AttendanceSession | null> {
+  return retryAttendanceRead(async () => {
   const { data, error } = await supabase
     .from('attendance_sessions' as never)
     .select('*')
@@ -96,6 +124,7 @@ export async function getCurrentSession(userId: string): Promise<AttendanceSessi
     .maybeSingle();
   if (error) throw error;
   return (data as AttendanceSession | null) ?? null;
+  });
 }
 
 /**
@@ -166,15 +195,19 @@ export async function checkIn(
   // create the row with the real photo path in one insert. A failed or slow upload therefore
   // never leaves an open session behind that would block the next attempt.
   const sessionId = newSessionId();
+  const capturedAt = new Date();
   const path = await uploadPhoto(userId, sessionId, 'checkin', payload.photoBlob);
-  const { data: inserted, error: insertErr } = await supabase
+  let inserted: unknown;
+  let insertErr: unknown;
+  try {
+  const response = await supabase
     .from('attendance_sessions' as never)
     .insert({
       id: sessionId,
       user_id: userId,
       staff_id: staffId,
-      work_date: localDateString(),
-      check_in_at: new Date().toISOString(),
+      work_date: localDateString(capturedAt),
+      check_in_at: capturedAt.toISOString(),
       check_in_photo_url: path,
       check_in_lat: payload.lat,
       check_in_lng: payload.lng,
@@ -183,10 +216,18 @@ export async function checkIn(
     } as never)
     .select('*')
     .single();
+    inserted = response.data;
+    insertErr = response.error;
+  } catch (error) { insertErr = error; }
   if (insertErr) {
+    // A lost response does not mean a failed save. Read the exact attempted ID first.
+    const saved = await getSessionById(userId, sessionId).catch(() => null);
+    if (saved) inserted = saved;
+    else {
     // attendance_sessions_one_open_per_user: a session is already open for this user.
     if ((insertErr as { code?: string }).code === '23505') throw new AlreadyCheckedInError();
     throw new Error(`Check-in could not be saved. ${attendanceErrorMessage(insertErr)}`);
+    }
   }
   const result = inserted as AttendanceSession;
   if (result.staff_id) {
@@ -252,22 +293,29 @@ export async function checkOut(
   session: AttendanceSession,
   payload: CapturePayload,
 ): Promise<AttendanceSession> {
+  const current = await getSessionById(userId, session.id);
+  if (!current) throw new Error('Your shift could not be found. Refresh attendance and try again.');
+  if (current.status === 'completed' && current.check_out_at) return current;
+  session = current;
+  // Upload before changing breaks, so a failed photo leaves the shift untouched.
+  const checkOutAt = new Date();
+  const path = await uploadPhoto(userId, session.id, 'checkout', payload.photoBlob);
   // If a break is open, close it first
   if (session.status === 'on_break') {
     await endBreak(session.id);
   }
 
   // Recompute totals
-  const { data: allBreaks } = await supabase
+  const { data: allBreaks, error: breaksError } = await supabase
     .from('attendance_breaks' as never)
     .select('duration_minutes')
     .eq('session_id', session.id);
+  if (breaksError) throw breaksError;
   const totalBreak = (allBreaks ?? []).reduce(
     (sum: number, b: { duration_minutes: number | null }) => sum + (b.duration_minutes ?? 0),
     0,
   );
 
-  const checkOutAt = new Date();
   const checkInAt = new Date(session.check_in_at);
   const totalMinutes = Math.max(
     0,
@@ -284,9 +332,10 @@ export async function checkOut(
   );
   const lateCheckout = dayDiff > 1;
 
-  const path = await uploadPhoto(userId, session.id, 'checkout', payload.photoBlob);
-
-  const { data: updated, error } = await supabase
+  let updated: unknown;
+  let saveError: unknown;
+  try {
+  const response = await supabase
     .from('attendance_sessions' as never)
     .update({
       status: 'completed',
@@ -300,13 +349,22 @@ export async function checkOut(
       late_checkout: lateCheckout,
     } as never)
     .eq('id', session.id)
+    .eq('user_id', userId)
+    .in('status', ['active', 'on_break'])
     .select('*')
-    .single();
-  if (error) throw error;
+    .maybeSingle();
+    updated = response.data;
+    saveError = response.error;
+  } catch (error) { saveError = error; }
+  if (saveError || !updated) {
+    const saved = await getSessionById(userId, session.id).catch(() => null);
+    if (saved?.status === 'completed' && saved.check_out_at) return saved;
+    throw new Error(`Check-out could not be confirmed. ${attendanceErrorMessage(saveError)}`);
+  }
 
   // Compute discipline fine (best-effort; non-blocking on failure)
   if (session.staff_id) {
-    await recomputeDisciplineForSession({
+    void recomputeDisciplineForSession({
       staffId: session.staff_id,
       userId,
       sessionId: session.id,

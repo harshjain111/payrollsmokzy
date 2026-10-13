@@ -3,6 +3,7 @@ import {
   AttendanceSession,
   getCurrentSession,
   getRecentCompletedSession,
+  attendanceErrorMessage,
 } from '@/lib/attendance';
 
 /** Minimum gap between quiet refreshes triggered by the app coming back to the foreground. */
@@ -21,6 +22,10 @@ export function useCurrentAttendanceSession(userId: string | undefined) {
 
   useEffect(() => {
     loadedOnce.current = false;
+    requestSeq.current += 1;
+    setSession(null);
+    setRecentCompleted(null);
+    setError(null);
   }, [userId]);
 
   const refresh = useCallback(async () => {
@@ -32,10 +37,9 @@ export function useCurrentAttendanceSession(userId: string | undefined) {
     lastLoadAt.current = Date.now();
     if (!loadedOnce.current) setIsLoading(true);
     try {
-      const [open, done] = await Promise.all([
-        getCurrentSession(userId),
-        getRecentCompletedSession(userId),
-      ]);
+      const open = await getCurrentSession(userId);
+      // Recent history is optional; its failure must not hide a valid active shift.
+      const done = await getRecentCompletedSession(userId).catch(() => null);
       if (req !== requestSeq.current) return; // a newer refresh superseded this one
       setSession(open);
       setRecentCompleted(done);
@@ -44,7 +48,7 @@ export function useCurrentAttendanceSession(userId: string | undefined) {
     } catch (e) {
       if (req !== requestSeq.current) return;
       console.error('Attendance session load error', e);
-      setError(e instanceof Error ? e.message : 'Failed to load');
+      setError(attendanceErrorMessage(e));
     } finally {
       if (req === requestSeq.current) setIsLoading(false);
     }
@@ -64,9 +68,11 @@ export function useCurrentAttendanceSession(userId: string | undefined) {
     };
     document.addEventListener('visibilitychange', onWake);
     window.addEventListener('focus', onWake);
+    window.addEventListener('online', refresh);
     return () => {
       document.removeEventListener('visibilitychange', onWake);
       window.removeEventListener('focus', onWake);
+      window.removeEventListener('online', refresh);
     };
   }, [refresh]);
 
