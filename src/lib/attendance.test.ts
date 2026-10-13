@@ -5,9 +5,10 @@ const mocks = vi.hoisted(() => {
   const upload = vi.fn();
   const single = vi.fn();
   const insert = vi.fn();
+  const update = vi.fn();
   const maybeSingle = vi.fn();
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-  return { calls, upload, single, insert, maybeSingle, chain };
+  return { calls, upload, single, insert, update, maybeSingle, chain };
 });
 
 vi.mock('@/integrations/supabase/client', () => {
@@ -18,6 +19,7 @@ vi.mock('@/integrations/supabase/client', () => {
     gte: vi.fn(() => query),
     order: vi.fn(() => query),
     limit: vi.fn(() => query),
+    update: mocks.update,
     maybeSingle: mocks.maybeSingle,
   };
   mocks.chain.eq = query.eq;
@@ -27,6 +29,10 @@ vi.mock('@/integrations/supabase/client', () => {
     supabase: {
       storage: { from: () => ({ upload: mocks.upload }) },
       from: () => ({
+        update: (row: unknown) => {
+          mocks.update(row);
+          return query;
+        },
         insert: (row: unknown) => {
           mocks.calls.push('insert');
           mocks.insert(row);
@@ -48,6 +54,8 @@ import {
   attendanceErrorMessage,
   cameraErrorMessage,
   checkIn,
+  checkOut,
+  type AttendanceSession,
   formatSessionStatus,
   formatSessionTime,
   formatTime,
@@ -106,6 +114,44 @@ describe('checkIn', () => {
     mocks.single.mockResolvedValue({ data: null, error: { code: '42501', message: 'Permission denied' } });
     await expect(checkIn('user-1', null, payload)).rejects.toThrow('Check-in could not be saved. Permission denied');
     expect(mocks.upload.mock.calls[0][2]).toMatchObject({ upsert: false });
+  });
+
+  it('recovers a committed check-in when its response is lost, without a second insert', async () => {
+    const saved = { id: 'saved', staff_id: null, status: 'active' };
+    mocks.maybeSingle.mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: saved, error: null });
+    mocks.single.mockRejectedValue(new TypeError('Failed to fetch'));
+    expect(await checkIn('user-1', null, payload)).toEqual(saved);
+    expect(mocks.insert).toHaveBeenCalledTimes(1);
+  });
+
+  it('retries transient photo failure before saving, with a fresh path', async () => {
+    mocks.upload.mockResolvedValueOnce({ error: { message: 'Failed to fetch' } })
+      .mockResolvedValueOnce({ error: null });
+    mocks.single.mockResolvedValue({ data: { id: 'saved', staff_id: null }, error: null });
+    await checkIn('user-1', null, payload);
+    expect(mocks.upload).toHaveBeenCalledTimes(2);
+    expect(mocks.upload.mock.calls[0][0]).not.toBe(mocks.upload.mock.calls[1][0]);
+    expect(mocks.insert).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('checkOut', () => {
+  it('treats an already completed checkout as success without changing its time or photo', async () => {
+    const completed = { id: 'session-1', status: 'completed', check_out_at: '2026-10-13T10:00:00Z' } as AttendanceSession;
+    mocks.maybeSingle.mockResolvedValue({ data: completed, error: null });
+    expect(await checkOut('user-1', completed, payload)).toEqual(completed);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it('does not change an open break when the checkout photo fails', async () => {
+    const onBreak = { id: 'session-1', status: 'on_break' } as AttendanceSession;
+    mocks.maybeSingle.mockResolvedValue({ data: onBreak, error: null });
+    mocks.upload.mockResolvedValue({ error: { message: 'Permission denied' } });
+    await expect(checkOut('user-1', onBreak, payload)).rejects.toThrow('Photo could not be saved');
+    expect(mocks.insert).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
   });
 });
 
