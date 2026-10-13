@@ -11,5 +11,5 @@
 - [ ] Verify key phone screens and complete no-overflow checks
 - [x] Add times and per-person summaries to every HR attendance tile popup
 - [x] Correct hidden attendance errors and guard repeat check-ins; verify as Harry without creating false shifts
-- [ ] Harden attendance recovery for interrupted uploads and uncertain saves, including checkout retries
-- [ ] Verify attendance regression tests and signed-in recovery without altering real staff shifts
+- [x] Harden attendance recovery for interrupted uploads and uncertain saves, including checkout retries
+- [x] Verify attendance regression tests and signed-in recovery without altering real staff shifts
