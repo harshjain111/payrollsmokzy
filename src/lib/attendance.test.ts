@@ -21,6 +21,7 @@ vi.mock('@/integrations/supabase/client', () => {
     limit: vi.fn(() => query),
     update: mocks.update,
     maybeSingle: mocks.maybeSingle,
+    then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve),
   };
   mocks.chain.eq = query.eq;
   mocks.chain.gte = query.gte;
@@ -137,6 +138,16 @@ describe('checkIn', () => {
 });
 
 describe('checkOut', () => {
+  it('reconciles a lost checkout response without writing the checkout again', async () => {
+    const open = { id: 'session-1', user_id: 'user-1', staff_id: null, status: 'active', work_date: '2026-10-13', check_in_at: '2026-10-13T08:00:00Z' } as AttendanceSession;
+    const completed = { ...open, status: 'completed', check_out_at: '2026-10-13T10:00:00Z' };
+    mocks.maybeSingle.mockResolvedValueOnce({ data: open, error: null })
+      .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      .mockResolvedValueOnce({ data: completed, error: null });
+    expect(await checkOut('user-1', open, payload)).toEqual(completed);
+    expect(mocks.update).toHaveBeenCalledTimes(1);
+    expect(mocks.chain.eq).toHaveBeenCalledWith('user_id', 'user-1');
+  });
   it('treats an already completed checkout as success without changing its time or photo', async () => {
     const completed = { id: 'session-1', status: 'completed', check_out_at: '2026-10-13T10:00:00Z' } as AttendanceSession;
     mocks.maybeSingle.mockResolvedValue({ data: completed, error: null });
