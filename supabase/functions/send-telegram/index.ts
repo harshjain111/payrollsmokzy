@@ -34,8 +34,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    const OWNER_CHAT_ID = Deno.env.get('TELEGRAM_OWNER_CHAT_ID');
-    if (!OWNER_CHAT_ID) {
+    const chatIds = parseChatIds(Deno.env.get('TELEGRAM_OWNER_CHAT_ID'));
+    if (chatIds.length === 0) {
       throw new Error('TELEGRAM_OWNER_CHAT_ID is not configured');
     }
 
@@ -50,25 +50,13 @@ Deno.serve(async (req) => {
 
     const text = `🔔 <b>${escapeHtml(title)}</b>\n\n${escapeHtml(message)}`;
 
-    const response = await fetch(`${botApi}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: OWNER_CHAT_ID,
-        text,
-        parse_mode: 'HTML',
-      }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error('Telegram API error:', JSON.stringify(data));
-      throw new Error(`Telegram API call failed [${response.status}]: ${JSON.stringify(data)}`);
+    const results = await sendToChats(botApi, chatIds, text);
+    if (!results.some((r) => r.ok)) {
+      throw new Error(`Telegram API call failed for every chat: ${JSON.stringify(results)}`);
     }
 
     return new Response(
-      JSON.stringify({ success: true, message_id: data.result?.message_id }),
+      JSON.stringify({ success: true, results }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: unknown) {
@@ -86,4 +74,31 @@ function escapeHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+}
+
+/**
+ * TELEGRAM_OWNER_CHAT_ID may hold one chat id or several separated by commas
+ * (people who have pressed Start on the bot, and/or group ids like -1001234567890).
+ */
+function parseChatIds(raw: string | undefined): string[] {
+  return (raw ?? '').split(/[\s,]+/).map((id) => id.trim()).filter(Boolean);
+}
+
+/** Send one message to every chat; a failure for one chat doesn't stop the others. */
+async function sendToChats(botApi: string, chatIds: string[], text: string) {
+  return Promise.all(chatIds.map(async (chatId) => {
+    try {
+      const response = await fetch(`${botApi}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+      });
+      const data = await response.json();
+      if (!response.ok) console.error(`Telegram send to ${chatId} failed:`, JSON.stringify(data));
+      return { chat_id: chatId, ok: response.ok, message_id: data.result?.message_id, error: response.ok ? undefined : data.description };
+    } catch (error) {
+      console.error(`Telegram send to ${chatId} failed:`, error);
+      return { chat_id: chatId, ok: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }));
 }
