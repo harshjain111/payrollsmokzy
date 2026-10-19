@@ -14,7 +14,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 
-import { StatCard } from '@/components/ui/stat-card';
+import { TodayAttendanceBoard } from '@/components/attendance/TodayAttendanceBoard';
 import {
   Select,
   SelectContent,
@@ -390,36 +390,8 @@ export default function Attendance() {
           description="Analytical attendance report with daily detail and date-matrix views."
         />
 
-        <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 min-w-0">
-          <StatCard
-            title="Checked In Today"
-            value={stats.checkedIn}
-            subtitle="Currently on shift"
-            icon={CalendarClock}
-            color="green"
-          />
-          <StatCard
-            title="On Break"
-            value={stats.onBreak}
-            subtitle="Right now"
-            icon={Coffee}
-            color="orange"
-          />
-          <StatCard
-            title="Completed Today"
-            value={stats.completed}
-            subtitle="Shifts finished"
-            icon={CheckCircle2}
-            color="blue"
-          />
-          <StatCard
-            title="Absent Today"
-            value={stats.absentToday}
-            subtitle="No check-in"
-            icon={Users}
-            color="pink"
-          />
-        </div>
+        {/* Who is in, late or not in yet today — live */}
+        <TodayAttendanceBoard />
 
         <Card className="max-w-full min-w-0 overflow-hidden rounded-2xl border-0 shadow-card">
           <CardContent className="min-w-0 p-4 md:p-6 space-y-4">

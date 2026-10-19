@@ -90,7 +90,7 @@ export function attendanceErrorMessage(error: unknown): string {
   return message || 'Could not save attendance. Please retry or contact your manager.';
 }
 
-function localDateString(d: Date = new Date()): string {
+export function localDateString(d: Date = new Date()): string {
   // YYYY-MM-DD in local timezone
   const yr = d.getFullYear();
   const mo = String(d.getMonth() + 1).padStart(2, '0');
