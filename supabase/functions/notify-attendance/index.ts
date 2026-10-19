@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
   const publicKey = Deno.env.get('VAPID_PUBLIC_KEY');
   const privateKey = Deno.env.get('VAPID_PRIVATE_KEY');
   if (!publicKey || !privateKey) return respond({ skipped: 'VAPID keys not configured' });
-  webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') ?? 'mailto:admin@smokzy.app', publicKey, privateKey);
+  webpush.setVapidDetails(Deno.env.get('VAPID_SUBJECT') ?? 'https://snug-salary-safe.vercel.app', publicKey, privateKey);
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const body = await req.json().catch(() => ({}));
