@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
+import { TodayAttendanceBoard } from '@/components/attendance/TodayAttendanceBoard';
 import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
 import { ActionTile } from './ActionTile';
@@ -83,6 +84,9 @@ export function OwnerDashboard() {
           </Button>
         </Link>
       </PageHeader>
+
+      {/* Who is in, late or not in yet — live */}
+      <TodayAttendanceBoard />
 
       {/* Summary Stats */}
       <div className="grid gap-3 sm:gap-4 lg:gap-5 grid-cols-2 xl:grid-cols-4">
