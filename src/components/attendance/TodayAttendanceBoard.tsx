@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils';
 import type { AttendanceSession } from '@/lib/attendance';
 import { formatMinutes, formatTime, localDateString } from '@/lib/attendance';
 import type { Shift, ShiftAssignment } from '@/lib/discipline';
+import { AttendanceAlertsButton } from './AttendanceAlertsButton';
 
 interface StaffRow {
   id: string;
@@ -190,9 +191,12 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
               {lateArrivals > 0 && ` · ${lateArrivals} came in late`}
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => load()} disabled={loading} aria-label="Refresh attendance">
-            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-          </Button>
+          <div className="flex shrink-0 items-center gap-2">
+            <AttendanceAlertsButton />
+            <Button variant="outline" size="sm" onClick={() => load()} disabled={loading} aria-label="Refresh attendance">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+            </Button>
+          </div>
         </div>
 
         {/* Tap a chip to show only that group; tap again to show everyone. */}
