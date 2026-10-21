@@ -28,7 +28,7 @@ async function registration(): Promise<ServiceWorkerRegistration | null> {
   // The service worker only exists in the built app; give it a moment to register.
   return Promise.race([
     navigator.serviceWorker.ready,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 4000)),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500)),
   ]);
 }
 
