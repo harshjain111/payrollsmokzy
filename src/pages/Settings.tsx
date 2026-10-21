@@ -49,6 +49,7 @@ import { ManageCategoriesCard } from '@/components/settings/ManageCategoriesCard
 import { ManageClubsCard } from '@/components/settings/ManageClubsCard';
 import { DisciplineRulesCard } from '@/components/settings/DisciplineRulesCard';
 import { AttendanceCoverageCard } from '@/components/settings/AttendanceCoverageCard';
+import { AttendanceAlertsCard } from '@/components/attendance/AttendanceAlertsButton';
 import { useInstallApp } from '@/hooks/use-install-app';
 
 export default function Settings() {
@@ -237,6 +238,9 @@ export default function Settings() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Owner: instant check-in / check-out alerts on this phone */}
+        <AttendanceAlertsCard />
 
         {/* Install App */}
         <Card>

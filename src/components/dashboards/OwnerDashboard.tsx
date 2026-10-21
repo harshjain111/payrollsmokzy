@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { TodayAttendanceBoard } from '@/components/attendance/TodayAttendanceBoard';
+import { AttendanceAlertsCard } from '@/components/attendance/AttendanceAlertsButton';
 import { StatCard } from '@/components/ui/stat-card';
 import { Button } from '@/components/ui/button';
 import { ActionTile } from './ActionTile';
@@ -84,6 +85,9 @@ export function OwnerDashboard() {
           </Button>
         </Link>
       </PageHeader>
+
+      {/* Prompt to turn on instant check-in alerts (hides once on) */}
+      <AttendanceAlertsCard hideWhenOn />
 
       {/* Who is in, late or not in yet — live */}
       <TodayAttendanceBoard />
