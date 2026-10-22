@@ -34,6 +34,8 @@ export interface DisciplineLogRow {
   fine_reason: string | null;
   is_absent: boolean;
   absent_reason: string | null;
+  /** Days of salary an absence cuts (absences only). */
+  deduction_days?: number | null;
   computed_at: string;
   is_cancelled?: boolean;
   cancelled_by?: string | null;
@@ -155,6 +157,28 @@ function applyLadder(
     return { amount: Number(last.amount) || 0, tier: `slab_${last.from_min}_${last.to_min}` };
   }
   return { amount: 0, tier: 'within_grace' };
+}
+
+/** Late check-in fine for a check-in time against the shift start (after the grace minutes). */
+export function lateFine(
+  checkInIso: string,
+  scheduledIn: string,
+  workDate: string,
+  rules: DisciplineRules,
+  dailySalary: number,
+): { minutes: number; amount: number } {
+  const minutes = Math.max(
+    0,
+    diffMinutesActualVsScheduled(checkInIso, scheduledIn, workDate) - rules.grace_minutes_in,
+  );
+  const { amount } = applyLadder(
+    minutes,
+    rules.late_in_slabs,
+    rules.late_in_half_day_after_min,
+    rules.late_in_full_day_after_min,
+    dailySalary,
+  );
+  return { minutes, amount };
 }
 
 export interface ComputeInput {
@@ -377,4 +401,12 @@ export function formatScheduleRange(inT: string | null, outT: string | null): st
     return `${h12}:${String(m).padStart(2, '0')} ${ap}`;
   };
   return `${fmt(inT)} → ${fmt(outT)}`;
+}
+
+/** Readable reason for a penalty row; absences include how many days of salary they cut. */
+export function penaltyReason(r: Pick<DisciplineLogRow, 'is_absent' | 'absent_reason' | 'fine_reason' | 'deduction_days'>): string {
+  if (!r.is_absent) return r.fine_reason || '—';
+  const base = r.fine_reason || (r.absent_reason === 'no_checkout' ? 'Absent — no check-out' : 'Absent — no check-in');
+  const days = Number(r.deduction_days);
+  return days > 0 && !base.includes('salary cut') ? `${base} (${days} day${days === 1 ? '' : 's'} salary cut)` : base;
 }

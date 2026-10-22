@@ -7,6 +7,8 @@ import { useStaffBalance } from '@/hooks/useStaffBalance';
 import { LanguageToggle } from '@/components/staff/LanguageToggle';
 import { QuickAdvanceForm } from '@/components/staff/QuickAdvanceForm';
 import { AttendanceWidget } from '@/components/attendance/AttendanceWidget';
+import { LateReminderCard } from '@/components/attendance/AttendanceAlertsButton';
+import { MyDeductionsCard } from '@/components/staff/MyDeductionsCard';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -210,6 +212,11 @@ export function StaffDashboard() {
       <div className="space-y-4 pb-8">
         {/* Attendance widget */}
         <AttendanceWidget />
+
+        {/* What has been cut from this month's salary so far */}
+        <MyDeductionsCard />
+
+        <LateReminderCard />
 
         {/* Summary Cards */}
         <div className="grid grid-cols-2 gap-3">

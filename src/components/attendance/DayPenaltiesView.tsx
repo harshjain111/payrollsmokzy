@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { addDays, format, parseISO } from 'date-fns';
-import { Ban, CalendarDays, ChevronLeft, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
+import { CalendarDays, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Amount } from '@/components/ui/amount';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { supabase } from '@/integrations/supabase/client';
-import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
-import { PenaltyAction, PenaltyActionDialog, PenaltyTarget } from './PenaltyActionDialog';
+import { DisciplineLogRow, formatScheduleRange, penaltyReason } from '@/lib/discipline';
+import { PenaltyAction, PenaltyActionDialog, PenaltyRowActions, PenaltyTarget } from './PenaltyActionDialog';
 import { LoadError } from './LoadError';
 
 interface Props {
@@ -215,7 +215,7 @@ export function DayPenaltiesView({ canManage }: Props) {
                       : 'break-words text-xs'
                   }
                 >
-                  {r.is_absent ? r.absent_reason || 'Marked absent' : r.fine_reason || '—'}
+                  {penaltyReason(r)}
                 </p>
                 {r.is_cancelled && (
                   <p className="break-words text-[11px] text-emerald-700">
@@ -223,33 +223,14 @@ export function DayPenaltiesView({ canManage }: Props) {
                     {r.cancellation_reason ? ` — ${r.cancellation_reason}` : ''}
                   </p>
                 )}
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex gap-1.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex shrink-0 gap-1.5">
                     <Badge variant={r.is_cancelled ? 'secondary' : 'destructive'}>
                       {r.is_cancelled ? 'Waived' : 'Active'}
                     </Badge>
                     {r.is_absent && <Badge variant="outline">Absent</Badge>}
                   </div>
-                  {canManage &&
-                    (r.is_cancelled ? (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1"
-                        onClick={() => open(r, 'restore')}
-                      >
-                        <RotateCcw className="h-3.5 w-3.5" /> Restore
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="gap-1 border-destructive/30 text-destructive hover:bg-destructive/10"
-                        onClick={() => open(r, 'cancel')}
-                      >
-                        <Ban className="h-3.5 w-3.5" /> Waive penalty
-                      </Button>
-                    ))}
+                  {canManage && <PenaltyRowActions row={r} onOpen={open} />}
                 </div>
               </CardContent>
             </Card>

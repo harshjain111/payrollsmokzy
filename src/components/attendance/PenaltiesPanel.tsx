@@ -14,8 +14,8 @@ import {
 } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { DisciplineLogRow, formatScheduleRange } from '@/lib/discipline';
-import { PenaltyActionDialog, PenaltyAction } from './PenaltyActionDialog';
+import { DisciplineLogRow, formatScheduleRange, penaltyReason } from '@/lib/discipline';
+import { PenaltyActionDialog, PenaltyAction, PenaltyRowActions } from './PenaltyActionDialog';
 import { LoadError } from './LoadError';
 import {
   AlertDialog,
@@ -28,7 +28,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { format } from 'date-fns';
-import { Ban, Loader2, RotateCcw, ShieldAlert, AlertTriangle, UserX, PlayCircle } from 'lucide-react';
+import { Loader2, ShieldAlert, AlertTriangle, UserX, PlayCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
@@ -171,13 +171,9 @@ export function PenaltiesPanel() {
     return rows.filter((r) => (r.staff_name ?? '').toLowerCase().includes(q));
   }, [rows, search]);
 
-  const openCancel = (r: Row) => {
+  const openAction = (r: Row, action: PenaltyAction) => {
     setTarget(r);
-    setMode('cancel');
-  };
-  const openRestore = (r: Row) => {
-    setTarget(r);
-    setMode('restore');
+    setMode(action);
   };
 
   if (!canManage) return null;
@@ -299,11 +295,11 @@ export function PenaltiesPanel() {
                   <div className="min-w-0"><p className="truncate font-medium">{row.staff_name}</p><p className="text-xs text-muted-foreground">{format(new Date(row.work_date), 'dd MMM yyyy')} · {formatScheduleRange(row.scheduled_check_in, row.scheduled_check_out)}</p></div>
                   <span className={row.is_cancelled ? 'shrink-0 text-sm text-muted-foreground line-through' : 'shrink-0 text-sm font-semibold text-destructive'}>₹{Number(row.fine_amount).toFixed(0)}</span>
                 </div>
-                <p className={row.is_cancelled ? 'break-words text-xs text-muted-foreground line-through' : 'break-words text-xs'}>{row.fine_reason || (row.is_absent ? row.absent_reason || 'Absent' : '—')}</p>
+                <p className={row.is_cancelled ? 'break-words text-xs text-muted-foreground line-through' : 'break-words text-xs'}>{penaltyReason(row)}</p>
                 {row.is_cancelled && <p className="break-words text-[10px] text-success">Waived by {row.cancelled_by_name || 'system'} — {row.cancellation_reason}</p>}
-                <div className="flex items-center justify-between gap-3">
-                  <Badge variant={row.is_cancelled ? 'secondary' : 'destructive'}>{row.is_cancelled ? 'Waived' : 'Active'}</Badge>
-                  <Button size="sm" variant="outline" onClick={() => row.is_cancelled ? openRestore(row) : openCancel(row)} className={!row.is_cancelled ? 'gap-1 border-destructive/30 text-destructive hover:bg-destructive/10' : 'gap-1'}>{row.is_cancelled ? <RotateCcw className="h-3.5 w-3.5" /> : <Ban className="h-3.5 w-3.5" />}{row.is_cancelled ? 'Restore' : 'Waive'}</Button>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge className="shrink-0" variant={row.is_cancelled ? 'secondary' : 'destructive'}>{row.is_cancelled ? 'Waived' : 'Active'}</Badge>
+                  <PenaltyRowActions row={row} onOpen={openAction} compact />
                 </div>
               </div>
             ))}
@@ -331,7 +327,7 @@ export function PenaltiesPanel() {
                     </TableCell>
                     <TableCell className="text-xs max-w-[280px]">
                       <span className={r.is_cancelled ? 'line-through opacity-60' : ''}>
-                        {r.fine_reason || (r.is_absent ? r.absent_reason || 'Absent' : '—')}
+                        {penaltyReason(r)}
                       </span>
                       {r.is_cancelled && (
                         <p className="text-[10px] text-emerald-600 mt-0.5">
@@ -361,25 +357,7 @@ export function PenaltiesPanel() {
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      {r.is_cancelled ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openRestore(r)}
-                          className="gap-1"
-                        >
-                          <RotateCcw className="h-3.5 w-3.5" /> Restore
-                        </Button>
-                      ) : (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openCancel(r)}
-                          className="gap-1 text-destructive border-destructive/30 hover:bg-destructive/10"
-                        >
-                          <Ban className="h-3.5 w-3.5" /> Waive
-                        </Button>
-                      )}
+                      <PenaltyRowActions row={r} onOpen={openAction} compact />
                     </TableCell>
                   </TableRow>
                 ))}

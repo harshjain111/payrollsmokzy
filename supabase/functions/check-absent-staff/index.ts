@@ -19,9 +19,17 @@ function istToday(): string {
   return fmt.format(new Date());
 }
 
+/** Days of salary a rule cuts: 'full_day' = 1, 'half_day' = 0.5, '2_days' = 2; null for a ₹ amount. */
+function deductionDays(rule: string): number | null {
+  if (rule === 'full_day') return 1;
+  if (rule === 'half_day') return 0.5;
+  const m = /^(\d+(?:\.\d+)?)_days?$/.exec(rule);
+  return m ? Number(m[1]) : null;
+}
+
 function resolveDeduction(rule: string, dailySalary: number): number {
-  if (rule === 'full_day') return dailySalary;
-  if (rule === 'half_day') return dailySalary / 2;
+  const days = deductionDays(rule);
+  if (days !== null) return dailySalary * days;
   const n = Number(rule);
   return isFinite(n) ? n : 0;
 }
@@ -188,6 +196,7 @@ Deno.serve(async (req) => {
             fine_reason: 'Absent — no check-in',
             is_absent: true,
             absent_reason: 'no_checkin',
+            deduction_days: deductionDays(rules.absent_no_checkin_deduction),
             computed_at: new Date().toISOString(),
           })
           .eq('id', existingId);
@@ -199,6 +208,7 @@ Deno.serve(async (req) => {
           fine_reason: 'Absent — no check-in',
           is_absent: true,
           absent_reason: 'no_checkin',
+          deduction_days: deductionDays(rules.absent_no_checkin_deduction),
         });
       }
       total_absent++;
