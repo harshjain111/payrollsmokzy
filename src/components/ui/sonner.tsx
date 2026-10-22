@@ -10,6 +10,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
     <Sonner
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
+      // On phones, keep toasts above the bottom tab bar (and the iPhone home indicator).
+      mobileOffset={{ bottom: "calc(5rem + env(safe-area-inset-bottom))", left: 16, right: 16 }}
       toastOptions={{
         classNames: {
           toast:

@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { MobileTabBar } from '@/components/layout/MobileTabBar';
+import { buildMobileTabs, getMobileTabHrefs } from '@/components/layout/mobile-tabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -708,6 +710,19 @@ function AppHeader({ counts }: { counts: NavCounts }) {
   );
 }
 
+function AppMobileTabBar({ counts }: { counts: NavCounts }) {
+  const { userRole, isAccountant, accountingMode, hrWorkforceMode } = useAuth();
+  // Tabs are picked from the same items the sidebar shows, so they inherit its
+  // role rules (and HR's allow-list) and its badge counts.
+  const navItems = getNavSections(userRole, accountingMode, isAccountant, hrWorkforceMode, counts)
+    .flatMap((section) => section.items);
+  const { tabs, moreBadge } = buildMobileTabs(
+    navItems,
+    getMobileTabHrefs(userRole, isAccountant, accountingMode, hrWorkforceMode),
+  );
+  return <MobileTabBar tabs={tabs} moreBadge={moreBadge} />;
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   // Mounted once here (not per sidebar/header) so counts are fetched and
   // subscribed to only once.
@@ -719,10 +734,13 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <AppSidebar counts={counts} />
         <SidebarInset className="flex min-w-0 flex-col flex-1 overflow-x-hidden">
           <AppHeader counts={counts} />
-          <main className="flex-1 min-w-0 overflow-x-hidden p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))] animate-fade-in">
+          {/* Below md the fixed bottom tab bar (3.5rem + safe area) covers the
+              page end, so main reserves that much extra bottom padding. */}
+          <main className="flex-1 min-w-0 overflow-x-hidden p-3 pb-[calc(4.25rem+env(safe-area-inset-bottom))] sm:p-6 sm:pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-[calc(1.5rem+env(safe-area-inset-bottom))] animate-fade-in">
             {children}
           </main>
         </SidebarInset>
+        <AppMobileTabBar counts={counts} />
       </div>
     </SidebarProvider>
   );

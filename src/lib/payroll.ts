@@ -215,3 +215,25 @@ export async function undoSettlement(settlementId: string, reason: string) {
   );
   if (error) throw error;
 }
+
+/**
+ * Pay a settled salary in one step on the server (owner or admin): records the payout in the
+ * books, marks the salary paid and notifies the staff member. Refuses to pay twice.
+ */
+export async function paySalary(
+  settlementId: string,
+  paymentMode: PayoutMode,
+  paidBy?: { userId: string; userName: string } | null,
+) {
+  const { data, error } = await supabase.rpc(
+    'pay_salary' as never,
+    {
+      _settlement_id: settlementId,
+      _payment_mode: paymentMode,
+      _paid_by: paidBy?.userId ?? null,
+      _paid_by_user_name: paidBy?.userName ?? null,
+    } as never,
+  );
+  if (error) throw error;
+  return data as { journal_entry_id: string; amount: number; payment_request_id: string };
+}

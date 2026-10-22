@@ -18,7 +18,7 @@ export function InstallPrompt() {
   if (!canInstall || isInstalled || isPromptSnoozed || location.pathname === '/auth') return null;
 
   return (
-    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-sm animate-fade-in">
+    <div className="fixed bottom-[calc(1rem+var(--mobile-tab-bar-height,0px)+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-sm animate-fade-in">
       <div className="flex items-center gap-3 rounded-xl border bg-card p-4 shadow-elevated">
         <Download className="h-5 w-5 shrink-0 text-primary" />
         <p className="flex-1 text-sm font-medium text-card-foreground">
