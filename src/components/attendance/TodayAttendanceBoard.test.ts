@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { groupOf, lateByMinutes, type BoardPerson } from './TodayAttendanceBoard';
+import { groupOf, lateByMinutes, notInLateMinutes, type BoardPerson } from './TodayAttendanceBoard';
 import type { AttendanceSession } from '@/lib/attendance';
 
 const staff = { id: 's1', user_id: 'u1', employee_id: 'E1', full_name: 'Ravi', department: null, is_active: true, attendance_tracked: true };
@@ -9,11 +9,14 @@ const session = (status: string, checkIn: string) =>
 const person = (over: Partial<BoardPerson>): BoardPerson => ({ staff, session: null, due, onLeave: false, ...over });
 
 describe('TodayAttendanceBoard grouping', () => {
-  it('puts people without a check-in in "late" only after the shift start plus grace', () => {
-    expect(groupOf(person({}), new Date('2026-10-19T14:05:00'), 10)).toBe('upcoming');
-    expect(groupOf(person({}), new Date('2026-10-19T14:11:00'), 10)).toBe('late');
-    expect(groupOf(person({ due: null }), new Date('2026-10-19T23:00:00'), 10)).toBe('upcoming');
+  it('puts everyone without a check-in in one "not checked in" group, late only after shift start plus grace', () => {
+    expect(groupOf(person({}), new Date('2026-10-19T14:05:00'), 10)).toBe('notin');
+    expect(groupOf(person({}), new Date('2026-10-19T14:11:00'), 10)).toBe('notin');
+    expect(notInLateMinutes(person({}), new Date('2026-10-19T14:05:00'), 10)).toBe(0);
+    expect(notInLateMinutes(person({}), new Date('2026-10-19T14:45:00'), 10)).toBe(45);
+    expect(notInLateMinutes(person({ due: null }), new Date('2026-10-19T23:00:00'), 10)).toBe(0);
     expect(groupOf(person({ onLeave: true }), new Date('2026-10-19T18:00:00'), 10)).toBe('leave');
+    expect(notInLateMinutes(person({ onLeave: true }), new Date('2026-10-19T18:00:00'), 10)).toBe(0);
   });
 
   it('groups checked-in people by their session status', () => {

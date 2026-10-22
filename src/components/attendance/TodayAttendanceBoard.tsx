@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, Clock, Coffee, Loader2, RefreshCw, Search, ShieldAlert, UserX } from 'lucide-react';
+import { CheckCircle2, Clock, Coffee, Loader2, RefreshCw, Search, ShieldAlert, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -30,14 +30,13 @@ export interface BoardPerson {
   onLeave: boolean;
 }
 
-export type BoardGroup = 'late' | 'working' | 'break' | 'done' | 'upcoming' | 'leave';
+export type BoardGroup = 'notin' | 'working' | 'break' | 'done' | 'leave';
 
 const GROUPS: { key: BoardGroup; label: string; icon: typeof Clock; tone: string }[] = [
-  { key: 'late', label: 'Not in – late', icon: AlertTriangle, tone: 'border-destructive/40 bg-destructive/10 text-destructive' },
+  { key: 'notin', label: 'Not checked in', icon: UserX, tone: 'border-destructive/40 bg-destructive/10 text-destructive' },
   { key: 'working', label: 'Working now', icon: Clock, tone: 'border-success/40 bg-success/10 text-success' },
   { key: 'break', label: 'On break', icon: Coffee, tone: 'border-warning/40 bg-warning/10 text-warning' },
   { key: 'done', label: 'Checked out', icon: CheckCircle2, tone: 'border-info/40 bg-info/10 text-info' },
-  { key: 'upcoming', label: 'Not in yet', icon: UserX, tone: 'border-border bg-muted text-muted-foreground' },
   { key: 'leave', label: 'On leave', icon: ShieldAlert, tone: 'border-primary/40 bg-primary/10 text-primary' },
 ];
 
@@ -51,8 +50,14 @@ export function groupOf(p: BoardPerson, now: Date, graceMinutes: number): BoardG
     return 'working';
   }
   if (p.onLeave) return 'leave';
-  if (p.due && now.getTime() > p.due.getTime() + graceMinutes * 60_000) return 'late';
-  return 'upcoming';
+  return 'notin';
+}
+
+/** For someone not checked in: minutes past their shift start, once the grace time is over. Exported for tests. */
+export function notInLateMinutes(p: BoardPerson, now: Date, graceMinutes: number): number {
+  if (p.session || p.onLeave || !p.due) return 0;
+  const mins = Math.round((now.getTime() - p.due.getTime()) / 60_000);
+  return mins > graceMinutes ? mins : 0;
 }
 
 /** Minutes between the shift start (plus nothing) and check-in, if positive. Exported for tests. */
@@ -152,10 +157,11 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
   }, [load]);
 
   const grouped = useMemo(() => {
-    const out: Record<BoardGroup, BoardPerson[]> = { late: [], working: [], break: [], done: [], upcoming: [], leave: [] };
+    const out: Record<BoardGroup, BoardPerson[]> = { notin: [], working: [], break: [], done: [], leave: [] };
     for (const p of people) out[groupOf(p, now, grace)].push(p);
-    out.late.sort((a, b) => (a.due?.getTime() ?? 0) - (b.due?.getTime() ?? 0));
-    out.upcoming.sort((a, b) => (a.due?.getTime() ?? Infinity) - (b.due?.getTime() ?? Infinity));
+    // Late ones first (longest late on top), then shift later today, then no shift set.
+    const rank = (p: BoardPerson) => (notInLateMinutes(p, now, grace) > 0 ? 0 : p.due ? 1 : 2);
+    out.notin.sort((a, b) => rank(a) - rank(b) || (a.due?.getTime() ?? 0) - (b.due?.getTime() ?? 0) || a.staff.full_name.localeCompare(b.staff.full_name));
     for (const k of ['working', 'break', 'done'] as const) {
       out[k].sort((a, b) => new Date(a.session!.check_in_at).getTime() - new Date(b.session!.check_in_at).getTime());
     }
@@ -167,11 +173,14 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
     !query || p.staff.full_name.toLowerCase().includes(query) || p.staff.employee_id.toLowerCase().includes(query);
   const visibleGroups = GROUPS.filter((g) => filter === 'all' || filter === g.key);
   const lateArrivals = [...grouped.working, ...grouped.break, ...grouped.done].filter((p) => lateByMinutes(p, grace) > 0).length;
+  const lateNotIn = grouped.notin.filter((p) => notInLateMinutes(p, now, grace) > 0).length;
 
   const detail = (p: BoardPerson, group: BoardGroup) => {
     const s = p.session;
-    if (group === 'late') return `Shift ${format(p.due!, 'h:mm a')} · ${formatMinutes(Math.round((now.getTime() - p.due!.getTime()) / 60_000))} late`;
-    if (group === 'upcoming') return p.due ? `Shift starts ${format(p.due, 'h:mm a')}` : 'No shift set';
+    if (group === 'notin') {
+      if (!p.due) return 'No shift set';
+      return notInLateMinutes(p, now, grace) > 0 ? `Shift was at ${format(p.due, 'h:mm a')}` : `Shift starts ${format(p.due, 'h:mm a')}`;
+    }
     if (group === 'leave') return 'Approved leave';
     if (!s) return '';
     if (group === 'done') return `${formatTime(s.check_in_at)} – ${formatTime(s.check_out_at)} · ${formatMinutes(s.worked_minutes)}`;
@@ -200,7 +209,7 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
         </div>
 
         {/* Tap a chip to show only that group; tap again to show everyone. */}
-        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
           {GROUPS.map((g) => {
             const Icon = g.icon;
             const active = filter === g.key;
@@ -221,6 +230,9 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
                   <span className="text-lg font-bold tabular-nums leading-none">{loading && !updatedAt ? '—' : grouped[g.key].length}</span>
                 </div>
                 <p className="mt-1 truncate text-[11px] font-medium">{g.label}</p>
+                {g.key === 'notin' && lateNotIn > 0 && (
+                  <p className="truncate text-[10px] font-semibold">{lateNotIn} late</p>
+                )}
               </button>
             );
           })}
@@ -260,10 +272,11 @@ export function TodayAttendanceBoard({ className }: { className?: string }) {
                   </h3>
                   <ul className="divide-y rounded-xl border">
                     {list.map((p) => {
-                      const late = lateByMinutes(p, grace);
+                      const late = g.key === 'notin' ? notInLateMinutes(p, now, grace) : lateByMinutes(p, grace);
+                      const waiting = g.key === 'notin' && late === 0;
                       return (
                         <li key={p.staff.id} className="flex items-center gap-3 px-3 py-2.5">
-                          <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', g.tone)}>
+                          <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-full border text-xs font-semibold', waiting ? 'border-border bg-muted text-muted-foreground' : g.tone)}>
                             {initials(p.staff.full_name)}
                           </span>
                           <div className="min-w-0 flex-1">
