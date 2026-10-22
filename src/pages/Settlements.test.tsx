@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   fetchPayrollStaff: vi.fn(),
   settleSalary: vi.fn(),
   undoSettlement: vi.fn(),
-  auth: { canAccessSettlements: true, isOwner: false },
+  auth: { canAccessSettlements: true, canRecordSalaryPayments: false },
 }));
 
 vi.mock('@/lib/payroll', async (importOriginal) => {

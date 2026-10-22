@@ -36,7 +36,7 @@ function StatusBadge({ row }: { row: PayrollRow }) {
 export default function Settlements() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { canAccessSettlements, isOwner } = useAuth();
+  const { canAccessSettlements, canRecordSalaryPayments } = useAuth();
 
   const [month, setMonth] = useState(
     searchParams.get('month') || format(subMonths(new Date(), 1), 'yyyy-MM'),
@@ -267,7 +267,7 @@ export default function Settlements() {
       <SettleSalarySheet
         row={settleRow}
         month={month}
-        isOwner={isOwner}
+        canPay={canRecordSalaryPayments}
         onClose={() => setSettleRow(null)}
         onSettled={() => load()}
       />
