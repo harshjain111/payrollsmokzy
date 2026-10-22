@@ -16,6 +16,8 @@ import {
   TrendingUp,
   FileText,
   UserCog,
+  Calculator,
+  ShieldAlert,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -30,6 +32,20 @@ export function AdminDashboard() {
   const totalPendingPayoutsAmount = stats.totalApprovedExpensesAmount + stats.totalApprovedRequestsAmount;
 
   const quickActions: QuickAction[] = [
+    {
+      label: 'Settle Salaries',
+      description: 'Settle the month for each staff member',
+      icon: Calculator,
+      href: '/settlements',
+      variant: 'primary',
+    },
+    {
+      label: 'Penalties – Waive / Restore',
+      description: 'See late & absent penalties, cancel if needed',
+      icon: ShieldAlert,
+      href: '/penalties',
+      variant: 'accent',
+    },
     {
       label: 'Approve / Reject Requests',
       description: 'Review pending expense & advance requests',
