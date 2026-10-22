@@ -46,6 +46,7 @@ import {
   createExpensePayoutEntry 
 } from '@/lib/journal-entries';
 import { PaidBySelector } from '@/components/payouts/PaidBySelector';
+import { paySalary, type PayoutMode } from '@/lib/payroll';
 import type { PaymentMode, VoucherType, Expense, PaymentRequest, StaffPublic } from '@/types/database';
 import { EXPENSE_CATEGORY_LABELS } from '@/types/database';
 import { CancelApprovalDialog } from '@/components/expenses/CancelApprovalDialog';
@@ -241,6 +242,22 @@ export default function Payouts() {
       // Use selected paid_by or default to current user
       const paidByUserId = paidBy?.userId || user.id;
       const paidByUserName = paidBy?.userName || getUserDisplayName(user, staffData);
+
+      // Salaries are paid in one atomic step on the server (books, request, settlement,
+      // staff notification) — the same path as "Settle & pay" on Salary Settlement.
+      if (item.type === 'salary' && item.settlementId) {
+        if (paymentMode === 'petty_cash') {
+          throw new Error('Salaries cannot be paid from petty cash. Choose cash, UPI, bank transfer or cheque.');
+        }
+        await paySalary(item.settlementId, paymentMode as PayoutMode, { userId: paidByUserId, userName: paidByUserName });
+        toast({
+          title: 'Payout Successful',
+          description: `₹${item.amount.toLocaleString('en-IN')} paid to ${item.staffName}. Balance cleared.`,
+        });
+        setSelectedItem(null);
+        fetchApprovedItems();
+        return;
+      }
 
       // ========================================
       // STEP 1: CLAIM THE ITEM (guards against paying twice)

@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   fetchPayrollStaff: vi.fn(),
   settleSalary: vi.fn(),
   undoSettlement: vi.fn(),
+  paySalary: vi.fn(),
   auth: { canAccessSettlements: true, canRecordSalaryPayments: false },
 }));
 
@@ -20,6 +21,7 @@ vi.mock('@/lib/payroll', async (importOriginal) => {
     fetchPayrollStaff: mocks.fetchPayrollStaff,
     settleSalary: mocks.settleSalary,
     undoSettlement: mocks.undoSettlement,
+    paySalary: mocks.paySalary,
   };
 });
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => mocks.auth }));
@@ -57,6 +59,8 @@ const row = (over: Partial<PayrollRow>): PayrollRow => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.auth.canAccessSettlements = true;
+  mocks.auth.canRecordSalaryPayments = false;
+  mocks.paySalary.mockResolvedValue({ journal_entry_id: 'j', amount: 25500, payment_request_id: 'p' });
   mocks.fetchPayrollMonth.mockResolvedValue([
     row({}),
     row({ staff_id: 's2', full_name: 'Bilal', employee_id: 'E2', settlement_id: 'set-2', settled_balance_payable: 20000, advance_outstanding: 0 }),
@@ -73,14 +77,19 @@ const renderPage = () =>
   );
 
 describe('Settlements page', () => {
-  it('shows the month overview with status and totals', async () => {
+  it('opens on "To settle" and shows each step with totals', async () => {
     renderPage();
     expect(await screen.findByText('Asha')).toBeInTheDocument();
     expect(mocks.fetchPayrollMonth).toHaveBeenCalledWith('2026-09');
-    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(screen.queryByText('Bilal')).not.toBeInTheDocument();
     expect(screen.getByText('To settle')).toBeInTheDocument();
-    expect(screen.getByText('Settled · to pay')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Settle salary' })).toBeInTheDocument();
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /All/ }));
+    fireEvent.click(screen.getByRole('tab', { name: /All/ }));
+    expect(await screen.findByText('Bilal')).toBeInTheDocument();
+    expect(screen.getByText('Settled · to pay')).toBeInTheDocument();
+    // Without payment rights the settled row can only be viewed.
     expect(screen.getByRole('button', { name: 'View settlement' })).toBeInTheDocument();
   });
 
@@ -89,14 +98,18 @@ describe('Settlements page', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Settle salary' }));
 
     const sheet = await screen.findByRole('dialog');
+    expect(within(sheet).getByText('₹27,800')).toBeInTheDocument();
+    fireEvent.click(within(sheet).getByRole('button', { name: /Bonus \/ extra pay/ }));
     fireEvent.change(within(sheet).getByLabelText('Bonus / incentive / overtime'), { target: { value: '1000' } });
     fireEvent.change(within(sheet).getByPlaceholderText('What is it for? (required)'), { target: { value: 'Festival' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: /Other deduction/ }));
     fireEvent.change(within(sheet).getByLabelText('Other deduction'), { target: { value: '300' } });
     fireEvent.change(within(sheet).getByPlaceholderText('e.g. damage, uniform (required)'), { target: { value: 'Glass' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: /Recover advance/ }));
     fireEvent.change(within(sheet).getByLabelText('Recover from advance'), { target: { value: '3000' } });
 
     expect(within(sheet).getByText('₹25,500')).toBeInTheDocument();
-    fireEvent.click(within(sheet).getByRole('button', { name: 'Review & settle' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Settle ₹25,500' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Settle salary' }));
 
     await waitFor(() => expect(mocks.settleSalary).toHaveBeenCalled());
@@ -114,6 +127,7 @@ describe('Settlements page', () => {
         paymentMode: 'cash',
       }),
     );
+    expect(mocks.paySalary).not.toHaveBeenCalled();
     await waitFor(() => expect(mocks.fetchPayrollMonth).toHaveBeenCalledTimes(2));
   });
 
@@ -121,9 +135,49 @@ describe('Settlements page', () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: 'Settle salary' }));
     const sheet = await screen.findByRole('dialog');
+    fireEvent.click(within(sheet).getByRole('button', { name: /Unpaid leave/ }));
     fireEvent.change(within(sheet).getByLabelText('Unpaid leave days'), { target: { value: '0' } });
     expect(within(sheet).getByText('Give a reason for changing the leave days.')).toBeInTheDocument();
-    expect(within(sheet).getByRole('button', { name: 'Review & settle' })).toBeDisabled();
+    expect(within(sheet).getByRole('button', { name: /^Settle ₹/ })).toBeDisabled();
+  });
+
+  it('owner/admin can settle and pay in one step', async () => {
+    mocks.auth.canRecordSalaryPayments = true;
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Settle salary' }));
+    const sheet = await screen.findByRole('dialog');
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Settle & pay' }));
+    fireEvent.click(await screen.findByRole('alertdialog').then((d) => within(d).getByRole('button', { name: 'Settle & pay' })));
+    await waitFor(() => expect(mocks.paySalary).toHaveBeenCalledWith('new', 'cash'));
+  });
+
+  it('settles everyone selected in one go', async () => {
+    mocks.fetchPayrollMonth.mockResolvedValue([
+      row({}),
+      row({ staff_id: 's3', full_name: 'Chetan', employee_id: 'E3', advance_outstanding: 0, system_leave_days: 0 }),
+    ]);
+    renderPage();
+    await screen.findByText('Chetan');
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select everyone to settle' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Settle 2' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Settle all' }));
+    await waitFor(() => expect(mocks.settleSalary).toHaveBeenCalledTimes(2));
+    expect(mocks.settleSalary).toHaveBeenCalledWith(
+      expect.objectContaining({ staffId: 's1', leaveDays: 2, bonus: 0, advanceRecovery: 0 }),
+    );
+    expect(mocks.settleSalary).toHaveBeenCalledWith(expect.objectContaining({ staffId: 's3', leaveDays: 0 }));
+    expect(mocks.paySalary).not.toHaveBeenCalled();
+  });
+
+  it('pays a settled salary from its row', async () => {
+    mocks.auth.canRecordSalaryPayments = true;
+    mocks.fetchPayrollMonth.mockResolvedValue([
+      row({ staff_id: 's2', full_name: 'Bilal', employee_id: 'E2', settlement_id: 'set-2', settled_balance_payable: 20000, advance_outstanding: 0 }),
+    ]);
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: 'Pay' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Mark as paid' }));
+    await waitFor(() => expect(mocks.paySalary).toHaveBeenCalledWith('set-2', 'cash'));
   });
 
   it('blocks roles without settlement access', () => {
