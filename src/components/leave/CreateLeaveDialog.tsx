@@ -52,8 +52,9 @@ import { CalendarIcon } from 'lucide-react';
    const [staff, setStaff] = useState<StaffOption[]>([]);
    const [selectedStaffId, setSelectedStaffId] = useState(staffId || '');
    const [leaveDate, setLeaveDate] = useState<Date>();
-   const [leaveType, setLeaveType] = useState<LeaveType>('unpaid');
-   const [deductionDays, setDeductionDays] = useState(1);
+   // Approved leave means no salary cut unless unpaid leave is chosen.
+   const [leaveType, setLeaveType] = useState<LeaveType>('paid');
+   const [deductionDays, setDeductionDays] = useState(0);
    const [remarks, setRemarks] = useState('');
    const [isSubmitting, setIsSubmitting] = useState(false);
  
@@ -133,7 +134,7 @@ import { CalendarIcon } from 'lucide-react';
        const insertData = {
          staff_id: targetStaffId,
          leave_date: format(leaveDate, 'yyyy-MM-dd'),
-        leave_type: isStaff ? 'unpaid' as LeaveType : leaveType, // Staff requests default to unpaid, decided during approval
+        leave_type: isStaff ? 'paid' as LeaveType : leaveType, // Staff requests default to paid; the approver can change it
          deduction_days: canSetDeduction ? deductionDays : LEAVE_TYPE_CONFIG[leaveType].defaultDeduction,
          status: isStaff ? 'pending' as const : 'approved' as const, // Admin/Accountant/Owner can directly approve
          remarks: remarks || undefined,
@@ -178,8 +179,8 @@ import { CalendarIcon } from 'lucide-react';
    const resetForm = () => {
      setSelectedStaffId(staffId || '');
      setLeaveDate(undefined);
-     setLeaveType('unpaid');
-     setDeductionDays(1);
+     setLeaveType('paid');
+     setDeductionDays(0);
      setRemarks('');
    };
  

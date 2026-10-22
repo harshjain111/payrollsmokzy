@@ -26,10 +26,7 @@ import { PageHeader } from '@/components/layout/PageHeader';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import {
-  DisciplineLogRow,
-  formatScheduleRange,
-} from '@/lib/discipline';
+import { DisciplineLogRow, formatScheduleRange, penaltyReason } from '@/lib/discipline';
 import { ShieldAlert, Loader2, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
 
 interface StaffSummary {
@@ -275,9 +272,7 @@ export default function Penalties() {
                                       r.is_cancelled ? 'line-through opacity-60' : ''
                                     }`}
                                   >
-                                    {r.is_absent
-                                      ? r.absent_reason || 'Marked absent'
-                                      : r.fine_reason || '—'}
+                                    {penaltyReason(r)}
                                   </p>
                                   {r.is_cancelled && (
                                     <p className="mt-1 text-[10px] text-emerald-700">

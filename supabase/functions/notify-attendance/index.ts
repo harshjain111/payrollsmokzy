@@ -61,10 +61,15 @@ Deno.serve(async (req) => {
       const token = (req.headers.get('Authorization') ?? '').replace('Bearer ', '');
       const { data: { user } } = await admin.auth.getUser(token);
       if (!user) return respond({ error: 'Sign in first' }, 401);
-      const { data: subs } = await admin.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('user_id', user.id);
+      const [{ data: subs }, { data: owner }] = await Promise.all([
+        admin.from('push_subscriptions').select('id, endpoint, p256dh, auth').eq('user_id', user.id),
+        admin.from('user_roles').select('user_id').eq('user_id', user.id).eq('role', 'owner').maybeSingle(),
+      ]);
       const sent = await send((subs as Sub[]) ?? [], {
-        title: '🔔 Smokzy alerts are on',
-        body: 'You will get a notification here whenever staff check in or out.',
+        title: owner ? '🔔 Smokzy alerts are on' : '🔔 Smokzy reminders are on',
+        body: owner
+          ? 'You will get a notification here whenever staff check in or out.'
+          : 'If you have not checked in 15 minutes after your shift starts, you will get a reminder here.',
         url: '/dashboard',
         tag: 'smokzy-test',
       });

@@ -12,17 +12,22 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { disablePush, enablePush, getPushStatus, sendTestPush, type PushStatus } from '@/lib/push';
 
-/** Shared state + actions for the owner's check-in / check-out phone alerts on this phone. */
-function usePushAlerts() {
-  const { user, isOwner } = useAuth();
+/**
+ * Shared state + actions for phone notifications on this phone: the owner's check-in / check-out
+ * alerts, or a staff member's late check-in reminders (`noun` is used in the messages).
+ */
+function usePushAlerts(enabled: boolean, noun: 'Alerts' | 'Reminders' = 'Alerts') {
+  const { user } = useAuth();
   // Assume "off" until checked, so the control shows straight away.
   const [status, setStatus] = useState<PushStatus>('off');
   const [busy, setBusy] = useState(false);
+  const lower = noun.toLowerCase();
 
   useEffect(() => {
-    if (!isOwner) return;
+    if (!enabled) return;
     let cancelled = false;
     getPushStatus()
       .then((s) => !cancelled && setStatus(s))
@@ -30,11 +35,11 @@ function usePushAlerts() {
     return () => {
       cancelled = true;
     };
-  }, [isOwner]);
+  }, [enabled]);
 
   const turnOn = useCallback(async () => {
     if (status === 'needs-install') {
-      toast.info('On iPhone: in Safari tap Share → "Add to Home Screen". Then open Smokzy from the home screen and turn alerts on there.', { duration: 10000 });
+      toast.info(`On iPhone: in Safari tap Share → "Add to Home Screen". Then open Smokzy from the home screen and turn ${lower} on there.`, { duration: 10000 });
       return;
     }
     if (status === 'denied') {
@@ -52,57 +57,71 @@ function usePushAlerts() {
       setStatus(next);
       if (next === 'on') {
         const sent = await sendTestPush().catch(() => 0);
-        toast.success(sent > 0 ? 'Alerts are on — a test notification was sent.' : 'Alerts are on for this phone.');
+        toast.success(sent > 0 ? `${noun} are on — a test notification was sent.` : `${noun} are on for this phone.`);
       } else if (next === 'denied') {
-        toast.error('Notifications were blocked. Allow them in your phone settings to get alerts.');
+        toast.error(`Notifications were blocked. Allow them in your phone settings to get ${lower}.`);
       }
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not turn on alerts');
+      toast.error(e instanceof Error ? e.message : `Could not turn on ${lower}`);
     } finally {
       setBusy(false);
     }
-  }, [status, user]);
+  }, [status, user, noun, lower]);
 
   const test = useCallback(async () => {
     setBusy(true);
     try {
       const sent = await sendTestPush();
-      toast.success(sent > 0 ? 'Test notification sent.' : 'No phone is set up for alerts yet.');
+      toast.success(sent > 0 ? 'Test notification sent.' : `No phone is set up for ${lower} yet.`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : 'Could not send a test');
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [lower]);
 
   const turnOff = useCallback(async () => {
     setBusy(true);
     try {
       await disablePush();
       setStatus('off');
-      toast.success('Alerts turned off for this phone.');
+      toast.success(`${noun} turned off for this phone.`);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Could not turn off alerts');
+      toast.error(e instanceof Error ? e.message : `Could not turn off ${lower}`);
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [noun, lower]);
 
-  return { isOwner, status, busy, turnOn, test, turnOff };
+  return { status, busy, turnOn, test, turnOff };
 }
 
-function OnMenu({ busy, test, turnOff, size = 'sm' }: { busy: boolean; test: () => void; turnOff: () => void; size?: 'sm' | 'default' }) {
+function OnMenu({
+  busy,
+  test,
+  turnOff,
+  size = 'sm',
+  label = 'Alerts on',
+  hint = 'You get a notification on this phone when staff check in or out.',
+}: {
+  busy: boolean;
+  test: () => void;
+  turnOff: () => void;
+  size?: 'sm' | 'default';
+  label?: string;
+  hint?: string;
+}) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button size={size} variant="outline" disabled={busy} className="gap-1.5 border-success/50 text-success">
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <BellRing className="h-4 w-4" />}
-          Alerts on
+          {label}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          You get a notification on this phone when staff check in or out.
+          {hint}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={test}>
@@ -118,7 +137,8 @@ function OnMenu({ busy, test, turnOff, size = 'sm' }: { busy: boolean; test: () 
 
 /** Owner-only compact control (Today's attendance header). */
 export function AttendanceAlertsButton() {
-  const { isOwner, status, busy, turnOn, test, turnOff } = usePushAlerts();
+  const { isOwner } = useAuth();
+  const { status, busy, turnOn, test, turnOff } = usePushAlerts(isOwner);
   if (!isOwner) return null;
   if (status === 'on') return <OnMenu busy={busy} test={test} turnOff={turnOff} />;
   return (
@@ -134,7 +154,8 @@ export function AttendanceAlertsButton() {
  * are on; without it, it is the permanent Settings control.
  */
 export function AttendanceAlertsCard({ hideWhenOn = false }: { hideWhenOn?: boolean }) {
-  const { isOwner, status, busy, turnOn, test, turnOff } = usePushAlerts();
+  const { isOwner } = useAuth();
+  const { status, busy, turnOn, test, turnOff } = usePushAlerts(isOwner);
   if (!isOwner || (hideWhenOn && status === 'on')) return null;
   const on = status === 'on';
   return (
@@ -161,6 +182,51 @@ export function AttendanceAlertsCard({ hideWhenOn = false }: { hideWhenOn?: bool
           <Button onClick={turnOn} disabled={busy} className="w-full gap-2 sm:w-auto">
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
             Turn on alerts
+          </Button>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Staff card: turn on the "you are late, check in fast" reminder on this phone. It is sent by the
+ * late-checkin-reminder function 15 minutes after the shift start if there is still no check-in.
+ */
+export function LateReminderCard() {
+  const { staffData } = useAuth();
+  const { t } = useLanguage();
+  const tracked = (staffData as unknown as { attendance_tracked?: boolean } | null)?.attendance_tracked !== false;
+  const enabled = !!staffData?.id && tracked;
+  const { status, busy, turnOn, test, turnOff } = usePushAlerts(enabled, 'Reminders');
+  if (!enabled) return null;
+  const on = status === 'on';
+  return (
+    <Card className={on ? 'rounded-2xl border-success/40' : 'rounded-2xl border-primary/40 bg-primary/5'}>
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${on ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'}`}>
+            {on ? <BellRing className="h-5 w-5" /> : <Bell className="h-5 w-5" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{on ? t('rem_on') : t('rem_title')}</p>
+            <p className="text-sm text-muted-foreground">
+              {status === 'needs-install'
+                ? 'On iPhone, first add Smokzy to your Home Screen (Safari → Share → Add to Home Screen), then open it from there.'
+                : status === 'denied'
+                  ? 'Notifications are blocked. Allow them for this app in your phone settings.'
+                  : t('rem_desc')}
+            </p>
+          </div>
+        </div>
+        {on ? (
+          <div className="self-end sm:self-auto">
+            <OnMenu busy={busy} test={test} turnOff={turnOff} label={t('rem_on')} hint={t('rem_desc')} />
+          </div>
+        ) : (
+          <Button onClick={turnOn} disabled={busy} className="w-full shrink-0 gap-1.5 sm:w-auto">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bell className="h-4 w-4" />}
+            {t('rem_turn_on')}
           </Button>
         )}
       </CardContent>

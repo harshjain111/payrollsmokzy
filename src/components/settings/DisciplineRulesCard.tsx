@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Trash2, Plus, Shield, Loader2, Save, PowerOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -298,9 +299,44 @@ export function DisciplineRulesCard() {
 
         <Separator />
 
+        {/* Absent */}
+        <div className="space-y-3">
+          <h4 className="font-semibold text-sm">Absent without informing</h4>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="absent-cut" className="text-xs">No check-in and no approved leave — cut</Label>
+              <Select
+                value={rules.absent_no_checkin_deduction}
+                onValueChange={(v) => set('absent_no_checkin_deduction', v)}
+              >
+                <SelectTrigger id="absent-cut" className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="half_day">Half a day's salary</SelectItem>
+                  <SelectItem value="full_day">1 day's salary</SelectItem>
+                  <SelectItem value="2_days">2 days' salary</SelectItem>
+                  <SelectItem value="3_days">3 days' salary</SelectItem>
+                  {!['half_day', 'full_day', '2_days', '3_days'].includes(rules.absent_no_checkin_deduction) && (
+                    <SelectItem value={rules.absent_no_checkin_deduction}>
+                      Custom ({rules.absent_no_checkin_deduction})
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            An owner or admin can change the cut for a single day later (Penalties → Change cut),
+            or mark the day as leave if it was agreed.
+          </p>
+        </div>
+
+        <Separator />
+
         <p className="text-xs text-muted-foreground">
-          Combined daily fine is capped at one full day's salary. Approved leave on a
-          date skips fines entirely.
+          Late and early fines for one day are capped at one full day's salary. Approved leave
+          on a date removes that day's penalties, even when the leave is recorded later.
         </p>
 
         <div className="flex justify-end">

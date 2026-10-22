@@ -14,9 +14,17 @@ function ymdLocal(d: Date): string {
   return `${yr}-${mo}-${da}`;
 }
 
+/** Days of salary a rule cuts: 'full_day' = 1, 'half_day' = 0.5, '2_days' = 2; null for a ₹ amount. */
+function deductionDays(rule: string): number | null {
+  if (rule === 'full_day') return 1;
+  if (rule === 'half_day') return 0.5;
+  const m = /^(\d+(?:\.\d+)?)_days?$/.exec(rule);
+  return m ? Number(m[1]) : null;
+}
+
 function resolveDeduction(rule: string, dailySalary: number): number {
-  if (rule === 'full_day') return dailySalary;
-  if (rule === 'half_day') return dailySalary / 2;
+  const days = deductionDays(rule);
+  if (days !== null) return dailySalary * days;
   const n = Number(rule);
   return isFinite(n) ? n : 0;
 }
@@ -62,6 +70,17 @@ Deno.serve(async (req) => {
     const wd = new Date(workDate + 'T00:00:00');
     const daysInMonth = new Date(wd.getFullYear(), wd.getMonth() + 1, 0).getDate();
 
+    // Only staff with a shift have a check-in time to miss (same rule as check-absent-staff and
+    // the "no shift assigned — penalties skipped" warning on the Attendance page).
+    const { data: assigns } = await supabase
+      .from('staff_shift_assignments')
+      .select('staff_id, shift_id, override_check_in');
+    const scheduled = new Set(
+      (assigns ?? [])
+        .filter((a: { shift_id: string | null; override_check_in: string | null }) => a.shift_id || a.override_check_in)
+        .map((a: { staff_id: string }) => a.staff_id),
+    );
+
     let absentCreated = 0;
     let stuckClosed = 0;
 
@@ -95,7 +114,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       if (!session) {
-        if (existing) continue;
+        if (existing || !scheduled.has(s.id)) continue;
         const fine = resolveDeduction(rulesRow.absent_no_checkin_deduction, dailySalary);
         await supabase.from('attendance_discipline_log').insert({
           staff_id: s.id,
@@ -104,6 +123,7 @@ Deno.serve(async (req) => {
           fine_reason: 'Absent — no check-in',
           is_absent: true,
           absent_reason: 'no_checkin',
+          deduction_days: deductionDays(rulesRow.absent_no_checkin_deduction),
         });
         absentCreated++;
       } else if (session.status === 'active' || session.status === 'on_break') {
@@ -117,6 +137,7 @@ Deno.serve(async (req) => {
               fine_reason: 'Absent — no check-out',
               is_absent: true,
               absent_reason: 'no_checkout',
+              deduction_days: deductionDays(rulesRow.absent_no_checkout_deduction),
               session_id: session.id,
               computed_at: new Date().toISOString(),
             })
@@ -130,6 +151,7 @@ Deno.serve(async (req) => {
             fine_reason: 'Absent — no check-out',
             is_absent: true,
             absent_reason: 'no_checkout',
+            deduction_days: deductionDays(rulesRow.absent_no_checkout_deduction),
           });
         }
         stuckClosed++;
