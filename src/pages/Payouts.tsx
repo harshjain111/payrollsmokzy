@@ -178,7 +178,7 @@ export default function Payouts() {
       if (advanceError) throw advanceError;
       setApprovedAdvances((advanceData || []) as unknown as ApprovedRequest[]);
 
-      // Fetch pending SALARY payout requests (Owner only, payout_type = 'salary')
+      // Fetch pending SALARY payout requests (owner or admin, payout_type = 'salary')
       if (canRecordSalaryPayments) {
         const { data: salaryData, error: salaryError } = await supabase
           .from('payment_requests')
@@ -369,16 +369,14 @@ export default function Payouts() {
 
       // Update salary settlement with payout journal entry
       if (item.type === 'salary' && item.settlementId) {
-        const { error: settlementError } = await supabase
-          .from('salary_settlements')
-          .update({
-            paid_at: paidAt,
-            paid_by: paidByUserId,
-            paid_by_user_name: paidByUserName,
-            payment_mode: paymentMode,
-            payout_journal_entry_id: journalEntryId,
-          })
-          .eq('id', item.settlementId);
+        // Server function so admins (not only owners) can record the salary as paid.
+        const { error: settlementError } = await supabase.rpc('mark_salary_settlement_paid' as never, {
+          _settlement_id: item.settlementId,
+          _payment_mode: paymentMode,
+          _payout_journal_entry_id: journalEntryId,
+          _paid_by: paidByUserId,
+          _paid_by_user_name: paidByUserName,
+        } as never);
         if (settlementError) {
           console.error('Error marking settlement paid:', settlementError);
           followUpProblems.push('the salary settlement could not be marked as paid');
@@ -523,7 +521,7 @@ export default function Payouts() {
       });
     }
 
-    // Add salary payout requests (Owner only)
+    // Add salary payout requests (owner or admin)
     if ((activeTab === 'all' || activeTab === 'salary') && canRecordSalaryPayments) {
       pendingSalaries.forEach(salary => {
         // Extract reference month from reason (format: "Salary for MMMM yyyy")

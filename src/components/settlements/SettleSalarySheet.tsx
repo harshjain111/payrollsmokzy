@@ -41,8 +41,8 @@ import {
 interface Props {
   row: PayrollRow | null;
   month: string;
-  /** Owners pay salaries themselves in Payouts; admins hand over to the owner. */
-  isOwner: boolean;
+  /** Whether this user can also pay the salary in Payouts (owner or admin). */
+  canPay: boolean;
   onClose: () => void;
   onSettled: () => void;
 }
@@ -68,7 +68,7 @@ function Line({ label, value, tone, bold }: { label: string; value: string; tone
   );
 }
 
-export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: Props) {
+export function SettleSalarySheet({ row, month, canPay, onClose, onSettled }: Props) {
   const isMobile = useIsMobile();
   const monthEnd = monthEndOf(month);
   const monthLabel = format(parseISO(month + '-01'), 'MMMM yyyy');
@@ -161,7 +161,7 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
       });
       const net = Number(res.net_payable);
       if (net === 0) toast.success(`${row.full_name}: settled — nothing to pay this month`);
-      else if (isOwner) toast.success(`${row.full_name}: settled — pay ${inr2(net)} from Payouts`);
+      else if (canPay) toast.success(`${row.full_name}: settled — pay ${inr2(net)} from Payouts`);
       else toast.success(`${row.full_name}: settled — ${inr2(net)} is waiting for the owner in Payouts`);
       setConfirming(false);
       onSettled();
@@ -437,7 +437,7 @@ export function SettleSalarySheet({ row, month, isOwner, onClose, onSettled }: P
               <AlertDialogDescription>
                 {monthLabel} salary will be locked and recorded in the books.
                 {result && result.net > 0 &&
-                  (isOwner
+                  (canPay
                     ? ' The payment then appears in Payouts for you to pay.'
                     : ' The payment then appears in Payouts for the owner to pay.')}{' '}
                 You can undo it until the salary is paid.

@@ -289,7 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Accountant: can record payments (advance + expense only, no salary)
   const canMakePayments = isOwner;
   const canRecordPayments = isOwner || isAdmin || isAccountant;
-  const canRecordSalaryPayments = isOwner; // Only owner can do salary payments/settlements
+  const canRecordSalaryPayments = isOwner || isAdmin; // Owners and admins pay settled salaries (Payouts)
   const canRecordAdvancePayments = isOwner || isAdmin || isAccountant;
   const canRecordExpensePayments = isOwner || isAdmin || isAccountant;
   
