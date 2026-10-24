@@ -52,9 +52,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Generous: on a slow phone network loading the role can take a while, and sending a
+    // signed-in person back to the login page looks like they were logged out.
     const timeoutId = window.setTimeout(() => {
       setLoadingTimedOut(true);
-    }, 7000);
+    }, 30000);
 
     return () => window.clearTimeout(timeoutId);
   }, [isLoading]);

@@ -9,8 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Loader2, RefreshCw, WifiOff } from 'lucide-react';
 import { useState } from 'react';
 
+/** Phone logins are stored as <phone>@phone.smokzy.internal; show just the phone number. */
+const loginLabel = (email?: string | null) => (email ? email.replace(/@phone\.smokzy\.internal$/, '') : 'this login');
+
 export default function Dashboard() {
-  const { userRole, isLoading, isAccountant, accountingMode, isHR, hrWorkforceMode, staffData, userDataError, retryUserData } = useAuth();
+  const { user, userRole, isLoading, isAccountant, accountingMode, isHR, hrWorkforceMode, staffData, userDataError, retryUserData, signOut } = useAuth();
   const [isRetrying, setIsRetrying] = useState(false);
 
   const handleRetry = async () => {
@@ -71,12 +74,23 @@ export default function Dashboard() {
           </div>
         );
       }
+      // The server confirmed this login has no role (a failed load shows the screen above).
       return (
-        <div className="text-center py-20">
+        <div className="mx-auto max-w-lg py-16 text-center">
           <h2 className="text-xl font-semibold text-foreground">Role Not Assigned</h2>
-          <p className="text-muted-foreground mt-2">
-            Please contact your administrator to assign your role.
+          <p className="mt-2 text-muted-foreground">
+            This login has no role yet. Ask the owner to open Users and give a role to{' '}
+            <span className="font-medium text-foreground">{loginLabel(user?.email)}</span>.
           </p>
+          <div className="mt-6 flex justify-center gap-2">
+            <Button onClick={handleRetry} disabled={isRetrying}>
+              {isRetrying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Retry
+            </Button>
+            <Button variant="outline" onClick={() => signOut()}>
+              Sign out
+            </Button>
+          </div>
         </div>
       );
   }
