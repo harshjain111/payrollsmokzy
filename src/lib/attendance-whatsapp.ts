@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { fetchDisciplineRules, fetchStaffAssignment, type Slab as RuleSlab } from '@/lib/discipline';
+import { fetchDisciplineRules, fetchStaffAssignment, scheduleForDate, type Shift, type Slab as RuleSlab } from '@/lib/discipline';
 
 export type WaSlab = 'on_time' | 'level_1' | 'level_2' | 'half_day' | 'full_day';
 
@@ -42,27 +42,23 @@ function resolveSlab(
   return { slab: 'level_2', amount: Number(chosen.amount) || 0 };
 }
 
-async function getScheduledTimes(staffId: string): Promise<{
+async function getScheduledTimes(staffId: string, workDate: string): Promise<{
   scheduledIn: string | null;
   scheduledOut: string | null;
 }> {
   const assignment = await fetchStaffAssignment(staffId);
   if (!assignment) return { scheduledIn: null, scheduledOut: null };
-  let scheduledIn = assignment.override_check_in;
-  let scheduledOut = assignment.override_check_out;
-  if ((!scheduledIn || !scheduledOut) && assignment.shift_id) {
-    const { data: shift } = await supabase
+  let shift: Shift | null = null;
+  if ((!assignment.override_check_in || !assignment.override_check_out) && assignment.shift_id) {
+    const { data } = await supabase
       .from('shifts' as never)
       .select('*')
       .eq('id', assignment.shift_id)
       .maybeSingle();
-    if (shift) {
-      const s = shift as { check_in_time: string; check_out_time: string };
-      scheduledIn = scheduledIn ?? s.check_in_time;
-      scheduledOut = scheduledOut ?? s.check_out_time;
-    }
+    shift = (data as Shift | null) ?? null;
   }
-  return { scheduledIn, scheduledOut };
+  const { checkIn, checkOut } = scheduleForDate(assignment, shift, workDate);
+  return { scheduledIn: checkIn, scheduledOut: checkOut };
 }
 
 function scheduledIsoFromTime(workDate: string, time: string, nextDay = false): string {
@@ -126,7 +122,7 @@ export async function notifyCheckinWhatsapp(
     if (!staff || staff.attendance_tracked === false) return;
     const rules = await fetchDisciplineRules();
     if (!rules) return;
-    const { scheduledIn } = await getScheduledTimes(staffId);
+    const { scheduledIn } = await getScheduledTimes(staffId, workDate);
     if (!scheduledIn) return;
 
     const scheduledIso = scheduledIsoFromTime(workDate, scheduledIn);
@@ -178,7 +174,7 @@ export async function notifyCheckoutWhatsapp(
     // Master switch off: never send any check-out fine message
     if (rules.penalties_enabled === false) return;
 
-    const { scheduledIn, scheduledOut } = await getScheduledTimes(staffId);
+    const { scheduledIn, scheduledOut } = await getScheduledTimes(staffId, workDate);
     if (!scheduledOut) return;
 
     // Handle night shifts: scheduled_out next-day when out <= in
