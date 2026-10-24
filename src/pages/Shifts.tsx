@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,21 @@ import { toast } from 'sonner';
 import { Plus, Loader2, Clock } from 'lucide-react';
 import { LoadError } from '@/components/attendance/LoadError';
 
+const DAYS = [
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+  { value: 0, label: 'Sun' },
+];
+
+const weekendLabel = (days: number[] | null | undefined) =>
+  DAYS.filter((d) => (days ?? [0, 6]).includes(d.value))
+    .map((d) => d.label)
+    .join(', ');
+
 interface StaffLite {
   id: string;
   full_name: string;
@@ -50,6 +66,9 @@ export default function Shifts() {
   const [name, setName] = useState('');
   const [checkIn, setCheckIn] = useState('16:00');
   const [checkOut, setCheckOut] = useState('02:00');
+  const [weekendOut, setWeekendOut] = useState('');
+  const [weekendDays, setWeekendDays] = useState<number[]>([0, 6]);
+  const [isDefault, setIsDefault] = useState(false);
 
   /** quiet: reload after a save without swapping the list for a spinner (keeps input focus). */
   const load = async (quiet = false) => {
@@ -94,6 +113,9 @@ export default function Shifts() {
     setName('');
     setCheckIn('16:00');
     setCheckOut('02:00');
+    setWeekendOut('');
+    setWeekendDays([0, 6]);
+    setIsDefault(false);
     setDialogOpen(true);
   };
   const openEdit = (s: Shift) => {
@@ -101,15 +123,34 @@ export default function Shifts() {
     setName(s.name);
     setCheckIn(s.check_in_time.slice(0, 5));
     setCheckOut(s.check_out_time.slice(0, 5));
+    setWeekendOut(s.weekend_check_out_time?.slice(0, 5) ?? '');
+    setWeekendDays(s.weekend_days ?? [0, 6]);
+    setIsDefault(!!s.is_default);
     setDialogOpen(true);
   };
 
   const saveShift = async () => {
     if (savingShift) return;
     if (!name.trim()) return toast.error('Shift name required');
-    const payload = { name: name.trim(), check_in_time: checkIn, check_out_time: checkOut } as never;
+    if (weekendOut && weekendDays.length === 0) return toast.error('Pick the weekend days');
+    const payload = {
+      name: name.trim(),
+      check_in_time: checkIn,
+      check_out_time: checkOut,
+      weekend_check_out_time: weekendOut || null,
+      weekend_days: weekendDays,
+      is_default: isDefault,
+    } as never;
     setSavingShift(true);
     try {
+      // Only one shift can be the default for new staff.
+      if (isDefault) {
+        const others = shifts.filter((x) => x.is_default && x.id !== editing?.id);
+        for (const o of others) {
+          const { error } = await supabase.from('shifts' as never).update({ is_default: false } as never).eq('id', o.id);
+          if (error) throw error;
+        }
+      }
       const { error } = editing
         ? await supabase.from('shifts' as never).update(payload).eq('id', editing.id)
         : await supabase.from('shifts' as never).insert(payload);
@@ -230,6 +271,47 @@ export default function Shifts() {
                     If check-out is earlier than check-in (e.g. 02:00), it's treated as
                     the next day.
                   </p>
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <Label htmlFor="shift-weekend-out">Weekend check-out time (optional)</Label>
+                    <Input
+                      id="shift-weekend-out"
+                      type="time"
+                      value={weekendOut}
+                      onChange={(e) => setWeekendOut(e.target.value)}
+                    />
+                    <div role="group" aria-label="Weekend days" className="flex flex-wrap gap-1.5">
+                      {DAYS.map((d) => {
+                        const on = weekendDays.includes(d.value);
+                        return (
+                          <Button
+                            key={d.value}
+                            type="button"
+                            size="sm"
+                            variant={on ? 'default' : 'outline'}
+                            aria-pressed={on}
+                            onClick={() =>
+                              setWeekendDays((cur) =>
+                                on ? cur.filter((x) => x !== d.value) : [...cur, d.value].sort(),
+                              )
+                            }
+                          >
+                            {d.label}
+                          </Button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      On these days the shift ends at the weekend time instead (by the day the
+                      shift starts). Leave the time empty to use the same time every day.
+                    </p>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                    <Label htmlFor="shift-default" className="font-normal">
+                      <span className="block font-medium">Default for new staff</span>
+                      <span className="text-xs text-muted-foreground">New staff are put on this shift automatically</span>
+                    </Label>
+                    <Switch id="shift-default" checked={isDefault} onCheckedChange={setIsDefault} />
+                  </div>
                 </div>
                 <DialogFooter>
                   <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={savingShift}>
@@ -263,9 +345,16 @@ export default function Shifts() {
                         <p className="text-sm text-muted-foreground mt-1">
                           {s.check_in_time.slice(0, 5)} → {s.check_out_time.slice(0, 5)}
                         </p>
-                        <Badge variant="secondary" className="mt-2">
-                          {memberCount(s.id)} staff
-                        </Badge>
+                        {s.weekend_check_out_time && (
+                          <p className="text-sm text-muted-foreground">
+                            {weekendLabel(s.weekend_days)}: {s.check_in_time.slice(0, 5)} →{' '}
+                            {s.weekend_check_out_time.slice(0, 5)}
+                          </p>
+                        )}
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          <Badge variant="secondary">{memberCount(s.id)} staff</Badge>
+                          {s.is_default && <Badge variant="outline">Default for new staff</Badge>}
+                        </div>
                       </div>
                       <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
                         Edit

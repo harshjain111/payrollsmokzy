@@ -49,8 +49,39 @@ export interface Shift {
   name: string;
   check_in_time: string; // HH:MM:SS
   check_out_time: string;
+  /** Later end time on weekend days (e.g. 00:00); null = same every day. */
+  weekend_check_out_time?: string | null;
+  /** Days that use weekend_check_out_time, by the day the shift starts (0 = Sunday … 6 = Saturday). */
+  weekend_days?: number[] | null;
+  /** New staff are put on this shift automatically. */
+  is_default?: boolean;
   is_active: boolean;
   created_at: string;
+}
+
+/** True when the shift starting on workDate (yyyy-MM-dd) uses the weekend end time. */
+export function isWeekendShiftDay(shift: Pick<Shift, 'weekend_days'>, workDate: string): boolean {
+  const dow = new Date(workDate + 'T00:00:00').getDay();
+  return (shift.weekend_days ?? [0, 6]).includes(dow);
+}
+
+/**
+ * Start and end time for one person on one date: a personal override wins, then the shift's
+ * weekend end time on weekend days, then the shift's normal times.
+ */
+export function scheduleForDate(
+  assignment: Pick<ShiftAssignment, 'override_check_in' | 'override_check_out'> | null,
+  shift: Pick<Shift, 'check_in_time' | 'check_out_time' | 'weekend_check_out_time' | 'weekend_days'> | null,
+  workDate: string,
+): { checkIn: string | null; checkOut: string | null } {
+  const shiftOut =
+    shift?.weekend_check_out_time && isWeekendShiftDay(shift, workDate)
+      ? shift.weekend_check_out_time
+      : shift?.check_out_time ?? null;
+  return {
+    checkIn: assignment?.override_check_in ?? shift?.check_in_time ?? null,
+    checkOut: assignment?.override_check_out ?? shiftOut,
+  };
 }
 
 export interface ShiftAssignment {
@@ -221,20 +252,16 @@ export async function computeAndLogDiscipline(
   const assignment = await fetchStaffAssignment(input.staffId);
   if (!assignment) return null;
 
-  let scheduledIn: string | null = assignment.override_check_in;
-  let scheduledOut: string | null = assignment.override_check_out;
-  if ((!scheduledIn || !scheduledOut) && assignment.shift_id) {
-    const { data: shift } = await supabase
+  let shift: Shift | null = null;
+  if ((!assignment.override_check_in || !assignment.override_check_out) && assignment.shift_id) {
+    const { data } = await supabase
       .from('shifts' as never)
       .select('*')
       .eq('id', assignment.shift_id)
       .maybeSingle();
-    if (shift) {
-      const s = shift as Shift;
-      scheduledIn = scheduledIn ?? s.check_in_time;
-      scheduledOut = scheduledOut ?? s.check_out_time;
-    }
+    shift = (data as Shift | null) ?? null;
   }
+  const { checkIn: scheduledIn, checkOut: scheduledOut } = scheduleForDate(assignment, shift, input.workDate);
   if (!scheduledIn || !scheduledOut) return null;
 
   // Skip fine if approved leave exists for this date

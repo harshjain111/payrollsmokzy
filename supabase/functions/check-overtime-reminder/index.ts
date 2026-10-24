@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     // ---------- 2) 16-hour auto-close ----------
     const { data: stale } = await supabase
       .from('attendance_sessions')
-      .select('id, staff_id, check_in_at, total_break_minutes')
+      .select('id, staff_id, work_date, check_in_at, total_break_minutes')
       .in('status', ['active', 'on_break'])
       .is('check_out_at', null)
       .lte('check_in_at', sixteenAgoIso);
@@ -133,11 +133,16 @@ Deno.serve(async (req) => {
           .from('staff_shift_assignments')
           .select('staff_id, shift_id, override_check_in, override_check_out')
           .in('staff_id', ids),
-        supabase.from('shifts').select('id, check_in_time, check_out_time'),
+        supabase.from('shifts').select('id, check_in_time, check_out_time, weekend_check_out_time, weekend_days'),
       ]);
-      const shiftMap = new Map<string, { check_in_time: string; check_out_time: string }>(
-        (shifts ?? []).map((s: { id: string; check_in_time: string; check_out_time: string }) => [s.id, s]),
-      );
+      type ShiftRow = {
+        id: string;
+        check_in_time: string;
+        check_out_time: string;
+        weekend_check_out_time: string | null;
+        weekend_days: number[] | null;
+      };
+      const shiftMap = new Map<string, ShiftRow>((shifts ?? []).map((s: ShiftRow) => [s.id, s]));
       const assignMap = new Map<string, { shift_id: string | null; override_check_in: string | null; override_check_out: string | null }>();
       (assigns ?? []).forEach((a: { staff_id: string; shift_id: string | null; override_check_in: string | null; override_check_out: string | null }) =>
         assignMap.set(a.staff_id, a),
@@ -146,6 +151,7 @@ Deno.serve(async (req) => {
       for (const row of stale as Array<{
         id: string;
         staff_id: string | null;
+        work_date: string;
         check_in_at: string;
         total_break_minutes: number | null;
       }>) {
@@ -155,7 +161,10 @@ Deno.serve(async (req) => {
           if (a) {
             const sh = a.shift_id ? shiftMap.get(a.shift_id) : null;
             const inT = a.override_check_in || sh?.check_in_time || null;
-            const outT = a.override_check_out || sh?.check_out_time || null;
+            // Weekend days (by the day the shift starts) can end later, e.g. 12 AM instead of 11 PM.
+            const weekend = !!sh?.weekend_check_out_time &&
+              (sh.weekend_days ?? [0, 6]).includes(new Date(row.work_date + 'T00:00:00Z').getUTCDay());
+            const outT = a.override_check_out || (weekend ? sh?.weekend_check_out_time : sh?.check_out_time) || null;
             durationMin = shiftDurationMinutes(inT, outT);
           }
         }
