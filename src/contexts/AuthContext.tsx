@@ -76,6 +76,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [accountingMode, setAccountingModeState] = useState(() => readStoredBoolean(ACCOUNTING_MODE_KEY, false));
   const [hrWorkforceMode, setHrWorkforceModeState] = useState(() => readStoredBoolean(HR_WORKFORCE_MODE_KEY, true));
   const [userDataError, setUserDataError] = useState(false);
+  // The user whose role and staff record have been loaded. Until it matches the signed-in user,
+  // the app is still loading: right after login the role is not known yet, and showing the
+  // dashboard then made it say "Role Not Assigned" until the role arrived.
+  const [loadedUserId, setLoadedUserId] = useState<string | null>(null);
   const setAccountingMode = useCallback((mode: boolean) => {
     setAccountingModeState(mode);
     writeStoredBoolean(ACCOUNTING_MODE_KEY, mode);
@@ -119,6 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setUserRole(null);
           setStaffData(null);
           setUserDataError(false);
+          setLoadedUserId(null);
           setIsLoading(false);
         }
       }
@@ -156,8 +161,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (background && userDataRefreshInFlight.current) return;
     userDataRefreshInFlight.current = true;
 
-    for (let attempt = 0; attempt < 3; attempt += 1) {
+    const attempts = 4;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
       try {
+        // Make sure the sign-in is usable first. If renewing an expired sign-in fails (weak
+        // network), the queries below would run signed-out and find no role.
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!sessionData.session || sessionData.session.user.id !== userId) {
+          throw new Error('Sign-in is not ready yet');
+        }
+
         const [roleResult, staffResult] = await Promise.all([
           supabase
             .from('user_roles')
@@ -178,14 +192,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserRole(roleResult.data?.role as AppRole ?? null);
         setStaffData(staffResult.data ? staffResult.data as Staff : null);
         setUserDataError(false);
+        setLoadedUserId(userId);
         lastUserDataRefreshAt.current = Date.now();
         userDataRefreshInFlight.current = false;
         if (!background) setIsLoading(false);
         return;
       } catch (error) {
         console.error('Error in fetchUserData:', error);
-        if (attempt < 2) {
-          await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) => window.setTimeout(resolve, 750 * 2 ** attempt));
         }
       }
     }
@@ -219,9 +234,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     window.addEventListener('focus', refreshUserData);
+    // Coming back online after a failed load fixes "Couldn't load your account" by itself.
+    window.addEventListener('online', refreshUserData);
     document.addEventListener('visibilitychange', refreshWhenVisible);
     return () => {
       window.removeEventListener('focus', refreshUserData);
+      window.removeEventListener('online', refreshUserData);
       document.removeEventListener('visibilitychange', refreshWhenVisible);
     };
   }, [user?.id]);
@@ -303,12 +321,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const canAccessSettlements = isOwner || isAdmin; // Owners and admins settle salaries (paying stays owner-only)
   const canCreateUsers = isOwner || isHR;
 
+  const userDataPending = !!user && loadedUserId !== user.id && !userDataError;
+
   const value = {
     user,
     session,
     userRole,
     staffData,
-    isLoading,
+    isLoading: isLoading || userDataPending,
     signIn,
     signUp,
     signOut,
