@@ -82,7 +82,7 @@ export function MyDisciplineTab() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <label htmlFor="discipline-month" className="text-xs text-muted-foreground">Month</label>
+        <label htmlFor="discipline-month" className="shrink-0 text-xs text-muted-foreground">Month</label>
         <Input
           id="discipline-month"
           type="month"
